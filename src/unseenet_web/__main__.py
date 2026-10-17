@@ -30,8 +30,25 @@ def default_vault() -> Path:
         return Path("unseenet.vault")
 
 
+def use_bundled_tor() -> None:
+    """The Windows build keeps Tor in its contents folder: tell the core where."""
+    import os
+    if os.environ.get("UNSEENET_TOR") or not getattr(sys, "frozen", False):
+        return
+    name = "tor.exe" if sys.platform == "win32" else "tor"
+    base = Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent))
+    for candidate in (base / "tor" / name, Path(sys.executable).parent / "tor" / name):
+        if candidate.is_file():
+            os.environ["UNSEENET_TOR"] = str(candidate)
+            return
+
+
 def main(argv=None) -> None:
     frozen = getattr(sys, "frozen", False)          # the portable build
+    if sys.platform == "win32":
+        from .winfix import hide_child_consoles
+        hide_child_consoles()                       # no console window for Tor
+    use_bundled_tor()
     p = argparse.ArgumentParser(prog="unseenet-web", description="Unseenet in a window of its own.")
     p.add_argument("--vault", default=str(default_vault()), help="encrypted vault file (the same as the TUI's)")
     p.add_argument("--port", type=int, default=0, help="local port (default: a random free one)")
@@ -43,9 +60,12 @@ def main(argv=None) -> None:
     p.add_argument("--self-test", action="store_true", help="check this build and exit")
     p.add_argument("--offline", action="store_true", help="with --self-test: do not start Tor")
     p.add_argument("--node", help="with --self-test: also reach this node over Tor")
+    p.add_argument("--log", help="write messages to this file (the Windows build has no console)")
     p.add_argument("--version", action="version", version=f"unseenet-web {__version__}")
     args = p.parse_args(argv)
 
+    if args.log:
+        sys.stdout = sys.stderr = open(args.log, "w", encoding="utf-8", buffering=1)
     if args.self_test:
         from .selftest import self_test
         sys.exit(self_test(network=not args.offline, node=args.node))

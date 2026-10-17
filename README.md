@@ -32,7 +32,7 @@ Every push to `main` is built and self-tested; the newest builds are the
 - **Portable** - unzip and start, from a USB stick or a folder. Tor is included,
   and everything stays in `data/` beside the programs.
   `unseenet-web-…-usb.zip` has every platform; or take only yours:
-  - Windows: `Start Unseenet Web.bat` (an app window through WebView2)
+  - Windows: `Unseenet Web.exe` (an app window through WebView2, no console)
   - macOS: `Start Unseenet Web.command` (an app window)
   - Linux: `sh start-web-linux.sh` (Chromium, Chrome, Edge or Brave without
     tabs if you have one, else your browser)

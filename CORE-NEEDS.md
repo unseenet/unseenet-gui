@@ -93,6 +93,16 @@ browser, strict CSP) could become a UN-RFC. Then other front ends - a native
 app, an Android client, a screen reader client - could talk to the same local
 runtime without reimplementing Tor, the vault or postage.
 
+## 9. Starting Tor without a console window on Windows
+
+**Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without
+`creationflags`. From a windowed program (the web client's "Unseenet Web.exe")
+Tor then gets a console window of its own. unseenet-web works around it in
+`winfix.hide_child_consoles()`.
+
+**Proposal:** pass `creationflags=subprocess.CREATE_NO_WINDOW` on Windows when
+starting Tor (and in `binary_version`).
+
 ## Not needed from the core
 
 Everything security-relevant already happens in the core: signing, encryption,

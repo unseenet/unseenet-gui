@@ -92,15 +92,35 @@ jobs:
       - name: Self-test, offline (the program, its server and Tor start)
         shell: bash
         working-directory: try/Unseenet
-        run: ./web-${{ matrix.platform }}/unseenet-web --self-test --offline
+        run: |
+          # Windows: a windowed program without a console, so it writes to a log
+          case "${{ matrix.platform }}" in
+            windows-*) EXE="./Unseenet Web.exe" ;;
+            *) EXE="./web-${{ matrix.platform }}/unseenet-web" ;;
+          esac
+          rc=0; "$EXE" --self-test --offline --log selftest.txt || rc=$?
+          cat selftest.txt; exit $rc
       - name: Self-test over the Tor network
         continue-on-error: true            # the runner's network may not reach Tor
         timeout-minutes: 5
         shell: bash
         working-directory: try/Unseenet
-        run: >
-          ./web-${{ matrix.platform }}/unseenet-web --self-test
-          --node f6vnchi5p7ll4yn6yot6cz4ohzuxy3uhc3kztafuwn3zlyoup6tn64qd.onion
+        run: |
+          case "${{ matrix.platform }}" in
+            windows-*) EXE="./Unseenet Web.exe" ;;
+            *) EXE="./web-${{ matrix.platform }}/unseenet-web" ;;
+          esac
+          rc=0; "$EXE" --self-test --log selftest.txt \
+            --node f6vnchi5p7ll4yn6yot6cz4ohzuxy3uhc3kztafuwn3zlyoup6tn64qd.onion || rc=$?
+          cat selftest.txt; exit $rc
+      - name: No console window on Windows
+        if: startsWith(matrix.platform, 'windows')
+        shell: pwsh
+        working-directory: try/Unseenet
+        run: |
+          # PE subsystem 2 = Windows GUI (3 would be a console program)
+          $b = [IO.File]::ReadAllBytes("Unseenet Web.exe"); $pe = [BitConverter]::ToInt32($b, 0x3C)
+          $sub = [BitConverter]::ToUInt16($b, $pe + 0x5C); "subsystem $sub"; if ($sub -ne 2) { exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: unseenet-web-${{ matrix.platform }}
