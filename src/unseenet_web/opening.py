@@ -70,8 +70,11 @@ def find_app_browser() -> str | None:
 def show_window(url: str, fullscreen: bool = False) -> None:
     """Block until the window is closed."""
     import webview  # type: ignore
-    webview.create_window("Unseenet", url, width=1360, height=860, min_size=(420, 560),
-                          fullscreen=fullscreen, background_color="#10302A", text_select=True)
+    window = webview.create_window("Unseenet", url, width=1360, height=860, min_size=(420, 560),
+                                   fullscreen=fullscreen, background_color="#10302A", text_select=True)
+    if sys.platform == "win32":
+        from .winfix import set_window_icon
+        window.events.shown += lambda: set_window_icon(window)
     webview.start(private_mode=True)
 
 

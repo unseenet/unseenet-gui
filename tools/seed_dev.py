@@ -55,9 +55,20 @@ async def main() -> None:
     await tove.post(talk, "Proof-of-work feels slow on old laptops",
                     "On my 2012 ThinkPad a post takes a while. Could the client show progress?")
     await me.post(snak, "Hej fra Kvistgård", "Første indlæg i dk.snak. Velkommen!")
+    bh = await mikkel.post(snak, "Bornhack - hvem tager med?",
+                           "Jeg tænker at køre en node fra teltet. Nogen der vil peere?")
+    await tove.fetch_group(snak)
+    await tove.post(snak, "Re: Bornhack - hvem tager med?",
+                    "Jeg er med! Jeg tager en Pi og et powerbank.", references=[bh])
+    await me.fetch_group(snak)
+    await me.post(snak, "Re: Bornhack - hvem tager med?",
+                  "Fedt. Lad os lave en lukket gruppe til os der kører noder.", references=[bh])
+    await tove.post(talk, "Node on a Pi 5: notes",
+                    "Runs fine from an LXC too. Peering only needs the other node's onion address.")
 
     for text, who in [("Er der nogen her?", mikkel), ("Ja da! Webklienten virker.", tove),
-                      ("Fedt - jeg tester chat nu.", mikkel)]:
+                      ("Fedt - jeg tester chat nu.", mikkel), ("Den ser godt ud i mørkt tema.", tove),
+                      ("Og den kører fra en USB-stick.", mikkel)]:
         await who.post(chat, "chat", text)
 
     for p in (mikkel, tove):           # pick up the invitation

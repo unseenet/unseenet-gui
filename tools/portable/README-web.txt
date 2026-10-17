@@ -6,7 +6,7 @@ included. Nothing is installed and nothing is left on the computer: your
 vault, the offline cache and Tor's state are in data/ beside the programs.
 
 Start it:
-  Windows:  Start Unseenet Web.bat     (WebView2, part of Windows 10 and 11)
+  Windows:  Unseenet Web.exe           (WebView2, part of Windows 10 and 11)
   macOS:    Start Unseenet Web.command
   Linux:    sh start-web-linux.sh      (opens in Chromium/Chrome/Edge/Brave
                                         without tabs if you have one, else

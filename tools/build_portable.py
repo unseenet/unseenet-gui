@@ -15,8 +15,12 @@ A build is ``unseenet-web-<version>-<platform>.zip``::
 
     Unseenet/
       UNSEENET-PORTABLE, README-web.txt, LICENSES/, the launcher for that platform
-      web-<platform>/unseenet-web[.exe], _internal/    (PyInstaller, one folder)
+      web-<platform>/unseenet-web, _internal/          (PyInstaller, one folder)
       web-<platform>/tor/                              (Tor Expert Bundle)
+
+On Windows the program itself is the launcher, with the Unseenet icon and no
+console window: ``Unseenet Web.exe`` at the top, its files and Tor in
+``web-windows-x86_64/``.
 
 It uses the same top folder, marker and data/ as unseenet's portable build,
 so both can be unpacked onto one stick and share the vault.
@@ -42,9 +46,10 @@ MARKER = "UNSEENET-PORTABLE"
 PLATFORMS = ("linux-x86_64", "windows-x86_64", "macos-aarch64", "macos-x86_64")
 LAUNCHERS = {
     "linux": ["start-web-linux.sh"],
-    "windows": ["Start Unseenet Web.bat"],
+    "windows": [],                       # "Unseenet Web.exe" is its own launcher
     "macos": ["Start Unseenet Web.command"],
 }
+WINDOWS_EXE = "Unseenet Web"
 
 
 def log(msg: str) -> None:
@@ -67,11 +72,24 @@ def core_tools(core: Path):
     return mod
 
 
+def make_ico(core: Path, target: Path) -> bool:
+    try:
+        from PIL import Image
+        Image.open(core / "assets" / "icon-512.png").save(
+            target, sizes=[(16, 16), (24, 24), (32, 32), (48, 48), (64, 64), (128, 128), (256, 256)])
+        return True
+    except Exception as exc:  # noqa: BLE001
+        log(f"no icon ({exc})")
+        return False
+
+
 def pyinstaller(plat: str, work: Path, core: Path) -> Path:
     entry = work / "unseenet_web_entry.py"
     entry.write_text("from unseenet_web.__main__ import main\nmain()\n")
-    cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--console",
-           "--name", "unseenet-web",
+    windows = plat.startswith("windows")
+    cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir",
+           "--windowed" if windows else "--console",
+           "--name", WINDOWS_EXE if windows else "unseenet-web",
            "--distpath", str(work / "dist"), "--workpath", str(work / "build"), "--specpath", str(work),
            "--collect-submodules", "unseenet", "--collect-data", "unseenet",
            "--collect-submodules", "unseenet_web", "--collect-data", "unseenet_web",
@@ -85,17 +103,17 @@ def pyinstaller(plat: str, work: Path, core: Path) -> Path:
         cmd += ["--collect-all", "webview"]          # the app window (WebView2 / WKWebView)
     if not plat.startswith("windows"):
         cmd.append("--strip")
-    icon = core / "assets" / "icon-512.png"
-    if icon.exists() and not plat.startswith("linux"):
-        try:
-            import PIL  # noqa: F401
-            cmd += ["--icon", str(icon)]
-        except ImportError:
-            log("Pillow not installed: building without an icon")
+    ico = work / "unseenet.ico"
+    if not plat.startswith("linux") and make_ico(core, ico):
+        cmd += ["--icon", str(ico)]
+        if windows:                              # for the window, too (winfix.set_window_icon)
+            cmd += ["--add-data", f"{ico}{os.pathsep}."]
+    if windows:
+        cmd += ["--contents-directory", f"web-{plat}"]
     cmd.append(str(entry))
     log("running PyInstaller")
     subprocess.run(cmd, check=True, cwd=work)
-    return work / "dist" / "unseenet-web"
+    return work / "dist" / (WINDOWS_EXE if windows else "unseenet-web")
 
 
 def add_launchers(top: Path, system: str) -> None:
@@ -148,7 +166,11 @@ def build(plat: str, tor_archive: Path, out: Path, core: Path) -> Path:
         stage.mkdir(parents=True)
         common_files(stage)
         add_launchers(stage, plat.split("-")[0])
-        shutil.copytree(pyinstaller(plat, work, core), prog, symlinks=True)
+        built = pyinstaller(plat, work, core)
+        if plat.startswith("windows"):           # the exe at the top, its files (and Tor) below
+            shutil.copytree(built, stage, symlinks=True, dirs_exist_ok=True)
+        else:
+            shutil.copytree(built, prog, symlinks=True)
         up.check_archive_digest(tor_archive)
         up.unpack_tor(tor_archive, prog / "tor", stage / "LICENSES")
         (prog / "tor" / "VERSION").write_text(tor_archive.name + "\n")

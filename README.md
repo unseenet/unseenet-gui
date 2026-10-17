@@ -1,12 +1,42 @@
-# unseenet-web
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo-dark.svg">
+    <img src="docs/img/logo-light.svg" alt="Unseenet" width="320">
+  </picture>
+</p>
 
-Unseenet in a window: groups as threads, chats as chats, with the look of
-[unseenet.org](https://unseenet.org). A prototype of a modern client built on
-the [unseenet](https://github.com/unseenet/unseenet) core.
+<p align="center"><b>Usenet, unseen - now in a window.</b><br>
+Groups as threads, chats as chats, over Tor. Portable on Windows, macOS and Linux, or booted from a USB stick.</p>
+
+<p align="center">
+  <img src="docs/img/demo.gif" alt="Unlocking the vault, reading a thread, replying, chatting, the command palette and the light theme" width="880">
+</p>
+
+A modern client for [Unseenet](https://unseenet.org), the decentralised,
+encrypted discussion network over Tor onion services, built on the
+[unseenet](https://github.com/unseenet/unseenet) core with the look of
+[unseenet.org](https://unseenet.org).
 
 > **Pre-alpha prototype.** Neither this client nor the unseenet core has had a
 > security review. Play with it, pick it apart - do not rely on it to protect
 > anyone yet.
+
+| Threads | Chat |
+|---|---|
+| ![A discussion group: the thread list and a thread with replies](docs/img/threads.png) | ![A chat group: messages in order, and one that has reached the node](docs/img/chat.png) |
+| **Light, or dark** | **Everything by keyboard: Ctrl K** |
+| ![The light theme](docs/img/light.png) | ![The command palette, finding groups and commands](docs/img/palette.png) |
+
+### Booted from a stick
+
+<p align="center">
+  <img src="docs/img/boot.gif" alt="The boot splash, then the client full screen with network, keyboard and power at the top" width="880">
+</p>
+
+The bootable image starts with the Unseenet splash and then the client full
+screen - network, Wi-Fi, keyboard and power at the top. The splash is the
+image's own; the picture of the client is taken by the image's self-test, which
+boots it in QEMU on every build.
 
 ## How it works
 
@@ -32,7 +62,7 @@ Every push to `main` is built and self-tested; the newest builds are the
 - **Portable** - unzip and start, from a USB stick or a folder. Tor is included,
   and everything stays in `data/` beside the programs.
   `unseenet-web-…-usb.zip` has every platform; or take only yours:
-  - Windows: `Start Unseenet Web.bat` (an app window through WebView2)
+  - Windows: `Unseenet Web.exe` (an app window through WebView2, no console)
   - macOS: `Start Unseenet Web.command` (an app window)
   - Linux: `sh start-web-linux.sh` (Chromium, Chrome, Edge or Brave without
     tabs if you have one, else your browser)
@@ -162,6 +192,7 @@ src/unseenet_web/
 tests/            the server's guards
 tools/
   dev.sh          a playground without Tor (seed_dev.py fills it)
+  record_demo.py  the demo and screenshots in this README, from the playground
   build_portable.py, portable/   the portable builds (with unseenet's Tor tooling)
   image/          the bootable image (adapted from unseenet's)
 .github/workflows/build.yml      Tor, four portable builds, USB zip, image, releases
