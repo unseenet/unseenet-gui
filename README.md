@@ -24,7 +24,31 @@ passphrase is only sent once, to unlock.
 The group's type decides the view, as in the TUI: groups marked as chat open as
 a chat, the others as threads, and `V` switches either way.
 
-## Try it
+## Download
+
+Every push to `main` is built and self-tested; the newest builds are the
+[development pre-release](https://github.com/unseenet/unseenet-web/releases/tag/dev).
+
+- **Portable** - unzip and start, from a USB stick or a folder. Tor is included,
+  and everything stays in `data/` beside the programs.
+  `unseenet-web-…-usb.zip` has every platform; or take only yours:
+  - Windows: `Start Unseenet Web.bat` (an app window through WebView2)
+  - macOS: `Start Unseenet Web.command` (an app window)
+  - Linux: `sh start-web-linux.sh` (Chromium, Chrome, Edge or Brave without
+    tabs if you have one, else your browser)
+- **Bootable** - `unseenet-web-…-x86_64.img.xz`: write it to a USB stick (for
+  example with Raspberry Pi Imager, balenaEtcher or
+  `xz -dc FILE | sudo dd of=/dev/sdX bs=4M`), boot from it, and Unseenet starts
+  full screen and runs from memory. Set up Wi-Fi and the keyboard on the first
+  screen. The same stick also starts the portable client on a running
+  computer, with the same `data/`. It needs 4 GB of memory; "safe graphics" in
+  the boot menu helps if the screen stays black, and "text only" starts
+  unseenet's terminal client instead.
+
+Both use the same `Unseenet/` folder and `data/` as unseenet's own portable
+build, so the terminal client and this one can share a stick and a vault.
+
+## From source
 
 You need Python 3.11+.
 
@@ -66,6 +90,7 @@ Passphrase `test`. Everything is in `./dev`; `tools/dev.sh clean` deletes it.
 |---|---|
 | `Ctrl K` or `Ctrl P` | Commands and groups |
 | `N` | New post |
+| `M` | Write to someone (paste their key) |
 | `R` | Reply (focus the reply box) |
 | `V` | Switch between chat and threads |
 | `G` | Find groups on your nodes |
@@ -104,12 +129,15 @@ that.
 
 It can: unlock or create a vault, choose a name and node, follow and leave
 groups, read threads and chats (closed groups decrypted), post, reply, chat,
-"For you", read private messages, the command palette, and work on a narrow
-screen.
+"For you", private messages (write to anyone by key, conversations as chats,
+private replies), contacts, create groups (open, moderated, channel, closed;
+threads or chat; fast delivery), invite to your closed groups, your signature,
+a light and a dark theme, the command palette, and narrow screens. On the
+bootable image also: network and Wi-Fi, keyboard layout, restart and shut down.
 
-Not yet - use the TUI: writing private messages, creating groups, inviting
-members, names, contacts, moderation, reporting, bridges, several identities,
-and a light theme.
+Not yet - use the TUI: names (@you), moderation and member removal,
+reporting, ignoring people, Tor bridges, several identities, and updates of
+the stick.
 
 ## Built on the core
 
@@ -121,13 +149,22 @@ are listed in [CORE-NEEDS.md](CORE-NEEDS.md) as candidates for unseenet 0.4.0.
 
 ```
 src/unseenet_web/
-  __main__.py     command line: browser or --window
+  __main__.py     command line: how to open it, --self-test
+  opening.py      app window, browser in app mode, or the browser
   server.py       the local HTTP/WebSocket server and its guards
   runtime.py      one Session, its startup, refresh and push
   serialize.py    Session objects as JSON
+  system.py       the bootable image's network, keyboard and power
+  boot.py         the bootable image's session (cage) and its self-test
+  splash.py       the boot splash, drawn on the framebuffer
+  selftest.py     does this build work?
   static/         the page: index.html, app.css, app.js (no build step)
 tests/            the server's guards
-tools/            dev.sh and seed_dev.py: a playground without Tor
+tools/
+  dev.sh          a playground without Tor (seed_dev.py fills it)
+  build_portable.py, portable/   the portable builds (with unseenet's Tor tooling)
+  image/          the bootable image (adapted from unseenet's)
+.github/workflows/build.yml      Tor, four portable builds, USB zip, image, releases
 ```
 
 The front end is plain JavaScript with no dependencies and no build step, so

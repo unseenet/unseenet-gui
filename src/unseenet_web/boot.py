@@ -109,6 +109,11 @@ def self_test() -> int:
     cards = sorted(str(p) for p in Path("/dev/dri").glob("card*")) if Path("/dev/dri").exists() else []
     check("a screen to draw on", bool(cards), ", ".join(cards) or "no /dev/dri/card*")
     addrs = core.addresses()
+    for _ in range(90):                        # the network may still be coming up (DHCP)
+        if addrs:
+            break
+        time.sleep(1)
+        addrs = core.addresses()
     check("network", bool(addrs), ", ".join(f"{i} {a}" for i, a in addrs) or "no address")
 
     # The real thing: the client in the kiosk, its page loaded and its script running.
