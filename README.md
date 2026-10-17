@@ -6,10 +6,10 @@
 </p>
 
 <p align="center"><b>Usenet, unseen - now in a window.</b><br>
-Groups as threads, chats as chats, over Tor. Portable on Windows, macOS and Linux, or booted from a USB stick.</p>
+Discussions you read and answer, chats you chat in, over Tor. Portable on Windows, macOS and Linux, or booted from a USB stick.</p>
 
 <p align="center">
-  <img src="docs/img/demo.gif" alt="Unlocking the vault, reading a thread, replying, chatting, the command palette and the light theme" width="880">
+  <img src="docs/img/demo.gif" alt="Unlocking the vault, reading down a thread post by post, replying with a quote, chatting, the command palette and the light theme" width="880">
 </p>
 
 A modern client for [Unseenet](https://unseenet.org), the decentralised,
@@ -21,11 +21,18 @@ encrypted discussion network over Tor onion services, built on the
 > security review. Play with it, pick it apart - do not rely on it to protect
 > anyone yet.
 
-| Threads | Chat |
+A discussion is not a chat. Discussion groups work like a newsreader - the
+same way as unseenet's terminal client: the posts as a tree, the selected one
+below to read, `↑` `↓` through the thread and `Space` to the next unread, and
+`R` to answer in a compose window with the post quoted and your signature
+below. Chat groups are chats. The group's owner decides which a group is, and
+`V` lets you see it the other way.
+
+| Read a discussion | Answer it, quoting |
 |---|---|
-| ![A discussion group: the thread list and a thread with replies](docs/img/threads.png) | ![A chat group: messages in order, and one that has reached the node](docs/img/chat.png) |
-| **Light, or dark** | **Everything by keyboard: Ctrl K** |
-| ![The light theme](docs/img/light.png) | ![The command palette, finding groups and commands](docs/img/palette.png) |
+| ![A discussion group: the posts as a tree, the selected post below with its quote](docs/img/threads.png) | ![The compose window: the post quoted with "wrote:", your answer, your signature below](docs/img/reply.png) |
+| **Chat where it is a chat** | **Light, or dark** |
+| ![A chat group: messages in order, and one that has reached the node](docs/img/chat.png) | ![The light theme](docs/img/light.png) |
 
 ### Booted from a stick
 
@@ -51,8 +58,9 @@ Tor and talks to the same nodes. The browser only draws what you would see on
 screen: **keys, signing, encryption and postage never leave Python**, and the
 passphrase is only sent once, to unlock.
 
-The group's type decides the view, as in the TUI: groups marked as chat open as
-a chat, the others as threads, and `V` switches either way.
+The client follows the terminal client's way of working, so you can switch
+between them without learning anything new: the same keys, the same icons
+(`≡` discussion, `»` chat, `∩` closed), the same compose window.
 
 ## Download
 
@@ -120,15 +128,16 @@ Passphrase `test`. Everything is in `./dev`; `tools/dev.sh clean` deletes it.
 |---|---|
 | `Ctrl K` or `Ctrl P` | Commands and groups |
 | `N` | New post |
+| `R` | Reply: a compose window with the post quoted |
+| `↑` `↓` | Previous / next post in the tree |
+| `Space` | Next unread post (then the next group with unread posts) |
+| `Enter` | Read the post full screen (`Esc` goes back); in a chat: write |
 | `M` | Write to someone (paste their key) |
-| `R` | Reply (focus the reply box) |
 | `V` | Switch between chat and threads |
 | `G` | Find groups on your nodes |
 | `K` | Show your key |
 | `?` | About this group |
-| `↑` `↓` | Next / previous thread |
-| `Ctrl S` | Send a post or reply |
-| `Enter` | Send in a chat (and jump to the chat box) |
+| `Ctrl S` | Send, in the compose window |
 | `Esc` | Leave the text box, close a dialog |
 
 ## Security

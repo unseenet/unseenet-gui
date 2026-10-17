@@ -252,7 +252,8 @@ async def post(request):
     if not chat and not subject:
         return _error("a post needs a subject")
     refs = [str(r) for r in data.get("references", [])][:50]
-    job = rt.post(gid, subject, body, refs, chat=chat)
+    # the compose window already has the signature in the text, as the TUI's does
+    job = rt.post(gid, subject, body, refs, chat=chat, signature=bool(data.get("signature", True)))
     return _json({"job": job})
 
 

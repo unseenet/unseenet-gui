@@ -50,8 +50,20 @@ async def main() -> None:
                        "Honest answer: not much with four nodes. It starts to matter once each node has more peers.",
                        references=[root])
     await tove.fetch_group(talk)
-    await tove.post(talk, "Re: Forwarding delay: how long is long enough?",
-                    "How about letting the delay grow with how few peers a node has?", references=[root, r1])
+    r2 = await tove.post(talk, "Re: Forwarding delay: how long is long enough?",
+                         "Andreas wrote:\n"
+                         "> Honest answer: not much with four nodes. It starts to matter once\n"
+                         "> each node has more peers.\n\n"
+                         "Then how about letting the delay grow with how few peers a node has?\n"
+                         "A node with two peers waits longer than one with twenty.",
+                         references=[root, r1])
+    await mikkel.fetch_group(talk)
+    await mikkel.post(talk, "Re: Forwarding delay: how long is long enough?",
+                      "Tove wrote:\n"
+                      "> A node with two peers waits longer than one with twenty.\n\n"
+                      "I like that. It costs nothing on a busy network, and hides the most\n"
+                      "where it is needed. Worth a UN-RFC?",
+                      references=[root, r1, r2])
     await tove.post(talk, "Proof-of-work feels slow on old laptops",
                     "On my 2012 ThinkPad a post takes a while. Could the client show progress?")
     await me.post(snak, "Hej fra Kvistgård", "Første indlæg i dk.snak. Velkommen!")

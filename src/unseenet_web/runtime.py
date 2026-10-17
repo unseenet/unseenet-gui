@@ -223,14 +223,15 @@ class Runtime:
         self.session.save()
 
     # --- writing ------------------------------------------------------------
-    def post(self, gid: str, subject: str, body: str, references: list[str], chat: bool = False) -> str:
+    def post(self, gid: str, subject: str, body: str, references: list[str], chat: bool = False,
+             signature: bool = True) -> str:
         """Start a post in the background; its progress arrives as 'post' events.
 
         A chat message is sent like the TUI does it: the subject is its first
         line and there is no signature."""
         if chat:
             subject = body.split("\n", 1)[0][:60] + ("…" if len(body) > 60 else "")
-        else:
+        elif signature:
             sig = self.session.signature()
             body = body.rstrip("\n") + ("\n-- \n" + sig if sig else "")
         self._jobs += 1
