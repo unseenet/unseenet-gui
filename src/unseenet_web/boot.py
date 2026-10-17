@@ -158,7 +158,7 @@ def self_test() -> int:
             with tempfile.TemporaryDirectory() as tdir:
                 tor = TorProcess(Path(tdir), TorProcess.find_binary())
                 try:
-                    await tor.start(timeout=180)
+                    await tor.start(timeout=420)     # a VM's network can be slow to load relays
                     return True
                 except TorError as exc:
                     print(f"       {exc}")
