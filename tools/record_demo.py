@@ -5,7 +5,7 @@
     python tools/record_demo.py dev/web.log docs/img
 
 Needs Playwright (pip install playwright; playwright install chromium) and ffmpeg.
-Writes demo.gif, threads.png, chat.png, light.png and palette.png.
+Writes demo.gif, threads.png, reply.png, chat.png, light.png and palette.png.
 """
 import re
 import shutil
@@ -39,19 +39,25 @@ def main() -> None:
         page.wait_for_selector(".side .item.group", timeout=60000)
         pause(3)
         page.click(".item:has-text(\"unseenet@\")")
-        page.wait_for_selector(".thread")
-        pause(1.5)
-        page.click(".thread:has-text(\"Forwarding delay\")")
-        pause(2.5)
+        page.wait_for_selector(".prow")
+        pause(1.2)
+        page.click(".prow:has-text(\"Forwarding delay\") >> nth=0")
+        pause(1.8)
+        for _ in range(3):                         # read down the thread, as in a newsreader
+            page.keyboard.press("ArrowDown")
+            pause(1.6)
         page.screenshot(path=out / "threads.png")
-        page.click('[data-k="reply"]')
-        page.type('[data-k="reply"]', "Agreed - let the delay grow when a node has few peers.", delay=35)
-        pause(0.5)
+        page.keyboard.press("r")                   # reply: the post quoted, the signature below
+        page.wait_for_selector("#body")
+        pause(1.2)
+        page.keyboard.type("Agreed. I will write it up as a draft UN-RFC.", delay=40)
+        pause(0.8)
+        page.screenshot(path=out / "reply.png")
         page.keyboard.press("Control+s")
-        page.wait_for_selector(".sending", timeout=10000)
+        page.wait_for_selector(".prow.pending", timeout=10000)
         pause(1)
-        page.wait_for_selector(".sending", state="detached", timeout=90000)
-        pause(2)
+        page.wait_for_selector(".prow.pending", state="detached", timeout=90000)
+        pause(2.5)
         page.click(".item:has-text(\"dk.snak.chat\")")
         page.wait_for_selector('[data-k="chat"]')
         pause(1.5)
@@ -78,7 +84,8 @@ def main() -> None:
         page.keyboard.press("Enter")
         pause(0.6)
         page.click(".item:has-text(\"dk.snak\") >> nth=0")
-        page.wait_for_selector(".thread")
+        page.wait_for_selector(".prow")
+        page.click(".prow:has-text(\"Bornhack\") >> nth=2")
         pause(2.5)
         page.screenshot(path=out / "light.png")
         page.keyboard.press("Control+k")

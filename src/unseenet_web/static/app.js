@@ -355,7 +355,7 @@ async function loadSidebar() {
 }
 
 async function openGroup(gid, rerender = true) {
-  if (S.gid !== gid) { S.thread = null; S.replyTo = null; S.mobileReading = false; }
+  if (S.gid !== gid) { S.post = null; S.full = false; S.mobileReading = false; }
   S.gid = gid;
   await loadGroup();
   if (rerender) render();
@@ -442,8 +442,9 @@ function statusbar() {
   const k = (key, label) => h("span", {}, h("kbd", { text: key }), " " + label);
   return h("footer", { class: "statusbar" },
     h("span", { class: "keys" },
-      chat ? k("Esc", "shortcuts") : k("N", "new"), chat ? null : k("R", "reply"),
-      k("V", "chat/threads"), k("G", "groups"), k("?", "about group"), k("Ctrl K", "commands")),
+      chat ? [k("Esc", "shortcuts"), k("Enter", "write")] :
+        [k("N", "new"), k("R", "reply"), k("↑↓", "posts"), k("Space", "next unread"), k("Enter", "full screen")],
+      k("V", "chat/threads"), k("?", "about group"), k("Ctrl K", "commands")),
     h("span", { class: "grow" }),
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     h("span", { class: "st", title: S.state.status },
@@ -483,46 +484,66 @@ function mainArea() {
   return [head, g.view === "chat" ? chatView(d) : threadsView(d)];
 }
 
-// ---- threads ------------------------------------------------------------
+// ---- discussion: the newsreader (as in the terminal client) ------------------
+// The posts as a tree, one row each; the selected one below, to read; R answers
+// in a compose window with the post quoted. Chat groups are chats (chatView).
 function threadsOf(msgs) {
   const out = [];
   for (const m of msgs) {
     if (m.depth === 0 || !out.length) out.push({ root: m, items: [m] });
     else out[out.length - 1].items.push(m);
   }
-  for (const t of out) {
-    t.unread = t.items.filter(m => !m.read).length;
-    t.forMe = t.items.some(m => m.for_me && !m.read);
-    t.last = t.items.reduce((a, m) => (m.date && m.date > a ? m.date : a), "");
-  }
   return out;
 }
 
+function currentPost(msgs) {
+  return msgs.find(m => m.id === S.post) || msgs.find(m => !m.read) || msgs[0];
+}
+
 function threadsView(d) {
-  const g = d.group;
-  const threads = threadsOf(d.messages);
-  if (!threads.length) {
+  const g = d.group, msgs = d.messages;
+  if (!msgs.length) {
     return h("div", { class: "content" }, h("div", { class: "empty" },
       h("h2", { text: g.id === "for-you" ? "Nothing for you yet" : "No posts yet" }),
       h("p", { text: g.id === "for-you" ? "Replies to your posts, and posts that name you, show up here." :
         g.may_post ? "Be the first: press N to write a post." : "" })));
   }
-  let current = threads.find(t => t.root.id === S.thread) || threads[0];
-  S.thread = current.root.id;
-  markRead(current.items);
-  const list = h("section", { class: "threads", "aria-label": "Threads", "data-scroll": "threads" },
-    threads.map(t => h("button", {
-      class: `thread${t === current ? " on" : ""}${t.unread ? " unread" : ""}`,
-      onclick: () => { S.thread = t.root.id; S.replyTo = null; S.mobileReading = true; render(); } },
-      t.forMe ? h("span", { class: "mk you", "aria-label": "For you", text: "◄" }) :
-        h("span", { class: "mk" + (t.unread ? " new" : ""), "aria-label": t.unread ? "Unread" : null }),
-      h("span", { class: "tx" },
-        h("span", { class: "sj", text: t.root.subject || "(no subject)" }),
-        h("span", { class: "meta" }, h("span", { class: "mono", text: t.root.who }),
-          t.items.length > 1 ? ` · ${t.items.length - 1} ${t.items.length === 2 ? "reply" : "replies"}` : "",
-          " · " + when(t.last || t.root.date),
-          g.id === "for-you" ? " · " + labelOf(t.root.group) : "")))));
-  return h("div", { class: "content" + (S.mobileReading ? " reading" : "") }, list, reader(g, current));
+  const cur = currentPost(msgs);
+  S.post = cur.id;
+  markRead([cur]);
+  const pend = Object.entries(S.pending).filter(([, p]) => p.group === g.id && !p.chat);
+  const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
+    h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
+      h("span", { text: "From" }), h("span", { text: "Date" })),
+    msgs.map(m => h("button", {
+      class: `prow${m === cur ? " on" : ""}${m.read ? "" : " unread"}${m.depth === 0 ? " root" : ""}`,
+      "data-id": m.id, "aria-current": m === cur ? "true" : null,
+      onclick: () => { S.post = m.id; S.mobileReading = true; render(); },
+      ondblclick: () => { S.post = m.id; S.full = true; render(); } },
+      h("span", { class: "flag", "aria-label": m.read ? null : "Unread", text: m.read ? "" : "●" }),
+      h("span", { class: "sj" },
+        m.depth ? h("span", { class: "tree", "aria-hidden": "true", text: "  ".repeat(m.depth - 1) + "└ " }) : null,
+        m.for_me === "reply" ? h("span", { class: "you", text: "◄ " }) : m.for_me === "mention" ? h("span", { class: "you", text: "♦ " }) : null,
+        m.private ? h("span", { class: "muted", text: "@ " }) : m.encrypted ? h("span", { class: "muted", text: "∩ " }) : null,
+        // a reply with the thread's own subject: quieter, so new subjects stand out
+        h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: m.subject || "(no subject)" }),
+        g.id === "for-you" ? h("span", { class: "muted", text: "  (" + labelOf(m.group) + ")" }) : null),
+      h("span", { class: "from mono", text: m.who }),
+      h("span", { class: "date", text: when(m.date) }))),
+    pend.map(([job, p]) => h("div", { class: "prow pending" }, h("span", {}),
+      h("span", { class: "sj", text: p.body.subject || "" }),
+      h("span", { class: "from mono", text: S.state.me.label }),
+      h("span", { class: "date" }, p.state === "failed" ?
+        h("button", { class: "link", onclick: () => retry(job), title: p.error || "" }, "Not sent - again") : pendingState(p)))));
+  return h("div", { class: "content news" + (S.full ? " full" : "") + (S.mobileReading ? " reading" : "") },
+    table, readerPane(g, cur, msgs));
+}
+
+function sameSubject(m, msgs) {
+  const bare = (s) => (s || "").replace(/^(re:\s*)+/i, "").trim().toLowerCase();
+  const i = msgs.indexOf(m);
+  for (let j = i - 1; j >= 0; j--) if (msgs[j].depth === 0) return bare(msgs[j].subject) === bare(m.subject);
+  return false;
 }
 
 function labelOf(gid) {
@@ -530,23 +551,35 @@ function labelOf(gid) {
   return g ? g.label : gid.split("@")[0];
 }
 
-function reader(g, t) {
-  const target = S.replyTo && t.items.find(m => m.id === S.replyTo) || t.items[t.items.length - 1];
-  const posts = t.items.map(m => postEl(m, g, m === target && (g.may_post || g.private_reply)));
-  const pend = Object.entries(S.pending).filter(([, p]) => p.group === g.id && !p.chat && p.thread === t.root.id);
-  return h("article", { class: "reader", "aria-label": "Thread" },
-    h("div", { class: "scroll", "data-scroll": "reader:" + t.root.id },
-      h("h2", { text: t.root.subject || "(no subject)" }), posts,
-      pend.map(([job, p]) => h("div", { class: "post", style: "margin-left:48px" },
-        h("span", { class: "av s c4", text: initials(S.state.me.display) }),
-        h("div", { class: "pb" }, h("div", { class: "ph" }, h("span", { class: "name", text: S.state.me.label }),
-          pendingState(p)), h("p", { class: "text", text: p.text }),
-          p.state === "failed" ? h("button", { class: "link", onclick: () => { delete S.pending[job]; render(); } }, "Dismiss") : null)))),
-    (g.may_post || g.private_reply) && g.id !== "for-you" && target.key ? replyBox(g, t, target) : null);
+// Quoted lines ("> ...", "> > ...") as quotes, one colour per level; long ones folded.
+function renderBody(text) {
+  const lines = text.split("\n"), out = [];
+  let i = 0;
+  const level = (ln) => { const m = ln.match(/^((?:>\s?)+)/); return m ? (m[1].match(/>/g) || []).length : 0; };
+  while (i < lines.length) {
+    if (level(lines[i]) === 0) {
+      const para = [];
+      while (i < lines.length && level(lines[i]) === 0) para.push(lines[i++]);
+      const t = para.join("\n");
+      const wrote = /^(.{1,80}) (wrote|skrev):$/.test(para[para.length - 1] || "") && i < lines.length;
+      if (wrote) {
+        const before = para.slice(0, -1).join("\n");
+        if (before.trim()) out.push(h("p", { class: "text", text: before }));
+        out.push(h("p", { class: "attrib", text: para[para.length - 1] }));
+      } else if (t.trim() || out.length) out.push(h("p", { class: "text", text: t }));
+      continue;
+    }
+    const q = [];
+    while (i < lines.length && level(lines[i]) > 0) q.push(lines[i++]);
+    const rows = q.map(ln => h("div", { class: "ql q" + Math.min(level(ln), 3) }, ln.replace(/^((?:>\s?)+)/, "") || " "));
+    out.push(q.length > 6 ?
+      h("details", { class: "quote-block" }, h("summary", { text: `Quoted text (${q.length} lines)` }), rows) :
+      h("div", { class: "quote-block" }, rows));
+  }
+  return out;
 }
 
-function postEl(m, g, isTarget) {
-  const indent = Math.min(m.depth, 4) * 22;
+function readerPane(g, m, msgs) {
   const marks = [];
   if (m.mine) marks.push(h("span", { class: "sm", text: "you" }));
   else if (m.contact) marks.push(h("span", { class: "sm", text: "contact" }));
@@ -555,44 +588,100 @@ function postEl(m, g, isTarget) {
   if (m.for_me === "mention") marks.push(h("span", { class: "sm you", text: "♦ names you" }));
   if (m.encrypted) marks.push(h("span", { class: "sm lock" }, svg(ICON.lock, 12, 2.5), " encrypted"));
   else if (m.private && m.verified) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " verified sender"));
-  else marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " signed"));
-  return h("div", { class: "post" + (isTarget && S.replyTo === m.id ? " target" : ""), style: indent ? `margin-left:${indent}px` : null },
-    avatar(m, m.depth > 0),
-    h("div", { class: "pb" },
-      h("div", { class: "ph" }, nameEl(m.who), marks),
-      m.readable ? h("p", { class: "text", text: m.text }) : h("p", { class: "text bad", text: m.error || "Could not be read." }),
-      m.signature ? h("p", { class: "sig", text: m.signature }) : null,
-      h("div", { class: "pa" },
-        (g.may_post || g.private_reply) && g.id !== "for-you" ? h("button", { class: "link", onclick: () => {
-          S.replyTo = m.id; render(); const r = document.querySelector('[data-k="reply"]'); if (r) r.focus(); } }, "Reply") : null,
-        g.id === "for-you" ? h("button", { class: "link", onclick: async () => {
-          await openGroup(m.group); S.thread = m.references[0] || m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
-        !m.mine && m.key && !g.private_reply ? h("button", { class: "link", onclick: () => openGroup("contact:" + m.key) }, "Message") : null,
-        !m.mine && m.key && !m.contact ? h("button", { class: "link", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
-        h("button", { class: "link", onclick: () => copy(m.key, "Their key is copied.") }, "Copy key"))));
+  else if (!m.private) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " signed"));
+  const parent = m.references.length ? msgs.find(x => x.id === m.references[m.references.length - 1]) : null;
+  const canReply = (g.may_post || g.private_reply) && g.id !== "for-you" && m.readable && m.key;
+  const pos = msgs.indexOf(m);
+  return h("article", { class: "reader", "aria-label": "Post" },
+    h("div", { class: "scroll", "data-scroll": "post:" + m.id },
+      h("h2", { text: m.subject || "(no subject)" }),
+      h("div", { class: "post" }, avatar(m),
+        h("div", { class: "pb" }, h("div", { class: "ph" }, nameEl(m.who), marks),
+          parent ? h("button", { class: "inreply", onclick: () => { S.post = parent.id; render(); } },
+            "In reply to ", h("span", { class: "mono", text: parent.who })) : null)),
+      h("div", { class: "pbody" },
+        m.readable ? renderBody(m.text) : h("p", { class: "text bad", text: m.error || "Could not be read." }),
+        m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null)),
+    h("div", { class: "pbar" },
+      canReply ? h("button", { class: "btn primary", onclick: () => openReply(m, g) }, "Reply", h("kbd", { text: "R" })) : null,
+      g.id === "for-you" ? h("button", { class: "btn", onclick: async () => {
+        await openGroup(m.group); S.post = m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
+      !m.mine && m.key && !g.private_reply ? h("button", { class: "btn", onclick: () => openGroup("contact:" + m.key) }, "Message") : null,
+      !m.mine && m.key && !m.contact ? h("button", { class: "btn", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
+      h("span", { class: "grow" }),
+      h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
+      h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),
+      h("button", { class: "btn icon", "aria-label": "Next post", title: "Next (↓)", onclick: () => step(1) }, "↓"),
+      h("button", { class: "btn", title: "Space", onclick: nextUnread }, "Next unread", h("kbd", { text: "Space" })),
+      h("button", { class: "btn icon", "aria-label": S.full ? "Back to the list" : "Read full screen",
+        title: S.full ? "Back to the list (Esc)" : "Full screen (Enter)", onclick: () => { S.full = !S.full; render(); } }, S.full ? "▾" : "▴")));
 }
 
-function replyBox(g, t, target) {
-  const key = "reply:" + t.root.id;
-  const send = () => {
-    const ta = document.querySelector('[data-k="reply"]');
-    const text = ta.value.trim();
-    if (!text) return;
-    const subject = /^re:/i.test(t.root.subject) ? t.root.subject : "Re: " + t.root.subject;
-    if (g.private_reply) doSend("/api/private", g.id, { key: target.key, subject, body: text, reply_to: target.id }, { thread: t.root.id, text });
-    else doPost(g.id, { subject, body: text, references: [...target.references, target.id] },
-      { thread: t.root.id, text });
-    S.drafts[key] = ""; S.replyTo = null; ta.value = "";
+function step(delta) {
+  const msgs = S.data && S.data.messages;
+  if (!msgs || !msgs.length) return;
+  const i = msgs.findIndex(m => m.id === S.post);
+  const next = msgs[Math.max(0, Math.min(msgs.length - 1, i + delta))];
+  S.post = next.id; render();
+  const row = document.querySelector(`.prow[data-id="${CSS.escape(next.id)}"]`);
+  if (row) row.scrollIntoView({ block: "nearest" });
+}
+
+async function nextUnread() {
+  const msgs = (S.data && S.data.messages) || [];
+  const i = msgs.findIndex(m => m.id === S.post);
+  const next = msgs.slice(i + 1).find(m => !m.read) || msgs.slice(0, Math.max(0, i)).find(m => !m.read);
+  if (next) { S.post = next.id; render(); return; }
+  // nothing more here: the next group with something unread, as a newsreader does
+  const groups = allGroups(), at = groups.findIndex(x => x.id === S.gid);
+  const other = groups.slice(at + 1).concat(groups.slice(0, Math.max(0, at))).find(x => x.unread && x.view !== "chat");
+  if (other) { await openGroup(other.id); toast("Next unread: " + other.label); }
+  else toast("Nothing unread.");
+}
+
+async function signatureText() {
+  try { const s = await api("GET", "/api/signature"); return s.preview || ""; } catch (_) { return ""; }
+}
+
+// The terminal client's compose window: subject, the post quoted, your signature below "-- ".
+async function openReply(m, g) {
+  const subject = /^re:/i.test(m.subject) ? m.subject : "Re: " + m.subject;
+  const quoted = m.text.trimEnd().split("\n").map(ln => "> " + ln).join("\n");
+  const top = `${m.who} wrote:\n${quoted}\n\n`;
+  const sig = await signatureText();
+  const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
+  openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
+    subject, body, cursor: top.length, private: !!g.private_reply,
+    send: (subject, text) => g.private_reply ?
+      doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id }, { text }) :
+      doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false }, { text }) });
+}
+
+function openComposeWindow({ g, title, subject, body, cursor, send, private: priv }) {
+  const go = async (e) => {
+    e && e.preventDefault();
+    const f = document.querySelector(".dialog form");
+    const s = f.subject.value.trim(), b = f.body.value.replace(/\s+$/, "");
+    const own = b.split(/\n-- \n/)[0].split("\n").filter(ln => !/^>/.test(ln) && !/ wrote:$/.test(ln)).join("").trim();
+    if (!s || !own) { toast("Write something of your own above the signature."); return; }
+    closeDialog();
+    await send(s, b);
+    toast(priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds.");
   };
-  return h("form", { class: "compose", onsubmit: (e) => { e.preventDefault(); send(); } },
-    h("label", { for: "reply", class: "hint" }, "Reply to ", h("span", { class: "mono", style: "color:var(--paper)", text: target.who })),
-    h("div", { class: "row" },
-      h("textarea", { id: "reply", rows: "2", "data-k": "reply", placeholder: "Write a reply …", value: S.drafts[key] || "",
-        oninput: (e) => { S.drafts[key] = e.target.value; },
-        onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "Enter")) { e.preventDefault(); send(); } } }),
-      h("button", { class: "btn primary", type: "submit", style: "height:44px" }, "Post reply")),
-    h("div", { class: "hint" }, h("kbd", { text: "Ctrl S" }), g.private_reply ?
-      " sends · sealed to them: only they can read it" : " posts · signed with your key · a few seconds of proof-of-work"));
+  S.dialog = { focus: "#body", render: () => dialogShell({ label: title, wide: true },
+    h("div", { class: "dh" }, h("h2", { text: title }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
+      h("label", { for: "subject", text: "Subject" }),
+      h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject }),
+      h("label", { for: "body", text: "Text" }),
+      h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true" }),
+      h("p", { class: "hint", style: "margin:0", text: priv ? "Sealed to them: only they can read it." :
+        "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added." })),
+    h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", onclick: go }, priv ? "Send" : "Post", h("kbd", { text: "Ctrl S" })))) };
+  render();
+  const ta = document.getElementById("body");
+  if (ta && cursor != null) { ta.focus(); ta.setSelectionRange(cursor, cursor); ta.scrollTop = 0; }
 }
 
 function pendingState(p) {
@@ -741,31 +830,14 @@ function openInfo() {
   render();
 }
 
-function openCompose() {
+async function openCompose() {
   const g = S.data && S.data.group;
-  if (!g || !g.may_post || g.view === "chat") return;
-  const send = async (e) => {
-    e && e.preventDefault();
-    const f = document.querySelector(".dialog form");
-    const subject = f.subject.value.trim(), body = f.body.value.trim();
-    if (!subject || !body) { toast("A post needs a subject and some text."); return; }
-    closeDialog();
-    S.thread = null;
-    await doPost(g.id, { subject, body }, { text: body, thread: "__new__" });
-    toast("Sending - postage takes a few seconds.");
-  };
-  S.dialog = { focus: "#subject", render: () => dialogShell({ label: "New post", wide: true },
-    h("div", { class: "dh" }, h("h2", {}, "New post in ", h("span", { class: "mono", text: g.label })),
-      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-    h("form", { class: "db", onsubmit: send, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") send(e); } },
-      h("label", { for: "subject", text: "Subject" }),
-      h("input", { id: "subject", name: "subject", class: "in", "data-k": "subject", autocomplete: "off" }),
-      h("label", { for: "body", text: "Text" }),
-      h("textarea", { id: "body", name: "body", class: "in", "data-k": "body" }),
-      h("p", { class: "hint", style: "margin:0", text: "Your signature is added below. The post is signed with your key and carries a little proof-of-work." })),
-    h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
-      h("button", { class: "btn primary", onclick: send }, "Post", h("kbd", { text: "Ctrl S" })))) };
-  render();
+  if (!g || !g.may_post || g.view === "chat" || g.type === "contact") return;
+  const sig = await signatureText();
+  openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
+    body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
+    send: (subject, text) => { S.post = null; return doPost(g.id, { subject, body: text, signature: false }, { text }); } });
+  setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
 function openBrowse() {
@@ -962,23 +1034,26 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") {
     if (S.dialog) { e.preventDefault(); closeDialog(); return; }
     if (typing(document.activeElement)) { document.activeElement.blur(); return; }
-    if (S.replyTo) { S.replyTo = null; render(); }
+    if (S.full) { S.full = false; render(); }
     return;
   }
   if (S.dialog || typing(document.activeElement) || ctrl || e.altKey) return;
   const g = S.data && S.data.group;
   const keys = {
     n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
-    r: () => { const el = document.querySelector('[data-k="reply"]'); if (el) el.focus(); },
-    Enter: () => { const el = document.querySelector('[data-k="chat"]'); if (el) el.focus(); },
   };
   if (keys[e.key]) { e.preventDefault(); keys[e.key](); return; }
-  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && g && g.view !== "chat" && S.data) {
-    const threads = threadsOf(S.data.messages);
-    const i = threads.findIndex(t => t.root.id === S.thread);
-    const next = threads[Math.max(0, Math.min(threads.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))];
-    if (next) { e.preventDefault(); S.thread = next.root.id; S.replyTo = null; render(); }
+  if (g && g.view === "chat") {
+    if (e.key === "Enter") { const el = document.querySelector('[data-k="chat"]'); if (el) { e.preventDefault(); el.focus(); } }
+    return;
   }
+  if (!S.data || !S.data.messages.length) return;
+  const cur = S.data.messages.find(x => x.id === S.post);
+  if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); step(1); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); step(-1); }
+  else if (e.key === " ") { e.preventDefault(); nextUnread(); }
+  else if (e.key === "Enter") { e.preventDefault(); S.full = !S.full; render(); }
+  else if (e.key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
 });
 
 // ---- events from the server --------------------------------------------
@@ -1014,7 +1089,7 @@ function connectEvents() {
       p.state = e.state; p.error = e.error;
       if (e.state === "reached") {
         delete S.pending[e.job];
-        if (p.thread === "__new__" && S.gid === p.group) S.thread = e.message_id;
+        if (S.gid === p.group && p.body && !p.chat) S.post = e.message_id;
         if (S.gid === p.group) await loadGroup();
       }
       if (e.state === "failed") toast("Not sent: " + (e.error || "unknown error"));

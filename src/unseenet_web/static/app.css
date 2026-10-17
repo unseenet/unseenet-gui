@@ -323,6 +323,56 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .member { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .dialog form .error:empty { display: none; }
 
+
+/* ---- discussion: the newsreader ------------------------------------------------ */
+.content.news { flex-direction: column; }
+.ptable { flex: 0 0 38%; min-height: 120px; overflow-y: auto; border-bottom: 1px solid var(--line); }
+.prow { display: grid; grid-template-columns: 18px minmax(0, 1fr) 190px 116px; gap: 12px; align-items: center;
+  width: 100%; min-height: 32px; padding: 0 20px; border: none; background: transparent; color: var(--paper-2);
+  text-align: left; font-size: 13.5px; }
+.prow:hover { background: var(--ink-2); }
+.prow.on { background: var(--ink-sel); color: var(--paper); }
+.prow.head { position: sticky; top: 0; z-index: 1; min-height: 28px; background: var(--ink); cursor: default;
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--line); }
+.prow.head:hover { background: var(--ink); }
+.prow .flag { color: var(--green); font-size: 10px; }
+.prow .sj { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow.root .sj { color: var(--paper); }
+.prow.unread .sj { font-weight: 700; color: var(--paper); }
+.prow .tree { font-family: var(--mono); color: var(--muted); }
+.prow .same { color: var(--muted); }
+.prow.unread .same, .prow.on .same { color: inherit; }
+.prow .you { color: var(--amber); }
+.prow .from, .prow .date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 12px; color: var(--muted); }
+.prow.pending { opacity: 0.8; cursor: default; }
+.news .reader { flex: 1 1 auto; min-height: 0; }
+.news.full .ptable { display: none; }
+.reader .pbody { max-width: 46em; margin-left: 46px; }
+.reader .post { max-width: 46em; }
+.inreply { border: none; background: none; padding: 2px 0; color: var(--muted); font-size: 12px; cursor: pointer; }
+.inreply:hover { color: var(--paper); }
+.attrib { margin: 12px 0 4px; font-size: 13px; color: var(--muted); }
+.quote-block { margin: 2px 0 10px; padding: 6px 12px; border-left: 3px solid var(--green-deep);
+  border-radius: 0 8px 8px 0; background: var(--ink-deep); color: var(--paper-2); font-size: 13.5px;
+  white-space: pre-wrap; overflow-wrap: anywhere; }
+.ql.q2 { padding-left: 12px; color: var(--muted); }
+.ql.q3 { padding-left: 24px; color: var(--muted); opacity: 0.8; }
+details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.pbar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 24px;
+  border-top: 1px solid var(--line); }
+.pbar .grow { flex: 1; }
+.compose-body { min-height: 360px; font-size: 13.5px; line-height: 1.5; tab-size: 4; }
+@media (max-width: 860px) {
+  .ptable { flex-basis: auto; flex-grow: 1; border-bottom: none; }
+  .content.news.reading .ptable { display: none; }
+  .content.news:not(.reading) .reader { display: none; }
+  .prow { grid-template-columns: 14px minmax(0, 1fr) 90px; padding: 0 12px; }
+  .prow .from { display: none; }
+  .reader .pbody { margin-left: 0; }
+}
+
 /* ---- the bootable image ---------------------------------------------------------- */
 .sysbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end;
   position: fixed; top: 16px; right: 16px; left: 16px; z-index: 5; }
