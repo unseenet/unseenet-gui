@@ -1,0 +1,207 @@
+#!/usr/bin/env python3
+"""Build a portable Unseenet web client: one folder per platform, with Tor inside.
+
+    python tools/build_portable.py --core ../unseenet                       # this platform
+    python tools/build_portable.py --core ../unseenet --platform windows-x86_64 --tor-archive tor.tar.gz
+    python tools/build_portable.py --core ../unseenet --fetch-tor linux-x86_64 --out tor/
+    python tools/build_portable.py --core ../unseenet --combine dist/*.zip --out dist/
+
+The Tor handling (download, OpenPGP check against the pinned Tor key, the
+pinned version) is unseenet's own: ``--core`` points at a checkout of
+github.com/unseenet/unseenet and its ``tools/build_portable.py`` is used, so
+both projects ship the same, verified Tor.
+
+A build is ``unseenet-web-<version>-<platform>.zip``::
+
+    Unseenet/
+      UNSEENET-PORTABLE, README-web.txt, LICENSES/, the launcher for that platform
+      web-<platform>/unseenet-web[.exe], _internal/    (PyInstaller, one folder)
+      web-<platform>/tor/                              (Tor Expert Bundle)
+
+It uses the same top folder, marker and data/ as unseenet's portable build,
+so both can be unpacked onto one stick and share the vault.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import zipfile
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+TOOLS = ROOT / "tools"
+TOP = "Unseenet"
+MARKER = "UNSEENET-PORTABLE"
+PLATFORMS = ("linux-x86_64", "windows-x86_64", "macos-aarch64", "macos-x86_64")
+LAUNCHERS = {
+    "linux": ["start-web-linux.sh"],
+    "windows": ["Start Unseenet Web.bat"],
+    "macos": ["Start Unseenet Web.command"],
+}
+
+
+def log(msg: str) -> None:
+    print(f"[build-web] {msg}", flush=True)
+
+
+def version() -> str:
+    text = (ROOT / "src" / "unseenet_web" / "__init__.py").read_text()
+    return re.search(r'__version__ = "([^"]+)"', text).group(1)
+
+
+def core_tools(core: Path):
+    """unseenet's tools/build_portable.py, as a module."""
+    path = core / "tools" / "build_portable.py"
+    if not path.is_file():
+        sys.exit(f"{path} not found: --core must be a checkout of github.com/unseenet/unseenet")
+    spec = importlib.util.spec_from_file_location("core_build_portable", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def pyinstaller(plat: str, work: Path, core: Path) -> Path:
+    entry = work / "unseenet_web_entry.py"
+    entry.write_text("from unseenet_web.__main__ import main\nmain()\n")
+    cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir", "--console",
+           "--name", "unseenet-web",
+           "--distpath", str(work / "dist"), "--workpath", str(work / "build"), "--specpath", str(work),
+           "--collect-submodules", "unseenet", "--collect-data", "unseenet",
+           "--collect-submodules", "unseenet_web", "--collect-data", "unseenet_web",
+           "--collect-submodules", "aiohttp",
+           "--collect-all", "nacl", "--hidden-import", "_cffi_backend",
+           "--collect-data", "certifi",
+           # not used by the web client; unseenet.boot and the TUI import them
+           "--exclude-module", "textual", "--exclude-module", "rich",
+           "--exclude-module", "tkinter", "--exclude-module", "unittest", "--exclude-module", "PIL"]
+    if not plat.startswith("linux"):
+        cmd += ["--collect-all", "webview"]          # the app window (WebView2 / WKWebView)
+    if not plat.startswith("windows"):
+        cmd.append("--strip")
+    icon = core / "assets" / "icon-512.png"
+    if icon.exists() and not plat.startswith("linux"):
+        try:
+            import PIL  # noqa: F401
+            cmd += ["--icon", str(icon)]
+        except ImportError:
+            log("Pillow not installed: building without an icon")
+    cmd.append(str(entry))
+    log("running PyInstaller")
+    subprocess.run(cmd, check=True, cwd=work)
+    return work / "dist" / "unseenet-web"
+
+
+def add_launchers(top: Path, system: str) -> None:
+    for name in LAUNCHERS[system]:
+        data = (TOOLS / "portable" / name).read_bytes().replace(b"\r\n", b"\n")
+        if system == "windows":
+            data = data.replace(b"\n", b"\r\n")
+        (top / name).write_bytes(data)
+        (top / name).chmod(0o644 if system == "windows" else 0o755)
+
+
+def common_files(top: Path) -> None:
+    (top / MARKER).write_text(
+        "This folder is a portable Unseenet. Its programs keep everything in data/\n"
+        "beside them. Delete this file to make them use the current directory.\n")
+    shutil.copy2(TOOLS / "portable" / "README-web.txt", top / "README-web.txt")
+    licenses = top / "LICENSES"
+    licenses.mkdir(exist_ok=True)
+    shutil.copy2(ROOT / "LICENSE", licenses / "unseenet-web-LICENSE.txt")
+
+
+def write_zip(stage: Path, zip_path: Path) -> None:
+    """Zip keeping Unix modes and symlinks. No UNSEENET-VERSION/FILES: those belong
+    to the terminal client's updater, which must not mistake this zip for its own."""
+    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+        for path in sorted(stage.rglob("*")):
+            arc = (Path(TOP) / path.relative_to(stage)).as_posix()
+            info = zipfile.ZipInfo(arc + ("/" if path.is_dir() and not path.is_symlink() else ""),
+                                   (2026, 1, 1, 0, 0, 0))
+            info.create_system = 3
+            if path.is_symlink():
+                info.external_attr = 0o120777 << 16
+                z.writestr(info, os.readlink(path))
+            elif path.is_dir():
+                info.external_attr = (0o40755 << 16) | 0x10
+                z.writestr(info, b"")
+            else:
+                mode = 0o755 if (path.stat().st_mode & 0o111) else 0o644
+                info.external_attr = (0o100000 | mode) << 16
+                info.compress_type = zipfile.ZIP_DEFLATED
+                z.writestr(info, path.read_bytes())
+
+
+def build(plat: str, tor_archive: Path, out: Path, core: Path) -> Path:
+    up = core_tools(core)
+    with tempfile.TemporaryDirectory() as tmp:
+        work = Path(tmp)
+        stage = work / "stage" / TOP
+        prog = stage / f"web-{plat}"
+        stage.mkdir(parents=True)
+        common_files(stage)
+        add_launchers(stage, plat.split("-")[0])
+        shutil.copytree(pyinstaller(plat, work, core), prog, symlinks=True)
+        up.check_archive_digest(tor_archive)
+        up.unpack_tor(tor_archive, prog / "tor", stage / "LICENSES")
+        (prog / "tor" / "VERSION").write_text(tor_archive.name + "\n")
+        out.mkdir(parents=True, exist_ok=True)
+        zip_path = out / f"unseenet-web-{version()}-{plat}.zip"
+        write_zip(stage, zip_path)
+    log(f"built {zip_path} ({zip_path.stat().st_size // (1024 * 1024)} MB)")
+    return zip_path
+
+
+def combine(zips: list[Path], out: Path, core: Path) -> Path:
+    up = core_tools(core)
+    with tempfile.TemporaryDirectory() as tmp:
+        for z in zips:
+            log(f"adding {z.name}")
+            up.extract_zip(z, Path(tmp))
+        stage = Path(tmp) / TOP
+        for system in LAUNCHERS:
+            add_launchers(stage, system)
+        out.mkdir(parents=True, exist_ok=True)
+        zip_path = out / f"unseenet-web-{version()}-usb.zip"
+        write_zip(stage, zip_path)
+    log(f"built {zip_path} ({zip_path.stat().st_size // (1024 * 1024)} MB)")
+    return zip_path
+
+
+def main() -> None:
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--core", type=Path, default=Path(os.environ.get("UNSEENET_CORE", ROOT.parent / "unseenet")),
+                   help="checkout of github.com/unseenet/unseenet (default: ../unseenet or $UNSEENET_CORE)")
+    p.add_argument("--platform", choices=PLATFORMS)
+    p.add_argument("--tor-archive", type=Path, help="an expert bundle fetched with --fetch-tor")
+    p.add_argument("--fetch-tor", nargs="+", metavar="PLATFORM", help="download and verify bundles, then stop")
+    p.add_argument("--combine", nargs="+", type=Path, metavar="ZIP", help="merge platform zips into one USB zip")
+    p.add_argument("--checksums", nargs="+", type=Path, metavar="FILE", help="write SHA256SUMS.txt")
+    p.add_argument("--out", type=Path, default=ROOT / "dist-portable")
+    args = p.parse_args()
+    core = args.core.resolve()
+    up = core_tools(core)
+    if args.fetch_tor:
+        for plat in args.fetch_tor:
+            up.fetch_tor(plat, up.pinned_tor_version(), args.out)
+        return
+    if args.combine:
+        combine(args.combine, args.out, core)
+        return
+    if args.checksums:
+        print(up.checksums(args.checksums, args.out).read_text(), end="")
+        return
+    plat = args.platform or up.this_platform()
+    archive = args.tor_archive or up.fetch_tor(plat, up.pinned_tor_version(), args.out / "tor-download")
+    build(plat, archive, args.out, core)
+
+
+if __name__ == "__main__":
+    main()

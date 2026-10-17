@@ -12,6 +12,7 @@ import hashlib
 from unseenet.client.session import GroupInfo, Message, Session, split_signature
 from unseenet.core.groups import short_group_id
 
+CONTACT = "contact:"            # a conversation with one key, shown as a chat (as in the TUI)
 ACCESS_ICONS = {"moderated": "√", "channel": "►", "closed": "∩"}
 VIEW_ICONS = {"chat": "»", "data": "¤", "threads": "≡"}
 
@@ -44,11 +45,24 @@ def group_kind(s: Session, gid: str) -> dict:
             "encrypted": gtype == "closed"}
 
 
+def seen_name(s: Session, key_text: str) -> str:
+    """The name someone gave themselves in a post we have, for labelling a bare key."""
+    for msgs in s.cache.values():
+        for m in msgs.values():
+            if m.author_key == key_text and m.from_name:
+                return m.from_name
+    return ""
+
+
 def group_summary(s: Session, gid: str) -> dict:
     label = s.group_label(gid)
     data = s.manifest_data(gid)
     entry = s.group_entry(gid)
-    return {"id": gid, "label": label, "hierarchy": label.split("@")[0].split(".")[0],
+    members = []
+    if entry.get("owner") and (entry.get("type") or data.get("type")) == "closed":
+        members = [{"key": k, "label": s.identity_label(k, seen_name(s, k)), "colour": colour(k)}
+                   for k in s.members(gid)]
+    return {"members": members, "id": gid, "label": label, "hierarchy": label.split("@")[0].split(".")[0],
             "short": short_group_id(gid), "title": data.get("title") or entry.get("title", ""),
             "description": data.get("description", ""), "rules": data.get("rules", ""),
             "owner": entry.get("owner", False), "may_post": s.may_post(gid),
@@ -62,7 +76,9 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
     for g in sorted(groups, key=lambda g: g["label"]):
         hierarchies.setdefault(g["hierarchy"], []).append(g)
     inbox = s.my_inbox if inbox_ready else None
-    return {"for_you": len(s.for_you()),
+    people = [{"id": CONTACT + key, "key": key, "label": name, "colour": colour(key),
+               "unread": s.unread_from(key)} for key, name in s.contacts()]
+    return {"for_you": len(s.for_you()), "people": people,
             "inbox": {"id": inbox, "unread": s.unread_count(inbox) if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
 
@@ -87,7 +103,7 @@ def threaded(msgs: list[Message]) -> list[tuple[Message, int]]:
 def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns: list) -> dict:
     text, sig = split_signature(m.body) if m.readable else ("", None)
     if m.to_key:
-        who, who_key = "You → " + s.identity_label(m.to_key), m.to_key
+        who, who_key = "You → " + s.identity_label(m.to_key, seen_name(s, m.to_key)), m.to_key
     elif m.private and m.sender_key:
         who, who_key = s.identity_label(m.sender_key, m.from_name), m.sender_key
     else:
@@ -110,14 +126,23 @@ def group_view(s: Session, gid: str) -> dict:
                 "Only you can read these. Nodes see sealed envelopes.", "view": "threads",
                 "type": "inbox", "access": "@", "icon": "≡", "encrypted": True, "fast": False,
                 "may_post": False, "owner": True, "unread": s.unread_count(gid), "for_you": 0,
-                "rules": "", "description": ""}
+                "rules": "", "description": "", "members": [], "private_reply": True}
+    elif gid.startswith(CONTACT):
+        key = gid[len(CONTACT):]
+        msgs = s.visible(s.conversation(key))
+        head = {"id": gid, "label": s.identity_label(key, seen_name(s, key)), "hierarchy": "", "key": key,
+                "title": "Private conversation. Only the two of you can read it.",
+                "view": "chat", "type": "contact", "access": "@", "icon": "»", "encrypted": True,
+                "fast": False, "may_post": True, "owner": False, "unread": s.unread_from(key),
+                "for_you": 0, "rules": "", "description": "", "members": [],
+                "contact": bool(s.contact_name(key)), "colour": colour(key)}
     elif gid == "for-you":
         msgs = list(reversed(s.for_you(unread_only=False)[:200]))
         head = {"id": gid, "label": "For you", "hierarchy": "", "title":
                 "Replies to your posts and posts that name you, from all your groups",
                 "view": "threads", "type": None, "access": "", "icon": "◄", "encrypted": False,
                 "fast": False, "may_post": False, "owner": False, "unread": 0, "for_you": 0,
-                "rules": "", "description": ""}
+                "rules": "", "description": "", "members": []}
     else:
         msgs = s.visible(sorted(s.cache.get(gid, {}).values(), key=lambda m: m.number))
         head = group_summary(s, gid)

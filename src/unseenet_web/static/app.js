@@ -20,6 +20,15 @@ const TOKEN = (() => {
   return t;
 })();
 
+// ---- theme: the system's choice, or the one picked in the palette -------------
+function theme(set) {
+  let t = null;
+  try { if (set) localStorage.setItem("unseenet-theme", set); t = localStorage.getItem("unseenet-theme"); } catch (_) { t = set || null; }
+  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
+  return t || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+}
+theme();
+
 const S = {
   state: null, sidebar: null, gid: null, data: null, thread: null, replyTo: null,
   pending: {}, drafts: {}, dialog: null, status: "", error: "", busy: false,
@@ -101,7 +110,7 @@ function dayLabel(d) {
   return d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
 }
 function initials(who) {
-  const name = (who || "?").replace(/^You → /, "").replace(/^@/, "").trim();
+  const name = (who || "?").replace(/^You → /, "").replace(/^@/, "").replace(/ √$/, "").trim();
   const parts = name.split(/[\s.@_-]+/).filter(Boolean);
   return ((parts[0] || "?")[0] + (parts.length > 1 && name.includes(" ") ? parts[1][0] : "")).toUpperCase();
 }
@@ -135,7 +144,9 @@ function render() {
     if (el.dataset.stick === "bottom" && (!was || was.bottom)) el.scrollTop = el.scrollHeight;
     else if (was) el.scrollTop = was.top;
   });
-  const again = key && root.querySelector(`[data-k="${CSS.escape(key)}"]`);
+  // A dialog takes the focus from the page behind it; inside a dialog, keep the field you were in.
+  const inDialog = active && active.closest && active.closest(".dialog");
+  const again = key && (!S.dialog || inDialog) && root.querySelector(`[data-k="${CSS.escape(key)}"]`);
   if (again) {
     again.focus({ preventScroll: true });
     if (sel && again.setSelectionRange) try { again.setSelectionRange(sel[0], sel[1]); } catch (_) { }
@@ -160,9 +171,15 @@ function noToken() {
       "Start it again, or open the address it printed." })));
 }
 
+// The logo has light strokes for dark grounds; the ink version is for light ones.
+function logo(size) {
+  return [h("img", { class: "logo on-dark", src: "/static/icon.svg", alt: "", width: size, height: size }),
+          h("img", { class: "logo on-light", src: "/static/icon-ink.svg", alt: "", width: size, height: size })];
+}
+
 function brandHead(subject, headers) {
   return h("div", { class: "unlock-head" },
-    h("img", { src: "/static/icon.svg", alt: "", width: "56", height: "56" }),
+    logo(56),
     headers ? h("div", { class: "headers" }, headers) : null,
     h("h1", { class: "subject" }, h("small", { text: "Subject:" }), subject));
 }
@@ -181,6 +198,7 @@ function unlockScreen() {
     S.busy = false; render();
   };
   return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
+    st.bootable ? systemBar() : null,
     brandHead(isNew ? "A new vault." : "Welcome back.",
       ["Vault: ", h("b", { text: st.vault })]),
     h("form", { class: "form", onsubmit: submit },
@@ -199,6 +217,82 @@ function unlockScreen() {
       h("div", { class: "muted", text: "Nothing leaves this computer except through Tor. The window loads nothing from the internet." })),
     h("p", { class: "note" }, h("strong", { text: "Pre-alpha. " }),
       "The code has not had a security review. Do not rely on it to protect anyone yet.")));
+}
+
+// ---- the bootable image: network, keyboard, power ------------------------------
+let SYS = null;
+async function loadSystem() {
+  try { SYS = await api("GET", "/api/system"); } catch (_) { SYS = null; }
+  render();
+}
+
+function systemBar() {
+  if (SYS === null) { SYS = false; loadSystem(); }
+  const s = SYS || {};
+  const online = (s.addresses || []).length > 0;
+  return h("div", { class: "sysbar" },
+    h("button", { class: "btn", onclick: openNetwork },
+      h("span", { class: "dot" + (online ? " ok" : "") }),
+      online ? s.addresses.map(a => a.interface).join(", ") + " connected" : "No network - set it up"),
+    h("label", { class: "sr", for: "kbd", text: "Keyboard" }),
+    h("select", { id: "kbd", class: "btn", onchange: async (e) => {
+        const r = await api("POST", "/api/system/keyboard", { layout: e.target.value });
+        toast(r.restart ? "Changing the keyboard …" : "The keyboard changes at the next start.");
+      } }, (s.keyboards || []).map(k => h("option", { value: k.id, selected: k.id === s.keyboard ? "" : null, text: "⌨ " + k.name }))),
+    h("button", { class: "btn", onclick: () => power("reboot") }, "Restart"),
+    h("button", { class: "btn", onclick: () => power("poweroff") }, "Shut down"));
+}
+
+async function power(action) {
+  if (!confirm(action === "poweroff" ? "Shut down the computer?" : "Restart the computer?")) return;
+  try { await api("POST", "/api/system/power", { action }); } catch (_) { }
+  document.getElementById("root").replaceChildren(h("div", { class: "unlock" },
+    h("p", { class: "muted", text: action === "poweroff" ? "Shutting down …" : "Restarting …" })));
+}
+
+function openNetwork() {
+  const nets = {}, busy = {};
+  let msg = "", pick = null;
+  loadSystem();
+  const scan = async (dev) => {
+    busy[dev] = true; render();
+    try { nets[dev] = await api("POST", "/api/system/wifi", { action: "scan", device: dev }); }
+    catch (e) { msg = e.message; }
+    busy[dev] = false; render();
+  };
+  const connect = async (dev, name, pass) => {
+    msg = "Connecting to " + name + " …"; render();
+    try {
+      const r = await api("POST", "/api/system/wifi", { action: "connect", device: dev, name, passphrase: pass });
+      msg = r.ok ? "Connected to " + name + "." : r.message; pick = null;
+      await loadSystem(); scan(dev);
+    } catch (e) { msg = e.message; render(); }
+  };
+  S.dialog = { render: () => {
+    const s = SYS || {};
+    return dialogShell({ label: "Network", wide: true },
+      h("div", { class: "dh" }, h("h2", { text: "Network" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "db" },
+        h("p", { style: "margin:0" }, (s.addresses || []).length ? ["Connected: ",
+          s.addresses.map(a => h("span", { class: "mono", text: `${a.interface} ${a.address}  ` }))] :
+          "Not connected. A network cable works by itself; for Wi-Fi, pick a network below."),
+        h("p", { class: "hint", style: "margin:0", text: "Only Tor uses the network. The computer gets a new random hardware address for each Wi-Fi network." }),
+        (s.wifi || []).map(dev => [
+          h("div", { class: "row-between" }, h("h3", { style: "margin:6px 0 0;font-size:14px", text: "Wi-Fi (" + dev + ")" }),
+            h("button", { class: "btn", onclick: () => scan(dev), disabled: busy[dev] }, busy[dev] ? "Looking …" : "Look for networks")),
+          (nets[dev] || []).map(n => h("div", { class: "cmd" + (pick === n.name ? " on" : "") },
+            h("span", { class: "nm", text: (n.connected ? "● " : "") + n.name }),
+            h("small", { text: `${n.security} · ${n.signal}` }),
+            n.connected ? h("small", { text: "connected" }) : pick === n.name && n.security !== "open" ?
+              h("form", { class: "inline", onsubmit: (e) => { e.preventDefault(); connect(dev, n.name, e.target.pw.value); } },
+                h("label", { class: "sr", for: "pw", text: "Passphrase" }),
+                h("input", { id: "pw", name: "pw", type: "password", class: "in", placeholder: "Passphrase", "data-k": "pw", autofocus: true }),
+                h("button", { class: "btn primary", type: "submit" }, "Connect")) :
+              h("button", { class: "btn", onclick: () => { if (n.security === "open") connect(dev, n.name, ""); else { pick = n.name; render(); } } }, "Connect")))]),
+        !(s.wifi || []).length ? h("p", { class: "muted", style: "margin:0", text: "No Wi-Fi on this computer (or its firmware is not on the stick)." }) : null,
+        msg ? h("p", { class: "hint", style: "margin:0", role: "status", text: msg }) : null));
+  } };
+  render();
 }
 
 function setupScreen() {
@@ -305,13 +399,22 @@ function sidebar() {
     "aria-current": S.gid === gid ? "page" : null },
     h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
   return h("nav", { class: "side", "aria-label": "Groups" },
-    h("div", { class: "brand" }, h("img", { src: "/static/icon.svg", alt: "" }), "Unseenet"),
+    h("div", { class: "brand" }, logo(30), "Unseenet"),
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl K" })),
     sb ? h("div", { class: "nav" },
       item("for-you", "◄", "For you", sb.for_you ? h("span", { class: "foryou", text: `◄${sb.for_you}` }) : null),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private messages",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null) : null,
+    sb ? h("div", { class: "nav" },
+      h("h3", { class: "row-h" }, h("span", { text: "people" }),
+        h("button", { class: "mini", "aria-label": "Write to someone", title: "Write to someone", onclick: () => openWrite() }, svg(ICON.plus, 14, 2.5))),
+      sb.people.length ? sb.people.map(p => h("button", {
+        class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}`, onclick: () => openGroup(p.id) },
+        h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+        h("span", { class: "nm", text: p.label }),
+        p.unread ? h("span", { class: "count", text: p.unread }) : null)) :
+        h("p", { class: "hint", style: "margin:0 10px", text: "Add people as contacts, then write to them here." })) : null,
     sb ? sb.hierarchies.map(hier => h("div", { class: "nav" },
       h("h3", { text: hier.name + ".*" }),
       hier.groups.map(g => item(g.id, (g.access || "") + g.icon, g.label, [
@@ -342,6 +445,7 @@ function statusbar() {
       chat ? k("Esc", "shortcuts") : k("N", "new"), chat ? null : k("R", "reply"),
       k("V", "chat/threads"), k("G", "groups"), k("?", "about group"), k("Ctrl K", "commands")),
     h("span", { class: "grow" }),
+    S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     h("span", { class: "st", title: S.state.status },
       h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), S.state.status || "", " · pre-alpha"));
 }
@@ -355,17 +459,22 @@ function mainArea() {
   const g = d.group;
   const chips = [
     h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : "≡ threads" }),
-    g.encrypted ? h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5), g.type === "inbox" ? "sealed to you" : "closed · end-to-end encrypted") :
+    g.encrypted ? h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5),
+      g.type === "inbox" ? "sealed to you" : g.type === "contact" ? "private · sealed to each of you" : "closed · end-to-end encrypted") :
       g.type ? h("span", { class: "chip", text: g.type }) : null,
     g.fast ? h("span", { class: "chip warn", text: "fast delivery" }) : null,
   ];
-  const canSwitch = g.type && g.type !== "inbox";
+  const canSwitch = g.type && g.type !== "inbox" && g.type !== "contact";
   const head = h("header", { class: "ghead" },
-    S.mobileReading ? h("button", { class: "btn icon", "aria-label": "Back to threads", onclick: () => { S.mobileReading = false; render(); } }, svg(ICON.back)) : null,
+    S.mobileReading ? h("button", { class: "btn icon back", "aria-label": "Back to threads", onclick: () => { S.mobileReading = false; render(); } }, svg(ICON.back)) : null,
     h("div", { class: "t" },
       h("div", { class: "row" }, h("h1", { text: g.label }), chips),
       g.title ? h("p", { text: g.title }) : null),
     h("div", { class: "actions" },
+      g.type === "contact" ? [
+        h("button", { class: "btn", onclick: () => openAddContact(g.key, g.contact ? g.label.replace(/ √$/, "") : "") }, g.contact ? "Rename" : "Add contact"),
+        h("button", { class: "btn", onclick: () => copy(g.key, "Their key is copied.") }, "Copy key")] : null,
+      g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
@@ -423,7 +532,7 @@ function labelOf(gid) {
 
 function reader(g, t) {
   const target = S.replyTo && t.items.find(m => m.id === S.replyTo) || t.items[t.items.length - 1];
-  const posts = t.items.map(m => postEl(m, g, m === target && g.may_post));
+  const posts = t.items.map(m => postEl(m, g, m === target && (g.may_post || g.private_reply)));
   const pend = Object.entries(S.pending).filter(([, p]) => p.group === g.id && !p.chat && p.thread === t.root.id);
   return h("article", { class: "reader", "aria-label": "Thread" },
     h("div", { class: "scroll", "data-scroll": "reader:" + t.root.id },
@@ -433,7 +542,7 @@ function reader(g, t) {
         h("div", { class: "pb" }, h("div", { class: "ph" }, h("span", { class: "name", text: S.state.me.label }),
           pendingState(p)), h("p", { class: "text", text: p.text }),
           p.state === "failed" ? h("button", { class: "link", onclick: () => { delete S.pending[job]; render(); } }, "Dismiss") : null)))),
-    g.may_post && g.id !== "for-you" ? replyBox(g, t, target) : null);
+    (g.may_post || g.private_reply) && g.id !== "for-you" && target.key ? replyBox(g, t, target) : null);
 }
 
 function postEl(m, g, isTarget) {
@@ -454,10 +563,12 @@ function postEl(m, g, isTarget) {
       m.readable ? h("p", { class: "text", text: m.text }) : h("p", { class: "text bad", text: m.error || "Could not be read." }),
       m.signature ? h("p", { class: "sig", text: m.signature }) : null,
       h("div", { class: "pa" },
-        g.may_post && g.id !== "for-you" ? h("button", { class: "link", onclick: () => {
+        (g.may_post || g.private_reply) && g.id !== "for-you" ? h("button", { class: "link", onclick: () => {
           S.replyTo = m.id; render(); const r = document.querySelector('[data-k="reply"]'); if (r) r.focus(); } }, "Reply") : null,
         g.id === "for-you" ? h("button", { class: "link", onclick: async () => {
           await openGroup(m.group); S.thread = m.references[0] || m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
+        !m.mine && m.key && !g.private_reply ? h("button", { class: "link", onclick: () => openGroup("contact:" + m.key) }, "Message") : null,
+        !m.mine && m.key && !m.contact ? h("button", { class: "link", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
         h("button", { class: "link", onclick: () => copy(m.key, "Their key is copied.") }, "Copy key"))));
 }
 
@@ -468,7 +579,8 @@ function replyBox(g, t, target) {
     const text = ta.value.trim();
     if (!text) return;
     const subject = /^re:/i.test(t.root.subject) ? t.root.subject : "Re: " + t.root.subject;
-    doPost(g.id, { subject, body: text, references: [...target.references, target.id] },
+    if (g.private_reply) doSend("/api/private", g.id, { key: target.key, subject, body: text, reply_to: target.id }, { thread: t.root.id, text });
+    else doPost(g.id, { subject, body: text, references: [...target.references, target.id] },
       { thread: t.root.id, text });
     S.drafts[key] = ""; S.replyTo = null; ta.value = "";
   };
@@ -479,7 +591,8 @@ function replyBox(g, t, target) {
         oninput: (e) => { S.drafts[key] = e.target.value; },
         onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "Enter")) { e.preventDefault(); send(); } } }),
       h("button", { class: "btn primary", type: "submit", style: "height:44px" }, "Post reply")),
-    h("div", { class: "hint" }, h("kbd", { text: "Ctrl S" }), " posts · signed with your key · a few seconds of proof-of-work"));
+    h("div", { class: "hint" }, h("kbd", { text: "Ctrl S" }), g.private_reply ?
+      " sends · sealed to them: only they can read it" : " posts · signed with your key · a few seconds of proof-of-work"));
 }
 
 function pendingState(p) {
@@ -534,7 +647,8 @@ function chatView(d) {
     const input = document.querySelector('[data-k="chat"]');
     const text = input.value.trim();
     if (!text) return;
-    doPost(g.id, { body: text, chat: true }, { text, chat: true });
+    if (g.type === "contact") doSend("/api/private", g.id, { key: g.key, body: text, chat: true }, { text, chat: true });
+    else doPost(g.id, { body: text, chat: true }, { text, chat: true });
     input.value = ""; S.drafts["chat:" + g.id] = "";
   };
   return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
@@ -547,17 +661,21 @@ function chatView(d) {
           oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; } }),
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
       h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Esc" }), " for shortcuts",
-        g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
+        g.type === "contact" ? " · sealed to them" : g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
       h("div", { class: "chatbar hint", text: "Only chosen people can write here." })));
 }
 
 // ---- posting ------------------------------------------------------------
-async function doPost(gid, body, local) {
+function doPost(gid, body, local) {
+  return doSend(`/api/groups/${encodeURIComponent(gid)}/post`, gid, body, local);
+}
+
+async function doSend(path, gid, body, local) {
   try {
-    const { job } = await api("POST", `/api/groups/${encodeURIComponent(gid)}/post`, body);
-    S.pending[job] = { group: gid, state: "pow", body, ...local };
+    const { job } = await api("POST", path, body);
+    S.pending[job] = { group: gid, state: "pow", body, path, ...local };
   } catch (err) {
-    S.pending["local" + Date.now()] = { group: gid, state: "failed", error: err.message, body, ...local };
+    S.pending["local" + Date.now()] = { group: gid, state: "failed", error: err.message, body, path, ...local };
   }
   render();
 }
@@ -565,7 +683,7 @@ async function doPost(gid, body, local) {
 function retry(job) {
   const p = S.pending[job];
   delete S.pending[job];
-  doPost(p.group, p.body, { text: p.text, chat: p.chat, thread: p.thread });
+  doSend(p.path || `/api/groups/${encodeURIComponent(p.group)}/post`, p.group, p.body, { text: p.text, chat: p.chat, thread: p.thread });
 }
 
 async function toggleView() {
@@ -615,7 +733,11 @@ function openInfo() {
         h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
         h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
         h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id })),
-      g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }), h("p", { class: "text", style: "margin:0", text: g.rules })] : null)) };
+      g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }), h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
+      g.members && g.members.length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: `Members (${g.members.length})` }),
+        g.members.map(m => h("div", { class: "member" }, h("span", { class: `av xs c${m.colour}`, text: initials(m.label) }),
+          h("span", { class: "mono", text: m.label })))] : null),
+    g.owner && g.type === "closed" ? h("div", { class: "df btns" }, h("button", { class: "btn primary", onclick: openInvite }, "Invite someone")) : null) };
   render();
 }
 
@@ -671,6 +793,108 @@ function openBrowse() {
   render();
 }
 
+function formDialog({ label, title, focus, fields, submit, button, note, values }) {
+  let err = "";
+  const vals = { ...(values || {}) };       // kept across re-renders (choices re-render the dialog)
+  const keep = (e) => { if (e.target.name) vals[e.target.name] = e.target.type === "checkbox" ? e.target.checked : e.target.value; };
+  const go = async (e) => {
+    e && e.preventDefault();
+    const f = document.querySelector(".dialog form");
+    f.querySelectorAll("[name]").forEach(el => keep({ target: el }));
+    try { await submit(vals, f); }
+    catch (x) { err = x.message; render(); }
+  };
+  S.dialog = { focus, render: () => dialogShell({ label },
+    h("div", { class: "dh" }, h("h2", {}, title), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("form", { class: "db", onsubmit: go, oninput: keep, onchange: keep }, fields(vals), note ? h("p", { class: "hint", style: "margin:0", text: note }) : null,
+      h("div", { class: "error", role: "alert", text: err })),
+    h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", onclick: go }, button))) };
+  render();
+}
+
+function openAddContact(key, name) {
+  formDialog({ values: { key, name }, label: "Contact", title: key ? "Add contact" : "Add a contact", focus: key ? "#cname" : "#ckey", button: "Save",
+    note: "The name is yours alone: others never see it, and nobody can fake it - it is tied to their key.",
+    fields: (vals) => [
+      h("label", { for: "ckey", text: "Their key" }),
+      h("input", { id: "ckey", name: "key", class: "in mono", value: vals.key, "data-k": "ckey", placeholder: "ed25519:…", autocomplete: "off" }),
+      h("label", { for: "cname", text: "Your name for them" }),
+      h("input", { id: "cname", name: "name", class: "in", value: vals.name, "data-k": "cname", autocomplete: "off" })],
+    submit: async (v) => {
+      await api("POST", "/api/contacts", { key: v.key.trim(), name: v.name });
+      closeDialog(); toast("Contact saved."); await loadSidebar(); if (S.gid && S.gid.startsWith("contact:")) { await loadGroup(); render(); }
+    } });
+}
+
+function openWrite(key = "") {
+  formDialog({ values: { key, body: "" }, label: "Write to someone", title: "Write to someone", focus: key ? "#wtext" : "#wkey", button: "Send",
+    note: "The message is sealed to their key: the node cannot read it, nor see who sent it.",
+    fields: (vals) => [
+      h("label", { for: "wkey", text: "Their key" }),
+      h("input", { id: "wkey", name: "key", class: "in mono", value: vals.key, "data-k": "wkey", placeholder: "ed25519:… - they find it with K", autocomplete: "off" }),
+      h("label", { for: "wtext", text: "Message" }),
+      h("textarea", { id: "wtext", name: "body", class: "in", "data-k": "wtext", style: "min-height:120px", value: vals.body })],
+    submit: async (v) => {
+      const k = v.key.trim(), body = v.body.trim();
+      if (!k || !body) throw new Error("A key and a message, please.");
+      const gid = "contact:" + k;
+      closeDialog();
+      await openGroup(gid);
+      await doSend("/api/private", gid, { key: k, body, chat: true }, { text: body, chat: true });
+    } });
+}
+
+function openCreateGroup() {
+  let gtype = "open", view = "threads";
+  const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
+    onclick: () => { if (name === "type") gtype = value; else view = value; render(); } },
+    h("span", {}, h("span", { text: label }), h("small", { text: small })));
+  formDialog({ label: "Create a group", title: "Create a group", focus: "#gname", button: "Create",
+    note: "The group belongs to your key. Creating it costs some proof-of-work, and it is sent to your node now.",
+    fields: (vals) => [
+      h("label", { for: "gname", text: "Name" }),
+      h("input", { id: "gname", name: "name", class: "in mono", "data-k": "gname", value: vals.name || "", placeholder: "e.g. dk.snak.marsvin or alt.test", autocomplete: "off" }),
+      h("label", { text: "Who may write" }),
+      h("div", { class: "choices row" },
+        pick("type", "open", gtype, "Open", "anyone"),
+        pick("type", "moderated", gtype, "Moderated", "posts need approval"),
+        pick("type", "channel", gtype, "Channel", "only chosen people"),
+        pick("type", "closed", gtype, "Closed", "members only, encrypted")),
+      h("label", { text: "Shown as" }),
+      h("div", { class: "choices row" }, pick("view", "threads", view, "≡ Threads", "posts and replies"), pick("view", "chat", view, "» Chat", "messages in order")),
+      h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)"),
+      h("label", { for: "gtitle", text: "Title" }),
+      h("input", { id: "gtitle", name: "title", class: "in", "data-k": "gtitle", value: vals.title || "", placeholder: "One line about the group" })],
+    submit: async (v) => {
+      toast("Creating the group - proof-of-work takes a moment …");
+      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view, fast: !!v.fast, title: v.title });
+      closeDialog(); await loadSidebar(); await openGroup(id); toast("The group is created.");
+    } });
+}
+
+function openInvite() {
+  const g = S.data && S.data.group;
+  if (!g || !g.owner || g.type !== "closed") return;
+  formDialog({ label: "Invite", title: "Invite to " + g.label, focus: "#ikey", button: "Invite",
+    note: "They get the group's key, sealed to them. They find their own key with K.",
+    fields: (vals) => [h("label", { for: "ikey", text: "Their key" }),
+      h("input", { id: "ikey", name: "key", class: "in mono", "data-k": "ikey", value: vals.key || "", placeholder: "ed25519:…", autocomplete: "off" })],
+    submit: async (v) => {
+      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/invite`, { key: v.key.trim() });
+      closeDialog(); toast("Invited."); await loadGroup(); render();
+    } });
+}
+
+async function openSignature() {
+  const cur = await api("GET", "/api/signature");
+  formDialog({ values: { template: cur.template }, label: "Signature", title: "Your signature", focus: "#sig", button: "Save",
+    note: "Added below your posts (not chat). {name}, {key} and {fp} are filled in. Empty: no signature. At most 4 lines.",
+    fields: (vals) => [h("label", { for: "sig", class: "sr", text: "Signature" }),
+      h("textarea", { id: "sig", name: "template", class: "in mono", value: vals.template, "data-k": "sig", style: "min-height:100px" })],
+    submit: async (v) => { await api("POST", "/api/signature", { template: v.template }); closeDialog(); toast("Signature saved."); } });
+}
+
 function commands() {
   const g = S.data && S.data.group;
   const cmds = [
@@ -678,6 +902,15 @@ function commands() {
     { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
     { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
     { name: "Find groups on your nodes", key: "G", run: openBrowse },
+    { name: "Create a group", key: "", run: openCreateGroup },
+    { name: "Write to someone (paste their key)", key: "M", run: () => openWrite() },
+    { name: "Add a contact", key: "", run: () => openAddContact("", "") },
+    { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
+    { name: "Edit your signature", key: "", run: openSignature },
+    { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },
+    { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
+    { name: "Shut down the computer", key: "", when: S.state.bootable, run: () => power("poweroff") },
+    { name: theme() === "light" ? "Use the dark theme" : "Use the light theme", key: "", run: () => { theme(theme() === "light" ? "dark" : "light"); render(); } },
     { name: "Show my key", key: "K", run: openKey },
     { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
     { name: "Private messages", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
@@ -735,7 +968,7 @@ document.addEventListener("keydown", (e) => {
   if (S.dialog || typing(document.activeElement) || ctrl || e.altKey) return;
   const g = S.data && S.data.group;
   const keys = {
-    n: () => openCompose(), v: () => toggleView(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
+    n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
     r: () => { const el = document.querySelector('[data-k="reply"]'); if (el) el.focus(); },
     Enter: () => { const el = document.querySelector('[data-k="chat"]'); if (el) el.focus(); },
   };
@@ -772,7 +1005,8 @@ function connectEvents() {
         try { S.state = await api("GET", "/api/state"); } catch (_) { }
         await loadSidebar();
       }, 250);
-    } else if (e.type === "group" && (e.id === S.gid || S.gid === "for-you")) {
+    } else if (e.type === "group" && (e.id === S.gid || S.gid === "for-you" ||
+               (S.gid && S.gid.startsWith("contact:") && S.sidebar && e.id === S.sidebar.inbox.id))) {
       await loadGroup(); render();
     } else if (e.type === "post") {
       const p = S.pending[e.job];
