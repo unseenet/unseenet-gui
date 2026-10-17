@@ -169,15 +169,19 @@ jobs:
           IMG=dist/image/unseenet-web-$VERSION-x86_64.img
           TIMEOUT=1200 sh tools/image/boot-test.sh "$IMG" bios
           TIMEOUT=1200 sh tools/image/boot-test.sh "$IMG" uefi
-      - uses: actions/upload-artifact@v4
+      - name: The splash, the self-test's screenshots and the boot logs
+        uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: unseenet-web-image
+          name: image-checks
           path: |
-            dist/image/unseenet-web-*.img.xz
             dist/image/splash.png
             dist/image/selftest-screen-*.png
             dist/image/boot-test-*.log
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unseenet-web-image
+          path: dist/image/unseenet-web-*.img.xz
           compression-level: 0
 
   release:
