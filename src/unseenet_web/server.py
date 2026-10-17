@@ -71,6 +71,8 @@ async def guard(request: web.Request, handler):
         response = _error(str(exc))
     except NETWORK_ERRORS as exc:
         response = _error(f"network: {exc}", 502)
+    except (ValueError, KeyError) as exc:          # a bad key, name or group ID
+        response = _error(str(exc) or "not valid")
     response.headers["Content-Security-Policy"] = CSP
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "no-referrer"
@@ -195,6 +197,57 @@ async def post(request):
     return _json({"job": job})
 
 
+async def private(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    body = str(data.get("body", "")).strip("\n")
+    if not body.strip():
+        return _error("nothing to send")
+    job = rt.send_private(str(data.get("key", "")).strip(), body, str(data.get("subject", "")).strip(),
+                          reply_to=data.get("reply_to"), chat=bool(data.get("chat")))
+    return _json({"job": job})
+
+
+async def contacts(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    key = str(data.get("key", "")).strip()
+    if data.get("remove"):
+        rt.remove_contact(key)
+    else:
+        rt.add_contact(key, str(data.get("name", "")))
+    return _json({"ok": True})
+
+
+async def create(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    gtype = data.get("type", "open")
+    if gtype not in ("open", "moderated", "channel", "closed"):
+        return _error("type is open, moderated, channel or closed")
+    name = str(data.get("name", "")).strip().lower()
+    if not name:
+        return _error("a group needs a name")
+    gid = await rt.create_group(name, gtype, str(data.get("view", "threads")), bool(data.get("fast")),
+                                str(data.get("title", "")).strip(), str(data.get("description", "")).strip())
+    return _json({"id": gid})
+
+
+async def invite(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    await rt.invite(request.match_info["gid"], str(data.get("key", "")).strip())
+    return _json({"ok": True})
+
+
+async def signature(request):
+    rt = _unlocked(request)
+    if request.method == "POST":
+        data = await _body(request)
+        rt.set_signature(str(data.get("template", "")))
+    return _json({"template": rt.session.signature_template(), "preview": rt.session.signature()})
+
+
 async def browse(request):
     return _json(await _unlocked(request).browse())
 
@@ -250,6 +303,12 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/groups/{gid}/read", read)
     r.add_post("/api/groups/{gid}/view", view)
     r.add_post("/api/groups/{gid}/post", post)
+    r.add_post("/api/groups", create)
+    r.add_post("/api/groups/{gid}/invite", invite)
+    r.add_post("/api/private", private)
+    r.add_post("/api/contacts", contacts)
+    r.add_get("/api/signature", signature)
+    r.add_post("/api/signature", signature)
     r.add_get("/api/browse", browse)
     r.add_post("/api/subscribe", subscribe)
     r.add_post("/api/refresh", refresh)

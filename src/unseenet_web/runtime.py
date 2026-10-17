@@ -15,6 +15,8 @@ import os
 from pathlib import Path
 
 from unseenet.client.session import Message, Session, SessionError
+from unseenet.core import crypto
+from unseenet.core.groups import personal_inbox_id
 from unseenet.core.vault import Vault, VaultError
 from unseenet.nntp import NNTPError
 
@@ -203,7 +205,7 @@ class Runtime:
     def mark_read(self, gid: str, ids: list[str]) -> None:
         s = self.session
         wanted = set(ids)
-        if gid == s.my_inbox:
+        if gid == s.my_inbox or gid.startswith(serialize.CONTACT):
             pool = s.private_messages()
         elif gid == "for-you":                       # posts from all your groups
             pool = [m for msgs in s.cache.values() for m in msgs.values()]
@@ -249,6 +251,65 @@ class Runtime:
         await self._fetch(gid)
         self.emit("post", job=job, group=gid, state="reached", message_id=msgid)
 
+    # --- private messages, contacts, groups ------------------------------
+    def send_private(self, key_text: str, body: str, subject: str = "",
+                     reply_to: str | None = None, chat: bool = False) -> str:
+        """Seal a message to someone's inbox. Their key is all you need."""
+        s = self.session
+        owner = crypto.key_from_text(key_text)          # raises on a bad key
+        if key_text == s.identity().key_text:
+            raise SessionError("that is your own key")
+        inbox, refs = personal_inbox_id(owner), []
+        if reply_to:
+            msg = find_message(s, s.my_inbox, reply_to)
+            if msg is not None:
+                inbox = s.reply_target(msg) or inbox
+                refs = msg.references + [msg.message_id]
+        if chat or not subject:
+            subject = body.split("\n", 1)[0][:60] + ("…" if len(body) > 60 else "")
+        self._jobs += 1
+        job = f"job{self._jobs}"
+        ui_group = serialize.CONTACT + key_text if chat else s.my_inbox
+        self.spawn(self._private(job, ui_group, inbox, owner, subject, body, refs))
+        return job
+
+    async def _private(self, job, ui_group, inbox, owner, subject, body, refs) -> None:
+        s = self.session
+        self.emit("post", job=job, group=ui_group, state="pow")
+        try:
+            msgid = await s.send_private(inbox, subject, body, owner_key=owner, references=refs or None)
+        except (*NETWORK_ERRORS, ValueError) as exc:
+            self.emit("post", job=job, group=ui_group, state="failed", error=str(exc))
+            return
+        self.emit("post", job=job, group=ui_group, state="sent", message_id=msgid)
+        self.emit("group", id=ui_group)
+        self.emit("group", id=s.my_inbox)
+        self.emit("post", job=job, group=ui_group, state="reached", message_id=msgid)
+
+    def add_contact(self, key_text: str, name: str) -> None:
+        self.session.add_contact(key_text, name)
+        self.emit("groups")
+
+    def remove_contact(self, key_text: str) -> None:
+        self.session.remove_contact(key_text)
+        self.emit("groups")
+
+    async def create_group(self, name: str, gtype: str, view: str, fast: bool,
+                           title: str, description: str) -> str:
+        gid = await self.session.create_group(
+            name, gtype, title=title, description=description,
+            view=view if view in ("threads", "chat") else None, low_latency=fast)
+        await self._fetch(gid)
+        return gid
+
+    async def invite(self, gid: str, key_text: str) -> None:
+        crypto.key_from_text(key_text)
+        await self.session.invite(gid, key_text)
+        self.emit("group", id=gid)
+
+    def set_signature(self, template: str) -> None:
+        self.session.set_signature(template)
+
     async def browse(self) -> list[dict]:
         groups = await self.session.list_groups()
         return [serialize.browse_entry(self.session, g) for g in groups]
@@ -261,5 +322,6 @@ class Runtime:
 
 
 def find_message(s: Session, gid: str, message_id: str) -> Message | None:
-    pool = s.private_messages() if gid == s.my_inbox else s.cache.get(gid, {}).values()
+    pool = (list(s.cache.get(gid, {}).values()) + s.private_messages() if gid == s.my_inbox
+            else s.cache.get(gid, {}).values())
     return next((m for m in pool if m.message_id == message_id), None)
