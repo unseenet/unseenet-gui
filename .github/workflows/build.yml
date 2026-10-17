@@ -1,0 +1,212 @@
+name: build
+# Portable builds with Tor inside (Linux, Windows, macOS), one all-in-one USB
+# zip, and the bootable graphical image - each self-tested. Like unseenet's own
+# portable workflow, and using its Tor handling: Tor is downloaded and its
+# OpenPGP signature checked by unseenet's tools/build_portable.py.
+#
+# On version tags the files are attached to the release; on pushes to main they
+# replace the "dev" pre-release.
+on:
+  push:
+    tags: ["v*"]
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CORE_REF: main          # the unseenet core these builds are made with
+
+jobs:
+  tor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: unseenet/unseenet
+          ref: ${{ env.CORE_REF }}
+          path: core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: >
+          python tools/build_portable.py --core core --out tor
+          --fetch-tor linux-x86_64 windows-x86_64 macos-aarch64 macos-x86_64
+      - run: cp core/tools/tor-version.txt tor/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tor-bundles
+          path: tor/
+
+  portable:
+    needs: tor
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {platform: linux-x86_64, runner: ubuntu-22.04}
+          - {platform: windows-x86_64, runner: windows-latest}
+          - {platform: macos-aarch64, runner: macos-latest}
+          - {platform: macos-x86_64, runner: macos-15-intel}
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: unseenet/unseenet
+          ref: ${{ env.CORE_REF }}
+          path: core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Development version (not on release tags)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        shell: bash
+        run: sed -i.bak "s/^__version__ = \"\(.*\)\.dev0\"/__version__ = \"\1.dev${{ github.run_number }}\"/" src/unseenet_web/__init__.py
+      - name: Install
+        shell: bash
+        run: |
+          pip install ./core aiohttp pyinstaller pillow
+          case "${{ matrix.platform }}" in linux-*) ;; *) pip install pywebview ;; esac
+          pip install --no-deps .
+      - uses: actions/download-artifact@v4
+        with:
+          name: tor-bundles
+          path: tor
+      - name: Build
+        shell: bash
+        run: >
+          python tools/build_portable.py --core core --platform ${{ matrix.platform }} --out dist
+          --tor-archive tor/tor-expert-bundle-${{ matrix.platform }}-$(cat tor/tor-version.txt).tar.gz
+      - name: Unpack as a user would
+        shell: bash
+        run: |
+          mkdir try && cd try && python -c "import importlib.util as u; s=u.spec_from_file_location('b','../core/tools/build_portable.py'); b=u.module_from_spec(s); s.loader.exec_module(b); from pathlib import Path; b.extract_zip(next(Path('../dist').glob('*.zip')), Path('.'))"
+      - name: Self-test, offline (the program, its server and Tor start)
+        shell: bash
+        working-directory: try/Unseenet
+        run: ./web-${{ matrix.platform }}/unseenet-web --self-test --offline
+      - name: Self-test over the Tor network
+        continue-on-error: true            # the runner's network may not reach Tor
+        timeout-minutes: 5
+        shell: bash
+        working-directory: try/Unseenet
+        run: >
+          ./web-${{ matrix.platform }}/unseenet-web --self-test
+          --node f6vnchi5p7ll4yn6yot6cz4ohzuxy3uhc3kztafuwn3zlyoup6tn64qd.onion
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unseenet-web-${{ matrix.platform }}
+          path: dist/*.zip
+          compression-level: 0
+
+  usb:
+    needs: portable
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: unseenet/unseenet
+          ref: ${{ env.CORE_REF }}
+          path: core
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Development version (not on release tags)
+        if: "!startsWith(github.ref, 'refs/tags/v')"
+        run: sed -i "s/^__version__ = \"\(.*\)\.dev0\"/__version__ = \"\1.dev${{ github.run_number }}\"/" src/unseenet_web/__init__.py
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unseenet-web-*
+          path: zips
+          merge-multiple: true
+      - run: python tools/build_portable.py --core core --combine zips/*.zip --out zips
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unseenet-web-usb
+          path: zips/*-usb.zip
+          compression-level: 0
+
+  image:
+    # Alpine from RAM with the client full screen; booted in QEMU (BIOS and
+    # UEFI), where its self-test must pass: the page loads in the kiosk, Tor connects.
+    needs: usb
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: unseenet/unseenet
+          ref: ${{ env.CORE_REF }}
+          path: core
+      - uses: actions/download-artifact@v4
+        with:
+          name: unseenet-web-usb
+          path: usb
+      - name: Build
+        run: |
+          VERSION=$(sed -n 's/^__version__ = "\(.*\)"/\1/p' src/unseenet_web/__init__.py)
+          case "$GITHUB_REF" in
+            refs/tags/v*) VERSION="${GITHUB_REF_NAME#v}" ;;
+            *) VERSION="${VERSION%.dev0}.dev${{ github.run_number }}" ;;
+          esac
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          VERSION=$VERSION sh tools/image/build.sh core usb/*-usb.zip
+      - name: Boot it in QEMU (BIOS and UEFI) and run its self-test
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq qemu-system-x86 ovmf mtools >/dev/null
+          sudo chmod a+rw /dev/kvm 2>/dev/null || true
+          sudo chown -R "$(id -u)" dist
+          IMG=dist/image/unseenet-web-$VERSION-x86_64.img
+          TIMEOUT=1200 sh tools/image/boot-test.sh "$IMG" bios
+          TIMEOUT=1200 sh tools/image/boot-test.sh "$IMG" uefi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unseenet-web-image
+          path: |
+            dist/image/unseenet-web-*.img.xz
+            dist/image/splash.png
+            dist/image/selftest-screen-*.png
+            dist/image/boot-test-*.log
+          compression-level: 0
+
+  release:
+    needs: [usb, image]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: unseenet-web-*
+          path: files
+          merge-multiple: true
+      - name: Checksums
+        run: |
+          cd files && rm -f splash.png selftest-screen-*.png boot-test-*.log
+          sha256sum *.zip *.img.xz > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Release (tags) or the dev pre-release (main)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
+            gh release create "$GITHUB_REF_NAME" files/* --title "Unseenet web $GITHUB_REF_NAME" \
+              --notes "Portable builds with Tor inside, and the bootable graphical image. Pre-alpha."
+          else
+            gh release delete dev --yes --cleanup-tag 2>/dev/null || true
+            gh release create dev files/* --prerelease --latest=false --target "$GITHUB_SHA" \
+              --title "Development build" \
+              --notes "The newest code on main, built and self-tested automatically ($GITHUB_SHA). Not a release. Pre-alpha: not security reviewed."
+          fi
