@@ -18,6 +18,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import hmac
+import os
 import json
 import secrets
 from importlib import resources
@@ -27,6 +28,7 @@ from aiohttp import WSMsgType, web
 
 from unseenet.client.session import SessionError
 
+from . import system
 from .runtime import NETWORK_ERRORS, Runtime
 
 TOKEN_PROTOCOL = "unseenet-token."
@@ -125,7 +127,64 @@ async def static(request: web.Request) -> web.Response:
 # --- API --------------------------------------------------------------------
 
 async def state(request):
-    return _json(_rt(request).state())
+    marker = request.app["conf"].get("marker")
+    if marker:                                   # the page is up and its script runs (image self-test)
+        try:
+            Path(marker).write_text("page loaded\n")
+        except OSError:
+            pass
+    data = _rt(request).state()
+    if system.enabled():
+        data["bootable"] = True
+        data["keyboard"] = system.keyboard()
+    return _json(data)
+
+
+# --- the bootable image: network, keyboard, power -------------------------------
+def _bootable():
+    if not system.enabled():
+        raise web.HTTPNotFound()
+
+
+async def system_status(request):
+    _bootable()
+    return _json(await asyncio.to_thread(system.status))
+
+
+async def system_wifi(request):
+    _bootable()
+    data = await _body(request)
+    device = str(data.get("device", ""))
+    if data.get("action") == "scan":
+        return _json(await asyncio.to_thread(system.wifi_networks, device))
+    ok, msg = await asyncio.to_thread(system.wifi_connect, device, str(data.get("name", "")),
+                                      str(data.get("passphrase", "")) or None)
+    if ok:                                       # Tor may have given up while offline
+        rt = _rt(request)
+        if rt.session is not None:
+            rt.spawn(rt.refresh())
+    return _json({"ok": ok, "message": msg}, 200 if ok else 400)
+
+
+async def system_keyboard(request):
+    _bootable()
+    data = await _body(request)
+    system.set_keyboard(str(data.get("layout", "")))
+    rt = _rt(request)
+    if rt.session is None:                       # nothing unlocked yet: restart with the layout now
+        system.request_restart()
+        asyncio.get_running_loop().call_later(0.4, os._exit, system.RESTART)
+        return _json({"restart": True})
+    return _json({"restart": False})             # unlocked: it applies at the next start
+
+
+async def system_power(request):
+    _bootable()
+    data = await _body(request)
+    rt = _rt(request)
+    await rt.close()                             # stop Tor, save the vault
+    system.power(str(data.get("action", "")))
+    return _json({"ok": True})
 
 
 async def unlock(request):
@@ -290,7 +349,7 @@ async def events(request):
 def make_app(runtime: Runtime, token: str) -> web.Application:
     app = web.Application(middlewares=[guard], client_max_size=256 * 1024)
     app["runtime"], app["token"] = runtime, token
-    app["conf"] = {"port": 0}          # set once the socket is bound
+    app["conf"] = {"port": 0, "marker": os.environ.get("UNSEENET_WEB_MARKER")}   # port: once bound
     r = app.router
     r.add_get("/", index)
     r.add_get("/static/{name}", static)
@@ -313,6 +372,10 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/subscribe", subscribe)
     r.add_post("/api/refresh", refresh)
     r.add_get("/api/events", events)
+    r.add_get("/api/system", system_status)
+    r.add_post("/api/system/wifi", system_wifi)
+    r.add_post("/api/system/keyboard", system_keyboard)
+    r.add_post("/api/system/power", system_power)
 
     async def closing(app):
         await runtime.close()

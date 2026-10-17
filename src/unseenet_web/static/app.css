@@ -322,3 +322,11 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400 !important; }
 .member { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .dialog form .error:empty { display: none; }
+
+/* ---- the bootable image ---------------------------------------------------------- */
+.sysbar { display: flex; flex-wrap: wrap; gap: 8px; }
+.sysbar select.btn { appearance: none; background: transparent; padding-right: 14px; }
+.sysbar select option { background: var(--ink); color: var(--paper); }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.cmd form.inline { display: flex; gap: 6px; align-items: center; }
+.cmd form.inline .in { width: 180px; padding: 6px 10px; }

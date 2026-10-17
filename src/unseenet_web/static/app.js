@@ -198,6 +198,7 @@ function unlockScreen() {
     S.busy = false; render();
   };
   return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
+    st.bootable ? systemBar() : null,
     brandHead(isNew ? "A new vault." : "Welcome back.",
       ["Vault: ", h("b", { text: st.vault })]),
     h("form", { class: "form", onsubmit: submit },
@@ -216,6 +217,82 @@ function unlockScreen() {
       h("div", { class: "muted", text: "Nothing leaves this computer except through Tor. The window loads nothing from the internet." })),
     h("p", { class: "note" }, h("strong", { text: "Pre-alpha. " }),
       "The code has not had a security review. Do not rely on it to protect anyone yet.")));
+}
+
+// ---- the bootable image: network, keyboard, power ------------------------------
+let SYS = null;
+async function loadSystem() {
+  try { SYS = await api("GET", "/api/system"); } catch (_) { SYS = null; }
+  render();
+}
+
+function systemBar() {
+  if (SYS === null) { SYS = false; loadSystem(); }
+  const s = SYS || {};
+  const online = (s.addresses || []).length > 0;
+  return h("div", { class: "sysbar" },
+    h("button", { class: "btn", onclick: openNetwork },
+      h("span", { class: "dot" + (online ? " ok" : "") }),
+      online ? s.addresses.map(a => a.interface).join(", ") + " connected" : "No network - set it up"),
+    h("label", { class: "sr", for: "kbd", text: "Keyboard" }),
+    h("select", { id: "kbd", class: "btn", onchange: async (e) => {
+        const r = await api("POST", "/api/system/keyboard", { layout: e.target.value });
+        toast(r.restart ? "Changing the keyboard …" : "The keyboard changes at the next start.");
+      } }, (s.keyboards || []).map(k => h("option", { value: k.id, selected: k.id === s.keyboard ? "" : null, text: "⌨ " + k.name }))),
+    h("button", { class: "btn", onclick: () => power("reboot") }, "Restart"),
+    h("button", { class: "btn", onclick: () => power("poweroff") }, "Shut down"));
+}
+
+async function power(action) {
+  if (!confirm(action === "poweroff" ? "Shut down the computer?" : "Restart the computer?")) return;
+  try { await api("POST", "/api/system/power", { action }); } catch (_) { }
+  document.getElementById("root").replaceChildren(h("div", { class: "unlock" },
+    h("p", { class: "muted", text: action === "poweroff" ? "Shutting down …" : "Restarting …" })));
+}
+
+function openNetwork() {
+  const nets = {}, busy = {};
+  let msg = "", pick = null;
+  loadSystem();
+  const scan = async (dev) => {
+    busy[dev] = true; render();
+    try { nets[dev] = await api("POST", "/api/system/wifi", { action: "scan", device: dev }); }
+    catch (e) { msg = e.message; }
+    busy[dev] = false; render();
+  };
+  const connect = async (dev, name, pass) => {
+    msg = "Connecting to " + name + " …"; render();
+    try {
+      const r = await api("POST", "/api/system/wifi", { action: "connect", device: dev, name, passphrase: pass });
+      msg = r.ok ? "Connected to " + name + "." : r.message; pick = null;
+      await loadSystem(); scan(dev);
+    } catch (e) { msg = e.message; render(); }
+  };
+  S.dialog = { render: () => {
+    const s = SYS || {};
+    return dialogShell({ label: "Network", wide: true },
+      h("div", { class: "dh" }, h("h2", { text: "Network" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "db" },
+        h("p", { style: "margin:0" }, (s.addresses || []).length ? ["Connected: ",
+          s.addresses.map(a => h("span", { class: "mono", text: `${a.interface} ${a.address}  ` }))] :
+          "Not connected. A network cable works by itself; for Wi-Fi, pick a network below."),
+        h("p", { class: "hint", style: "margin:0", text: "Only Tor uses the network. The computer gets a new random hardware address for each Wi-Fi network." }),
+        (s.wifi || []).map(dev => [
+          h("div", { class: "row-between" }, h("h3", { style: "margin:6px 0 0;font-size:14px", text: "Wi-Fi (" + dev + ")" }),
+            h("button", { class: "btn", onclick: () => scan(dev), disabled: busy[dev] }, busy[dev] ? "Looking …" : "Look for networks")),
+          (nets[dev] || []).map(n => h("div", { class: "cmd" + (pick === n.name ? " on" : "") },
+            h("span", { class: "nm", text: (n.connected ? "● " : "") + n.name }),
+            h("small", { text: `${n.security} · ${n.signal}` }),
+            n.connected ? h("small", { text: "connected" }) : pick === n.name && n.security !== "open" ?
+              h("form", { class: "inline", onsubmit: (e) => { e.preventDefault(); connect(dev, n.name, e.target.pw.value); } },
+                h("label", { class: "sr", for: "pw", text: "Passphrase" }),
+                h("input", { id: "pw", name: "pw", type: "password", class: "in", placeholder: "Passphrase", "data-k": "pw", autofocus: true }),
+                h("button", { class: "btn primary", type: "submit" }, "Connect")) :
+              h("button", { class: "btn", onclick: () => { if (n.security === "open") connect(dev, n.name, ""); else { pick = n.name; render(); } } }, "Connect")))]),
+        !(s.wifi || []).length ? h("p", { class: "muted", style: "margin:0", text: "No Wi-Fi on this computer (or its firmware is not on the stick)." }) : null,
+        msg ? h("p", { class: "hint", style: "margin:0", role: "status", text: msg }) : null));
+  } };
+  render();
 }
 
 function setupScreen() {
@@ -368,6 +445,7 @@ function statusbar() {
       chat ? k("Esc", "shortcuts") : k("N", "new"), chat ? null : k("R", "reply"),
       k("V", "chat/threads"), k("G", "groups"), k("?", "about group"), k("Ctrl K", "commands")),
     h("span", { class: "grow" }),
+    S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     h("span", { class: "st", title: S.state.status },
       h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), S.state.status || "", " · pre-alpha"));
 }
@@ -829,6 +907,9 @@ function commands() {
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
+    { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },
+    { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
+    { name: "Shut down the computer", key: "", when: S.state.bootable, run: () => power("poweroff") },
     { name: theme() === "light" ? "Use the dark theme" : "Use the light theme", key: "", run: () => { theme(theme() === "light" ? "dark" : "light"); render(); } },
     { name: "Show my key", key: "K", run: openKey },
     { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
