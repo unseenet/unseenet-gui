@@ -39,6 +39,7 @@ def session_env(media: Path | None, layout: str) -> dict:
                WLR_RENDERER="pixman",                  # works on any screen, GPU or not
                WLR_NO_HARDWARE_CURSORS="1",
                GDK_BACKEND="wayland",
+               GTK_THEME="Adwaita:dark",               # the page follows it: Unseenet's dark look
                WEBKIT_DISABLE_COMPOSITING_MODE="1",    # software rendering, no GPU needed
                WEBKIT_DISABLE_DMABUF_RENDERER="1",
                NO_AT_BRIDGE="1",
