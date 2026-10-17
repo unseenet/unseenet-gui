@@ -1,0 +1,805 @@
+/* Unseenet web client.
+ *
+ * Talks only to the local server it was opened from. Everything a person
+ * wrote is put on the page with textContent, never as HTML, and links in
+ * posts are not made clickable: following one would leave Tor.
+ */
+"use strict";
+
+// ---- token --------------------------------------------------------------
+// The address we are opened with carries a one-time key (#t=...). Keep it for
+// this tab only, and take it out of the address bar and history.
+const TOKEN = (() => {
+  const m = location.hash.match(/[#&]t=([A-Za-z0-9_-]+)/);
+  let t = m ? m[1] : null;
+  try {
+    if (t) sessionStorage.setItem("unseenet-token", t);
+    else t = sessionStorage.getItem("unseenet-token");
+  } catch (_) { /* storage may be off; the hash still works this time */ }
+  if (m) history.replaceState(null, "", location.pathname);
+  return t;
+})();
+
+const S = {
+  state: null, sidebar: null, gid: null, data: null, thread: null, replyTo: null,
+  pending: {}, drafts: {}, dialog: null, status: "", error: "", busy: false,
+  knownNodes: null, setupNode: null, ws: null, mobileReading: false,
+};
+
+// ---- helpers ------------------------------------------------------------
+function h(tag, props, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === "class") el.className = v;
+    else if (k === "text") el.textContent = v;
+    else if (k.startsWith("on")) el.addEventListener(k.slice(2).toLowerCase(), v);
+    else if (k === "value") el.value = v;
+    else if (k === "style") el.style.cssText = v;     // via CSSOM: style attributes are blocked by the CSP
+    else el.setAttribute(k, v === true ? "" : v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid instanceof Node ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+
+function svg(path, size = 16, width = 2) {
+  const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", "0 0 24 24");
+  s.setAttribute("fill", "none"); s.setAttribute("stroke", "currentColor");
+  s.setAttribute("stroke-width", width); s.setAttribute("stroke-linecap", "round");
+  s.setAttribute("stroke-linejoin", "round"); s.setAttribute("aria-hidden", "true");
+  const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  p.setAttribute("d", path); s.append(p);
+  return s;
+}
+const ICON = {
+  search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5",
+  plus: "M12 5v14M5 12h14",
+  send: "M5 12h14M13 6l6 6-6 6",
+  check: "M20 6L9 17l-5-5",
+  checks: "M2 13l4 4L16 7M10 15l2 2L22 7",
+  lock: "M7 11V7a5 5 0 0 1 10 0v4M5 11h14v10H5z",
+  back: "M15 18l-6-6 6-6",
+  x: "M18 6L6 18M6 6l12 12",
+};
+
+async function api(method, path, body) {
+  const res = await fetch(path, {
+    method, headers: { "X-Unseenet-Token": TOKEN || "", ...(body ? { "Content-Type": "application/json" } : {}) },
+    body: body ? JSON.stringify(body) : undefined, cache: "no-store",
+  });
+  let data = null;
+  try { data = await res.json(); } catch (_) { /* not JSON */ }
+  if (!res.ok) throw new Error((data && data.error) || `${res.status} ${res.statusText}`);
+  return data;
+}
+
+function toast(text) {
+  document.querySelectorAll(".toast").forEach(t => t.remove());
+  const t = h("div", { class: "toast", role: "status", text });
+  document.body.append(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+const sameDay = (a, b) => a.toDateString() === b.toDateString();
+function when(iso, withDay = true) {
+  if (!iso) return "";
+  const d = new Date(iso), now = new Date();
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (sameDay(d, now) || !withDay) return time;
+  const days = Math.round((now - d) / 86400000);
+  if (days < 7) return d.toLocaleDateString([], { weekday: "short" }) + " " + time;
+  return d.toLocaleDateString([], { day: "numeric", month: "short" });
+}
+function dayLabel(d) {
+  const now = new Date(), y = new Date(now - 86400000);
+  if (sameDay(d, now)) return "Today";
+  if (sameDay(d, y)) return "Yesterday";
+  return d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
+}
+function initials(who) {
+  const name = (who || "?").replace(/^You → /, "").replace(/^@/, "").trim();
+  const parts = name.split(/[\s.@_-]+/).filter(Boolean);
+  return ((parts[0] || "?")[0] + (parts.length > 1 && name.includes(" ") ? parts[1][0] : "")).toUpperCase();
+}
+function avatar(m, small) {
+  return h("span", { class: `av c${m.colour ?? 5}${small ? " s" : ""}`, "aria-hidden": "true", text: initials(m.who) });
+}
+// "Mikkel~q7f3": the fingerprint part is shown quieter, like the TUI does.
+function nameEl(label) {
+  const i = label.lastIndexOf("~");
+  if (i > 0 && /^~[a-z2-7?]{4}( √)?$/.test(label.slice(i))) {
+    return h("span", { class: "name" }, label.slice(0, i), h("span", { class: "muted", text: label.slice(i) }));
+  }
+  return h("span", { class: "name", text: label });
+}
+const typing = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+
+// ---- rendering with focus and scroll kept --------------------------------
+function render() {
+  const root = document.getElementById("root");
+  const active = document.activeElement;
+  const key = active && active.dataset ? active.dataset.k : null;
+  const sel = typing(active) && active.selectionStart != null ? [active.selectionStart, active.selectionEnd] : null;
+  const scrolls = {};
+  root.querySelectorAll("[data-scroll]").forEach(el => {
+    scrolls[el.dataset.scroll] = { top: el.scrollTop, bottom: el.scrollHeight - el.scrollTop - el.clientHeight < 40 };
+  });
+  root.replaceChildren(view());
+  if (S.dialog) document.getElementById("root").append(S.dialog.render());
+  root.querySelectorAll("[data-scroll]").forEach(el => {
+    const was = scrolls[el.dataset.scroll];
+    if (el.dataset.stick === "bottom" && (!was || was.bottom)) el.scrollTop = el.scrollHeight;
+    else if (was) el.scrollTop = was.top;
+  });
+  const again = key && root.querySelector(`[data-k="${CSS.escape(key)}"]`);
+  if (again) {
+    again.focus({ preventScroll: true });
+    if (sel && again.setSelectionRange) try { again.setSelectionRange(sel[0], sel[1]); } catch (_) { }
+  } else if (S.dialog && S.dialog.focus) {
+    const f = root.querySelector(S.dialog.focus);
+    if (f) f.focus();
+  }
+}
+
+function view() {
+  if (!TOKEN) return noToken();
+  if (!S.state) return h("div", { class: "unlock" }, h("p", { class: "muted", text: "Starting …" }));
+  if (!S.state.unlocked) return unlockScreen();
+  if (S.state.setup) return setupScreen();
+  return appScreen();
+}
+
+function noToken() {
+  return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
+    brandHead("Open Unseenet from its own window."),
+    h("p", { class: "muted", text: "This page needs the one-time address that unseenet-web prints when it starts. " +
+      "Start it again, or open the address it printed." })));
+}
+
+function brandHead(subject, headers) {
+  return h("div", { class: "unlock-head" },
+    h("img", { src: "/static/icon.svg", alt: "", width: "56", height: "56" }),
+    headers ? h("div", { class: "headers" }, headers) : null,
+    h("h1", { class: "subject" }, h("small", { text: "Subject:" }), subject));
+}
+
+// ---- unlock and setup -----------------------------------------------------
+function unlockScreen() {
+  const st = S.state, isNew = !st.vault_exists;
+  const submit = async (e) => {
+    e.preventDefault();
+    const f = e.target, pass = f.pass.value;
+    if (isNew && pass !== f.again.value) { S.error = "The two passphrases are not the same."; render(); return; }
+    if (isNew && pass.length < 8) { S.error = "Use at least 8 characters - a few words is best."; render(); return; }
+    S.busy = true; S.error = ""; render();
+    try { S.state = await api("POST", "/api/unlock", { passphrase: pass }); await afterUnlock(); }
+    catch (err) { S.error = /wrong|decrypt|passphrase|invalid/i.test(err.message) ? "Wrong passphrase." : err.message; }
+    S.busy = false; render();
+  };
+  return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
+    brandHead(isNew ? "A new vault." : "Welcome back.",
+      ["Vault: ", h("b", { text: st.vault })]),
+    h("form", { class: "form", onsubmit: submit },
+      h("label", { for: "pass", text: isNew ? "Choose a passphrase" : "Passphrase" }),
+      h("input", { id: "pass", name: "pass", type: "password", class: "field", autocomplete: "current-password",
+        autofocus: true, "data-k": "pass", required: true }),
+      isNew ? [h("label", { for: "again", text: "The same again" }),
+        h("input", { id: "again", name: "again", type: "password", class: "field", "data-k": "again", required: true })] : null,
+      h("div", { class: "error", role: "alert", text: S.error }),
+      h("button", { class: "btn primary", type: "submit", disabled: S.busy },
+        S.busy ? "Unlocking …" : isNew ? "Create vault" : "Unlock")),
+    isNew ? h("p", { class: "hint", text: "Your keys, groups and saved posts are kept in this one file, " +
+      "encrypted with the passphrase. Lose both, and they are gone - nobody can reset it." }) : null,
+    h("div", { class: "statuscard" },
+      h("div", { text: "Tor starts when the vault is open." }),
+      h("div", { class: "muted", text: "Nothing leaves this computer except through Tor. The window loads nothing from the internet." })),
+    h("p", { class: "note" }, h("strong", { text: "Pre-alpha. " }),
+      "The code has not had a security review. Do not rely on it to protect anyone yet.")));
+}
+
+function setupScreen() {
+  const st = S.state, needName = !st.me, needNode = !st.node;
+  if (needNode && S.knownNodes === null) {
+    S.knownNodes = [];
+    api("GET", "/api/known-nodes").then(n => { S.knownNodes = n; if (!S.setupNode && n[0]) S.setupNode = n[0].address; render(); })
+      .catch(() => {});
+  }
+  const submit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    S.busy = true; S.error = ""; render();
+    try {
+      S.state = await api("POST", "/api/setup", {
+        display: needName ? f.display.value : "", node: needNode ? (f.custom.value.trim() || S.setupNode || "") : "" });
+      await afterUnlock();
+    } catch (err) { S.error = err.message; }
+    S.busy = false; render();
+  };
+  return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
+    brandHead("First start."),
+    h("form", { class: "form", onsubmit: submit },
+      needName ? [h("label", { for: "display", text: "Your name" }),
+        h("input", { id: "display", name: "display", class: "field", "data-k": "display", required: true,
+          placeholder: "What others see next to your posts" }),
+        h("p", { class: "hint", text: "Anyone can choose any name, so others also see the start of your key. " +
+          "You can claim a name like @you later." })] : null,
+      needNode ? [h("label", { text: "Your node" }),
+        h("div", { class: "choices" }, (S.knownNodes || []).map(n => h("button", {
+          type: "button", class: "choice", "aria-pressed": String(S.setupNode === n.address),
+          onclick: () => { S.setupNode = n.address; render(); } },
+          h("span", {}, h("span", { class: "mono", text: n.name || n.address }),
+            h("small", { text: n.description || n.operator || n.address }))))),
+        h("input", { name: "custom", class: "field mono", "data-k": "custom", placeholder: "or an address: xyz.onion or host:port",
+          style: "font-size:14px" })] : null,
+      h("div", { class: "error", role: "alert", text: S.error }),
+      h("button", { class: "btn primary", type: "submit", disabled: S.busy }, S.busy ? "Starting …" : "Start"))));
+}
+
+async function afterUnlock() {
+  if (S.state.setup) return;
+  connectEvents();
+  await loadSidebar();
+}
+
+// ---- app --------------------------------------------------------------
+function allGroups() {
+  return (S.sidebar ? S.sidebar.hierarchies : []).flatMap(h => h.groups);
+}
+
+async function loadSidebar() {
+  try { S.sidebar = await api("GET", "/api/groups"); }
+  catch (err) { S.status = err.message; }
+  if (!S.gid) {
+    const first = allGroups()[0];
+    if (first) await openGroup(first.id, false);
+  }
+  render();
+}
+
+async function openGroup(gid, rerender = true) {
+  if (S.gid !== gid) { S.thread = null; S.replyTo = null; S.mobileReading = false; }
+  S.gid = gid;
+  await loadGroup();
+  if (rerender) render();
+  const g = S.data && S.data.group;
+  if (g && g.view === "chat") setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
+}
+
+async function loadGroup() {
+  if (!S.gid) return;
+  const gid = S.gid;
+  try {
+    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid));
+    if (S.gid === gid) S.data = data;
+  } catch (err) { S.status = err.message; }
+}
+
+let markTimer = null, toMark = new Set();
+function markRead(msgs) {
+  const ids = msgs.filter(m => !m.read).map(m => m.id);
+  if (!ids.length) return;
+  ids.forEach(i => toMark.add(i));
+  msgs.forEach(m => { m.read = true; });
+  clearTimeout(markTimer);
+  const gid = S.gid;
+  markTimer = setTimeout(() => {
+    const list = [...toMark]; toMark.clear();
+    api("POST", `/api/groups/${encodeURIComponent(gid)}/read`, { ids: list }).catch(() => {});
+  }, 600);
+}
+
+function appScreen() {
+  return h("div", { class: "app" },
+    h("div", { class: "body" }, sidebar(), h("main", { class: "main" }, mainArea())),
+    statusbar());
+}
+
+function sidebar() {
+  const sb = S.sidebar, me = S.state.me || {};
+  const item = (gid, ic, label, extra, cls = "") => h("button", {
+    class: `item ${cls}${S.gid === gid ? " on" : ""}`, onclick: () => openGroup(gid),
+    "aria-current": S.gid === gid ? "page" : null },
+    h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
+  return h("nav", { class: "side", "aria-label": "Groups" },
+    h("div", { class: "brand" }, h("img", { src: "/static/icon.svg", alt: "" }), "Unseenet"),
+    h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
+      h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl K" })),
+    sb ? h("div", { class: "nav" },
+      item("for-you", "◄", "For you", sb.for_you ? h("span", { class: "foryou", text: `◄${sb.for_you}` }) : null),
+      sb.inbox.id ? item(sb.inbox.id, "@", "Private messages",
+        sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null) : null,
+    sb ? sb.hierarchies.map(hier => h("div", { class: "nav" },
+      h("h3", { text: hier.name + ".*" }),
+      hier.groups.map(g => item(g.id, (g.access || "") + g.icon, g.label, [
+        g.for_you ? h("span", { class: "foryou", text: `◄${g.for_you}` }) : null,
+        g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""))))) :
+      h("p", { class: "muted", text: "Loading your groups …" }),
+    sb && !sb.hierarchies.length ? h("div", { class: "nav" },
+      h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
+      h("button", { class: "btn", onclick: openBrowse }, "Find groups", h("kbd", { text: "G" }))) : null,
+    h("div", { class: "me" },
+      h("span", { class: "av s c4", "aria-hidden": "true", text: initials(me.display) }),
+      h("div", { class: "who" }, h("div", { text: me.label || me.display || "" }),
+        h("div", { class: "hint" }, h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
+          S.state.connected ? "Tor · " + shortNode(S.state.node) : "Not connected")),
+      h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
+}
+
+function shortNode(address) {
+  if (!address) return "";
+  return address.endsWith(".onion") ? address.slice(0, 6) + "….onion" : address;
+}
+
+function statusbar() {
+  const g = S.data && S.data.group, chat = g && g.view === "chat";
+  const k = (key, label) => h("span", {}, h("kbd", { text: key }), " " + label);
+  return h("footer", { class: "statusbar" },
+    h("span", { class: "keys" },
+      chat ? k("Esc", "shortcuts") : k("N", "new"), chat ? null : k("R", "reply"),
+      k("V", "chat/threads"), k("G", "groups"), k("?", "about group"), k("Ctrl K", "commands")),
+    h("span", { class: "grow" }),
+    h("span", { class: "st", title: S.state.status },
+      h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), S.state.status || "", " · pre-alpha"));
+}
+
+function mainArea() {
+  const d = S.data;
+  if (!S.gid || !d) {
+    return h("div", { class: "empty" }, h("h2", { text: "Pick a group" }),
+      h("p", { text: "Your groups are on the left. Press G to find more on your node." }));
+  }
+  const g = d.group;
+  const chips = [
+    h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : "≡ threads" }),
+    g.encrypted ? h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5), g.type === "inbox" ? "sealed to you" : "closed · end-to-end encrypted") :
+      g.type ? h("span", { class: "chip", text: g.type }) : null,
+    g.fast ? h("span", { class: "chip warn", text: "fast delivery" }) : null,
+  ];
+  const canSwitch = g.type && g.type !== "inbox";
+  const head = h("header", { class: "ghead" },
+    S.mobileReading ? h("button", { class: "btn icon", "aria-label": "Back to threads", onclick: () => { S.mobileReading = false; render(); } }, svg(ICON.back)) : null,
+    h("div", { class: "t" },
+      h("div", { class: "row" }, h("h1", { text: g.label }), chips),
+      g.title ? h("p", { text: g.title }) : null),
+    h("div", { class: "actions" },
+      canSwitch ? h("button", { class: "btn", onclick: toggleView },
+        g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
+      g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
+      g.view !== "chat" && g.may_post ? h("button", { class: "btn primary", onclick: () => openCompose() },
+        svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
+  return [head, g.view === "chat" ? chatView(d) : threadsView(d)];
+}
+
+// ---- threads ------------------------------------------------------------
+function threadsOf(msgs) {
+  const out = [];
+  for (const m of msgs) {
+    if (m.depth === 0 || !out.length) out.push({ root: m, items: [m] });
+    else out[out.length - 1].items.push(m);
+  }
+  for (const t of out) {
+    t.unread = t.items.filter(m => !m.read).length;
+    t.forMe = t.items.some(m => m.for_me && !m.read);
+    t.last = t.items.reduce((a, m) => (m.date && m.date > a ? m.date : a), "");
+  }
+  return out;
+}
+
+function threadsView(d) {
+  const g = d.group;
+  const threads = threadsOf(d.messages);
+  if (!threads.length) {
+    return h("div", { class: "content" }, h("div", { class: "empty" },
+      h("h2", { text: g.id === "for-you" ? "Nothing for you yet" : "No posts yet" }),
+      h("p", { text: g.id === "for-you" ? "Replies to your posts, and posts that name you, show up here." :
+        g.may_post ? "Be the first: press N to write a post." : "" })));
+  }
+  let current = threads.find(t => t.root.id === S.thread) || threads[0];
+  S.thread = current.root.id;
+  markRead(current.items);
+  const list = h("section", { class: "threads", "aria-label": "Threads", "data-scroll": "threads" },
+    threads.map(t => h("button", {
+      class: `thread${t === current ? " on" : ""}${t.unread ? " unread" : ""}`,
+      onclick: () => { S.thread = t.root.id; S.replyTo = null; S.mobileReading = true; render(); } },
+      t.forMe ? h("span", { class: "mk you", "aria-label": "For you", text: "◄" }) :
+        h("span", { class: "mk" + (t.unread ? " new" : ""), "aria-label": t.unread ? "Unread" : null }),
+      h("span", { class: "tx" },
+        h("span", { class: "sj", text: t.root.subject || "(no subject)" }),
+        h("span", { class: "meta" }, h("span", { class: "mono", text: t.root.who }),
+          t.items.length > 1 ? ` · ${t.items.length - 1} ${t.items.length === 2 ? "reply" : "replies"}` : "",
+          " · " + when(t.last || t.root.date),
+          g.id === "for-you" ? " · " + labelOf(t.root.group) : "")))));
+  return h("div", { class: "content" + (S.mobileReading ? " reading" : "") }, list, reader(g, current));
+}
+
+function labelOf(gid) {
+  const g = allGroups().find(x => x.id === gid);
+  return g ? g.label : gid.split("@")[0];
+}
+
+function reader(g, t) {
+  const target = S.replyTo && t.items.find(m => m.id === S.replyTo) || t.items[t.items.length - 1];
+  const posts = t.items.map(m => postEl(m, g, m === target && g.may_post));
+  const pend = Object.entries(S.pending).filter(([, p]) => p.group === g.id && !p.chat && p.thread === t.root.id);
+  return h("article", { class: "reader", "aria-label": "Thread" },
+    h("div", { class: "scroll", "data-scroll": "reader:" + t.root.id },
+      h("h2", { text: t.root.subject || "(no subject)" }), posts,
+      pend.map(([job, p]) => h("div", { class: "post", style: "margin-left:48px" },
+        h("span", { class: "av s c4", text: initials(S.state.me.display) }),
+        h("div", { class: "pb" }, h("div", { class: "ph" }, h("span", { class: "name", text: S.state.me.label }),
+          pendingState(p)), h("p", { class: "text", text: p.text }),
+          p.state === "failed" ? h("button", { class: "link", onclick: () => { delete S.pending[job]; render(); } }, "Dismiss") : null)))),
+    g.may_post && g.id !== "for-you" ? replyBox(g, t, target) : null);
+}
+
+function postEl(m, g, isTarget) {
+  const indent = Math.min(m.depth, 4) * 22;
+  const marks = [];
+  if (m.mine) marks.push(h("span", { class: "sm", text: "you" }));
+  else if (m.contact) marks.push(h("span", { class: "sm", text: "contact" }));
+  marks.push(h("span", { class: "sm", text: when(m.date) }));
+  if (m.for_me === "reply") marks.push(h("span", { class: "sm you", text: "◄ reply to you" }));
+  if (m.for_me === "mention") marks.push(h("span", { class: "sm you", text: "♦ names you" }));
+  if (m.encrypted) marks.push(h("span", { class: "sm lock" }, svg(ICON.lock, 12, 2.5), " encrypted"));
+  else if (m.private && m.verified) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " verified sender"));
+  else marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " signed"));
+  return h("div", { class: "post" + (isTarget && S.replyTo === m.id ? " target" : ""), style: indent ? `margin-left:${indent}px` : null },
+    avatar(m, m.depth > 0),
+    h("div", { class: "pb" },
+      h("div", { class: "ph" }, nameEl(m.who), marks),
+      m.readable ? h("p", { class: "text", text: m.text }) : h("p", { class: "text bad", text: m.error || "Could not be read." }),
+      m.signature ? h("p", { class: "sig", text: m.signature }) : null,
+      h("div", { class: "pa" },
+        g.may_post && g.id !== "for-you" ? h("button", { class: "link", onclick: () => {
+          S.replyTo = m.id; render(); const r = document.querySelector('[data-k="reply"]'); if (r) r.focus(); } }, "Reply") : null,
+        g.id === "for-you" ? h("button", { class: "link", onclick: async () => {
+          await openGroup(m.group); S.thread = m.references[0] || m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
+        h("button", { class: "link", onclick: () => copy(m.key, "Their key is copied.") }, "Copy key"))));
+}
+
+function replyBox(g, t, target) {
+  const key = "reply:" + t.root.id;
+  const send = () => {
+    const ta = document.querySelector('[data-k="reply"]');
+    const text = ta.value.trim();
+    if (!text) return;
+    const subject = /^re:/i.test(t.root.subject) ? t.root.subject : "Re: " + t.root.subject;
+    doPost(g.id, { subject, body: text, references: [...target.references, target.id] },
+      { thread: t.root.id, text });
+    S.drafts[key] = ""; S.replyTo = null; ta.value = "";
+  };
+  return h("form", { class: "compose", onsubmit: (e) => { e.preventDefault(); send(); } },
+    h("label", { for: "reply", class: "hint" }, "Reply to ", h("span", { class: "mono", style: "color:var(--paper)", text: target.who })),
+    h("div", { class: "row" },
+      h("textarea", { id: "reply", rows: "2", "data-k": "reply", placeholder: "Write a reply …", value: S.drafts[key] || "",
+        oninput: (e) => { S.drafts[key] = e.target.value; },
+        onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "Enter")) { e.preventDefault(); send(); } } }),
+      h("button", { class: "btn primary", type: "submit", style: "height:44px" }, "Post reply")),
+    h("div", { class: "hint" }, h("kbd", { text: "Ctrl S" }), " posts · signed with your key · a few seconds of proof-of-work"));
+}
+
+function pendingState(p) {
+  if (p.state === "failed") return h("span", { class: "state bad", text: "Not sent: " + (p.error || "") });
+  if (p.state === "sent") return h("span", { class: "state" }, svg(ICON.check, 14, 2.5), "sent");
+  return h("span", { class: "sending" }, "Sending · proof-of-work", h("span", { class: "bar" }, h("span", {})));
+}
+
+// ---- chat ---------------------------------------------------------------
+function chatView(d) {
+  const g = d.group;
+  const msgs = d.messages.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+  markRead(msgs);
+  const byId = Object.fromEntries(msgs.map(m => [m.id, m]));
+  const out = [h("div", { class: "spacer" })];
+  let lastDay = null, grp = null;
+  const flush = () => { if (grp) out.push(grp.el); grp = null; };
+  for (const m of msgs) {
+    const d0 = m.date ? new Date(m.date) : null;
+    if (d0 && (!lastDay || !sameDay(d0, lastDay))) { flush(); out.push(h("div", { class: "day", text: dayLabel(d0) })); lastDay = d0; }
+    const close = grp && grp.key === m.key && d0 && grp.at && d0 - grp.at < 5 * 60000;
+    if (!close) {
+      flush();
+      const col = h("div", { class: "col" });
+      if (!m.mine) col.append(h("div", { class: "hd" }, nameEl(m.who), h("span", { class: "hint", text: when(m.date, false) })));
+      else col.append(h("div", { class: "hint", text: when(m.date, false) }));
+      grp = { key: m.key, at: d0, col, el: h("div", { class: "mg" + (m.mine ? " mine" : "") }, m.mine ? null : avatar(m, true), col) };
+    }
+    grp.at = d0 || grp.at;
+    const quoted = m.references.length && byId[m.references[m.references.length - 1]];
+    grp.col.append(h("div", { class: "bubble", title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
+      quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + quoted.text.slice(0, 80)) : null,
+      m.readable ? m.text : h("i", { text: m.error || "Could not be read." })));
+    if (m.mine) grp.lastMine = m;
+  }
+  flush();
+  const last = out[out.length - 1];
+  if (msgs.length && msgs[msgs.length - 1].mine && last.classList && last.classList.contains("mg")) {
+    last.querySelector(".col").append(h("div", { class: "state ok" }, svg(ICON.checks, 14, 2.5), "reached the node"));
+  }
+  for (const [job, p] of Object.entries(S.pending)) {
+    if (p.group !== g.id || !p.chat || p.state === "reached") continue;
+    out.push(h("div", { class: "mg mine" }, h("div", { class: "col" },
+      h("div", { class: "bubble " + (p.state === "failed" ? "failed" : "pending"), text: p.text }),
+      p.state === "failed" ? h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ",
+        h("button", { class: "link", onclick: () => { retry(job); } }, "Try again")) : pendingState(p))));
+  }
+  if (msgs.length === 0 && !Object.keys(S.pending).length) {
+    out.push(h("div", { class: "empty" }, h("h2", { text: "Quiet here" }), h("p", { text: g.may_post ? "Say hello below." : "" })));
+  }
+  const send = () => {
+    const input = document.querySelector('[data-k="chat"]');
+    const text = input.value.trim();
+    if (!text) return;
+    doPost(g.id, { body: text, chat: true }, { text, chat: true });
+    input.value = ""; S.drafts["chat:" + g.id] = "";
+  };
+  return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
+    h("div", { class: "msgs", "data-scroll": "chat:" + g.id, "data-stick": "bottom" }, out),
+    g.may_post ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); } },
+      h("div", { class: "row" },
+        h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
+        h("input", { id: "chat", type: "text", "data-k": "chat", autocomplete: "off",
+          placeholder: "Message " + (g.access || "") + (g.access ? " " : "") + g.label, value: S.drafts["chat:" + g.id] || "",
+          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; } }),
+        h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
+      h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Esc" }), " for shortcuts",
+        g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
+      h("div", { class: "chatbar hint", text: "Only chosen people can write here." })));
+}
+
+// ---- posting ------------------------------------------------------------
+async function doPost(gid, body, local) {
+  try {
+    const { job } = await api("POST", `/api/groups/${encodeURIComponent(gid)}/post`, body);
+    S.pending[job] = { group: gid, state: "pow", body, ...local };
+  } catch (err) {
+    S.pending["local" + Date.now()] = { group: gid, state: "failed", error: err.message, body, ...local };
+  }
+  render();
+}
+
+function retry(job) {
+  const p = S.pending[job];
+  delete S.pending[job];
+  doPost(p.group, p.body, { text: p.text, chat: p.chat, thread: p.thread });
+}
+
+async function toggleView() {
+  const g = S.data && S.data.group;
+  if (!g || !g.type || g.type === "inbox") return;
+  const next = g.view === "chat" ? "threads" : "chat";
+  await api("POST", `/api/groups/${encodeURIComponent(g.id)}/view`, { view: next });
+  await loadGroup(); await loadSidebar();
+}
+
+async function copy(text, done) {
+  try { await navigator.clipboard.writeText(text); toast(done); }
+  catch (_) { toast("Could not copy - select it and press Ctrl C."); }
+}
+
+// ---- dialogs ------------------------------------------------------------
+function closeDialog() { S.dialog = null; render(); }
+
+function dialogShell(props, ...kids) {
+  return h("div", { class: "scrim", onclick: (e) => { if (e.target === e.currentTarget) closeDialog(); } },
+    h("div", { class: "dialog" + (props.wide ? " wide" : ""), role: "dialog", "aria-modal": "true", "aria-label": props.label }, kids));
+}
+
+function openKey() {
+  const me = S.state.me;
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Your key" },
+    h("div", { class: "dh" }, h("h2", { text: "Your key" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      h("p", { style: "margin:0", text: "Share it to get private messages and invitations to closed groups. It is safe to share: it is the public half." }),
+      h("div", { class: "keybox", text: me.key }),
+      h("p", { class: "hint", style: "margin:0", text: "Fingerprint " + me.fp + " - others see it after your name until they add you as a contact." })),
+    h("div", { class: "df btns" }, h("button", { class: "btn primary", onclick: () => copy(me.key, "Your key is copied.") }, "Copy key"))) };
+  render();
+}
+
+function openInfo() {
+  const g = S.data && S.data.group;
+  if (!g || !g.type) return;
+  S.dialog = { render: () => dialogShell({ label: "About this group" },
+    h("div", { class: "dh" }, h("h2", { class: "mono", text: g.label }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      g.title ? h("p", { style: "margin:0", text: g.title }) : null,
+      g.description ? h("p", { class: "muted", style: "margin:0", text: g.description }) : null,
+      h("dl", { class: "kv" },
+        h("dt", { text: "Type" }), h("dd", { text: g.type + (g.local ? ", local (one node)" : "") }),
+        h("dt", { text: "Shown as" }), h("dd", { text: g.view + (g.owner_view !== g.view ? ` (the owner chose ${g.owner_view})` : "") }),
+        h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
+        h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
+        h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id })),
+      g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }), h("p", { class: "text", style: "margin:0", text: g.rules })] : null)) };
+  render();
+}
+
+function openCompose() {
+  const g = S.data && S.data.group;
+  if (!g || !g.may_post || g.view === "chat") return;
+  const send = async (e) => {
+    e && e.preventDefault();
+    const f = document.querySelector(".dialog form");
+    const subject = f.subject.value.trim(), body = f.body.value.trim();
+    if (!subject || !body) { toast("A post needs a subject and some text."); return; }
+    closeDialog();
+    S.thread = null;
+    await doPost(g.id, { subject, body }, { text: body, thread: "__new__" });
+    toast("Sending - postage takes a few seconds.");
+  };
+  S.dialog = { focus: "#subject", render: () => dialogShell({ label: "New post", wide: true },
+    h("div", { class: "dh" }, h("h2", {}, "New post in ", h("span", { class: "mono", text: g.label })),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("form", { class: "db", onsubmit: send, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") send(e); } },
+      h("label", { for: "subject", text: "Subject" }),
+      h("input", { id: "subject", name: "subject", class: "in", "data-k": "subject", autocomplete: "off" }),
+      h("label", { for: "body", text: "Text" }),
+      h("textarea", { id: "body", name: "body", class: "in", "data-k": "body" }),
+      h("p", { class: "hint", style: "margin:0", text: "Your signature is added below. The post is signed with your key and carries a little proof-of-work." })),
+    h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", onclick: send }, "Post", h("kbd", { text: "Ctrl S" })))) };
+  render();
+}
+
+function openBrowse() {
+  let list = null, filter = "", err = "";
+  api("GET", "/api/browse").then(l => { list = l; if (S.dialog) render(); }).catch(e => { err = e.message; if (S.dialog) render(); });
+  S.dialog = { focus: "#browse", render: () => {
+    const shown = (list || []).filter(g => !filter || (g.label + " " + g.description).toLowerCase().includes(filter));
+    return dialogShell({ label: "Groups on your node", wide: true },
+      h("div", { class: "dh" }, svg(ICON.search, 18),
+        h("label", { for: "browse", class: "sr", text: "Filter groups" }),
+        h("input", { id: "browse", "data-k": "browse", placeholder: "Groups on your nodes …", value: filter,
+          oninput: (e) => { filter = e.target.value.toLowerCase(); render(); } }),
+        h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "db list" },
+        err ? h("p", { class: "error", text: err }) : null,
+        list === null && !err ? h("p", { class: "muted", style: "padding:12px", text: "Asking your nodes over Tor …" }) : null,
+        shown.map(g => h("div", { class: "cmd" },
+          h("span", { class: "mono muted", style: "width:28px", text: (g.access || "") + g.icon }),
+          h("span", { class: "nm" }, h("span", { class: "mono", text: g.label }), " ", h("small", { text: g.description })),
+          h("button", { class: g.subscribed ? "btn" : "btn primary", onclick: async () => {
+            await api("POST", "/api/subscribe", { id: g.id, on: !g.subscribed });
+            g.subscribed = !g.subscribed; await loadSidebar(); } }, g.subscribed ? "Leave" : "Follow")))),
+      h("div", { class: "df" }, h("span", { text: (list ? list.length : 0) + " groups" }), h("span", { text: "Esc close" })));
+  } };
+  render();
+}
+
+function commands() {
+  const g = S.data && S.data.group;
+  const cmds = [
+    { name: "New post", key: "N", when: g && g.may_post && g.view !== "chat", run: openCompose },
+    { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
+    { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
+    { name: "Find groups on your nodes", key: "G", run: openBrowse },
+    { name: "Show my key", key: "K", run: openKey },
+    { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
+    { name: "Private messages", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
+    { name: "For you: replies and mentions", key: "", run: () => openGroup("for-you") },
+  ].filter(c => c.when === undefined || c.when);
+  return cmds.concat(allGroups().map(x => ({ name: x.label, group: x, key: "", run: () => openGroup(x.id) })));
+}
+
+function openPalette() {
+  let q = "", sel = 0;
+  const shown = () => commands().filter(c => !q || c.name.toLowerCase().includes(q) ||
+    (c.group && (c.group.title || "").toLowerCase().includes(q)));
+  const run = (c) => { S.dialog = null; render(); c.run(); };
+  S.dialog = { focus: "#palette", render: () => {
+    const list = shown();
+    sel = Math.max(0, Math.min(sel, list.length - 1));
+    const acts = list.filter(c => !c.group), grps = list.filter(c => c.group);
+    const row = (c) => h("button", { class: "cmd" + (list.indexOf(c) === sel ? " on" : ""), onclick: () => run(c),
+      onmousemove: () => { if (list.indexOf(c) !== sel) { sel = list.indexOf(c); render(); } } },
+      c.group ? h("span", { class: "mono muted", style: "width:28px", text: (c.group.access || "") + c.group.icon }) : null,
+      h("span", { class: "nm" + (c.group ? " mono" : ""), text: c.name }),
+      c.group && c.group.unread ? h("span", { class: "count", text: c.group.unread }) : null,
+      c.key ? h("kbd", { text: c.key }) : null);
+    return dialogShell({ label: "Command palette" },
+      h("div", { class: "dh" }, svg(ICON.search, 18),
+        h("label", { for: "palette", class: "sr", text: "Search commands and groups" }),
+        h("input", { id: "palette", "data-k": "palette", placeholder: "Commands and groups …", value: q, autocomplete: "off",
+          oninput: (e) => { q = e.target.value.toLowerCase(); sel = 0; render(); },
+          onkeydown: (e) => {
+            if (e.key === "ArrowDown") { e.preventDefault(); sel++; render(); }
+            else if (e.key === "ArrowUp") { e.preventDefault(); sel--; render(); }
+            else if (e.key === "Enter") { e.preventDefault(); const c = shown()[sel]; if (c) run(c); }
+          } }),
+        h("kbd", { text: "Esc" })),
+      h("div", { class: "db list" },
+        acts.length ? [h("div", { class: "sect", text: "Commands" }), acts.map(row)] : null,
+        grps.length ? [h("div", { class: "sect", text: "Your groups" }), grps.map(row)] : null,
+        !list.length ? h("p", { class: "muted", style: "padding:12px", text: "Nothing matches." }) : null),
+      h("div", { class: "df" }, h("span", { text: "↑↓ move" }), h("span", { text: "Enter run" }), h("span", { text: "Esc close" })));
+  } };
+  render();
+}
+
+// ---- keys -----------------------------------------------------------------
+document.addEventListener("keydown", (e) => {
+  if (!S.state || !S.state.unlocked || S.state.setup) return;
+  const ctrl = e.ctrlKey || e.metaKey;
+  if (ctrl && (e.key === "k" || e.key === "p")) { e.preventDefault(); if (S.dialog) closeDialog(); else openPalette(); return; }
+  if (e.key === "Escape") {
+    if (S.dialog) { e.preventDefault(); closeDialog(); return; }
+    if (typing(document.activeElement)) { document.activeElement.blur(); return; }
+    if (S.replyTo) { S.replyTo = null; render(); }
+    return;
+  }
+  if (S.dialog || typing(document.activeElement) || ctrl || e.altKey) return;
+  const g = S.data && S.data.group;
+  const keys = {
+    n: () => openCompose(), v: () => toggleView(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
+    r: () => { const el = document.querySelector('[data-k="reply"]'); if (el) el.focus(); },
+    Enter: () => { const el = document.querySelector('[data-k="chat"]'); if (el) el.focus(); },
+  };
+  if (keys[e.key]) { e.preventDefault(); keys[e.key](); return; }
+  if ((e.key === "ArrowDown" || e.key === "ArrowUp") && g && g.view !== "chat" && S.data) {
+    const threads = threadsOf(S.data.messages);
+    const i = threads.findIndex(t => t.root.id === S.thread);
+    const next = threads[Math.max(0, Math.min(threads.length - 1, i + (e.key === "ArrowDown" ? 1 : -1)))];
+    if (next) { e.preventDefault(); S.thread = next.root.id; S.replyTo = null; render(); }
+  }
+});
+
+// ---- events from the server --------------------------------------------
+let sidebarTimer = null;
+function connectEvents() {
+  if (S.ws) return;
+  const ws = new WebSocket(`ws://${location.host}/api/events`, ["unseenet", "unseenet-token." + TOKEN]);
+  S.ws = ws;
+  ws.onopen = async () => {          // catch up on what happened before we were listening
+    try { S.state = await api("GET", "/api/state"); } catch (_) { }
+    await loadGroup(); await loadSidebar();
+  };
+  ws.onmessage = async (ev) => {
+    let e;
+    try { e = JSON.parse(ev.data); } catch (_) { return; }
+    if (e.type === "status") {
+      S.state.status = e.text;
+      S.state.connected = /^Connected/.test(e.text) ? true : /^Offline/.test(e.text) ? false : S.state.connected;
+      const st = document.querySelector(".statusbar");
+      if (st && !S.dialog) st.replaceWith(statusbar()); else render();
+    } else if (e.type === "groups") {
+      clearTimeout(sidebarTimer);
+      sidebarTimer = setTimeout(async () => {
+        try { S.state = await api("GET", "/api/state"); } catch (_) { }
+        await loadSidebar();
+      }, 250);
+    } else if (e.type === "group" && (e.id === S.gid || S.gid === "for-you")) {
+      await loadGroup(); render();
+    } else if (e.type === "post") {
+      const p = S.pending[e.job];
+      if (!p) return;
+      p.state = e.state; p.error = e.error;
+      if (e.state === "reached") {
+        delete S.pending[e.job];
+        if (p.thread === "__new__" && S.gid === p.group) S.thread = e.message_id;
+        if (S.gid === p.group) await loadGroup();
+      }
+      if (e.state === "failed") toast("Not sent: " + (e.error || "unknown error"));
+      render();
+    }
+  };
+  ws.onclose = () => { S.ws = null; setTimeout(() => { if (S.state && S.state.unlocked) connectEvents(); }, 3000); };
+}
+
+// ---- start --------------------------------------------------------------
+(async () => {
+  render();
+  if (!TOKEN) return;
+  try {
+    S.state = await api("GET", "/api/state");
+    if (S.state.unlocked) await afterUnlock();
+  } catch (err) {
+    S.state = { unlocked: false, vault: "", vault_exists: true };
+    S.error = "The client is not running any more: " + err.message;
+  }
+  render();
+})();

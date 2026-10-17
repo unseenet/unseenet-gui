@@ -1,0 +1,7 @@
+__pycache__/
+*.egg-info/
+.venv/
+*.vault
+*.vault.*
+unseenet-tor/
+dev/

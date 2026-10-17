@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "unseenet-web"
+dynamic = ["version"]
+description = "A local web client for Unseenet: groups and chat in a window, Tor and keys stay in the unseenet core"
+readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "Andreas Lorensen" }]
+requires-python = ">=3.11"
+dependencies = [
+    "unseenet @ git+https://github.com/unseenet/unseenet@main",
+    "aiohttp>=3.9",
+]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Programming Language :: Python :: 3",
+    "Topic :: Communications :: Usenet News",
+]
+
+[project.optional-dependencies]
+window = ["pywebview>=5"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+unseenet-web = "unseenet_web.__main__:main"
+
+[project.urls]
+Homepage = "https://github.com/unseenet/unseenet-web"
+Unseenet = "https://unseenet.org/"
+
+[tool.setuptools.dynamic]
+version = { attr = "unseenet_web.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+unseenet_web = ["static/*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["src"]
