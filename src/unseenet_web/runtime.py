@@ -275,7 +275,7 @@ class Runtime:
             self.emit("post", job=job, group=gid, state="failed", error=str(exc))
             return
         self.emit("post", job=job, group=gid, state="sent", message_id=msgid)
-        if notify and not s.was_submitted(gid, msgid):
+        if notify:          # for a post sent to the moderators, the core waits for approval
             self.spawn(s.send_mention_notices(gid, msgid, subject, kind, notify))
         await self._fetch(gid)
         self.emit("post", job=job, group=gid, state="reached", message_id=msgid)
