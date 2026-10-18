@@ -20,7 +20,7 @@ from unseenet import names as nm
 from unseenet.client import naming
 from unseenet.client.session import Message, Session, SessionError
 from unseenet.core import crypto
-from unseenet.core.groups import KIND_CHAT, KIND_POST, personal_inbox_id
+from unseenet.core.groups import KIND_CHAT, KIND_POST, group_refs, personal_inbox_id
 from unseenet.core.vault import Vault, VaultError
 from unseenet.nntp import NNTPError
 
@@ -327,6 +327,19 @@ class Runtime:
     async def browse(self) -> list[dict]:
         groups = await self.session.list_groups()
         return [serialize.browse_entry(self.session, g) for g in groups]
+
+    async def group_ref(self, text: str) -> list[dict]:
+        """What a #group reference can mean (unseenet #172): followed groups first,
+        with what to tell someone before they follow one."""
+        refs = group_refs(text)
+        if not refs:
+            return []
+        s = self.session
+        found = await s.find_group_ref(refs[0])
+        also = {g.group_id for g in found}
+        return [{**serialize.browse_entry(s, g), "label": s.group_label(g.group_id, also),
+                 "short": serialize.short_group_id(g.group_id),
+                 "warning": naming.group_warning(s, g.group_id, also)} for g in found]
 
     def subscribe(self, gid: str, on: bool) -> None:
         self.session.subscribe(gid, on)

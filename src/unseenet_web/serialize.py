@@ -11,7 +11,7 @@ import hashlib
 
 from unseenet.client.session import GroupInfo, Message, Session, split_signature
 from unseenet.core import markup
-from unseenet.core.groups import KIND_CHAT, short_group_id
+from unseenet.core.groups import KIND_CHAT, group_refs, short_group_id
 
 CONTACT = "contact:"            # a conversation with one key, shown as a chat (as in the TUI)
 ACCESS_ICONS = {"moderated": "√", "channel": "►", "closed": "∩"}
@@ -142,7 +142,9 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
             "tree": markup.body(text.rstrip("\n"), m.content_type, m.kind) if m.readable else [],
             "markdown": markup.is_markdown(m.content_type),
             "readable": m.readable, "error": m.error, "read": s.is_read(m),
-            "for_me": s.for_me(m, mine, patterns), "may_withdraw": s.may_cancel(m)}
+            "for_me": s.for_me(m, mine, patterns), "may_withdraw": s.may_cancel(m),
+            # groups it names with # (unseenet #172): # on the post, or a click, goes there
+            "groups": [r.text for r in group_refs(f"{m.subject}\n{text}")] if m.readable else []}
 
 
 def group_view(s: Session, gid: str) -> dict:
