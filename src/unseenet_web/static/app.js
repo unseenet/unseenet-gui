@@ -403,6 +403,18 @@ function appScreen() {
     statusbar());
 }
 
+// replies to you (◄) and posts naming you (♦), counted apart (unseenet #170)
+function forYouMarks(c) {
+  if (!c.for_you) return null;
+  const parts = [];
+  if (c.replies) parts.push(`◄${c.replies}`);
+  if (c.mentions) parts.push(`♦${c.mentions}`);
+  const title = [c.replies ? `${c.replies} ${c.replies === 1 ? "reply" : "replies"} to you` : "",
+                 c.mentions ? `${c.mentions} ${c.mentions === 1 ? "post names" : "posts name"} you` : ""]
+    .filter(Boolean).join(", ");
+  return h("span", { class: "foryou", title, text: parts.join(" ") || `◄${c.for_you}` });
+}
+
 function sidebar() {
   const sb = S.sidebar, me = S.state.me || {};
   const item = (gid, ic, label, extra, cls = "") => h("button", {
@@ -414,7 +426,7 @@ function sidebar() {
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl P" })),
     sb ? h("div", { class: "nav" },
-      item("for-you", "◄", "For you", sb.for_you ? h("span", { class: "foryou", text: `◄${sb.for_you}` }) : null),
+      item("for-you", "◄", "For you", forYouMarks(sb)),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
@@ -435,7 +447,7 @@ function sidebar() {
     sb ? sb.hierarchies.map(hier => h("div", { class: "nav" },
       h("h3", { text: hier.name + ".*" }),
       hier.groups.map(g => item(g.id, (g.access || "") + g.icon, g.label, [
-        g.for_you ? h("span", { class: "foryou", text: `◄${g.for_you}` }) : null,
+        forYouMarks(g),
         g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""))))) :
       h("p", { class: "muted", text: "Loading your groups …" }),
     sb && !sb.hierarchies.length ? h("div", { class: "nav" },
