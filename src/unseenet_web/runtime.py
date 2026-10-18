@@ -14,6 +14,10 @@ import contextlib
 import os
 from pathlib import Path
 
+from datetime import timedelta
+
+from unseenet import names as nm
+from unseenet.client import naming
 from unseenet.client.session import Message, Session, SessionError
 from unseenet.core import crypto
 from unseenet.core.groups import KIND_CHAT, KIND_POST, personal_inbox_id
@@ -395,6 +399,88 @@ class Runtime:
         targets = await s.report_targets(m)
         picked = [t for i, t in enumerate(targets) if i in set(chosen)]
         return await s.report(m, picked, note, anonymous=anonymous)
+
+
+    # --- names (UN-RFC 0019), as the TUI's @ and Ctrl+P -----------------------
+    async def names(self) -> dict:
+        s = self.session
+        try:
+            await asyncio.wait_for(s.refresh_naming(), 60)
+        except (*NETWORK_ERRORS, ValueError, asyncio.TimeoutError):
+            pass                                  # show what we have
+        return serialize.names(s)
+
+    async def name_action(self, data: dict) -> str:
+        """claim, renew, release, transfer, primary, ask, give, revoke, answer."""
+        s, action = self.session, str(data.get("action", ""))
+        name = str(data.get("name", "")).strip().lower().lstrip("@")
+        if action in ("claim", "renew", "release", "transfer"):
+            nm.check_name(name)
+            to = str(data.get("to", "")).strip() or None
+            if action == "transfer":
+                if not to:
+                    raise SessionError("transfer to which key?")
+                crypto.key_from_text(to)
+                if to == s.identity().key_text:
+                    raise SessionError("that is your own key")
+            await naming.claim(s, name, action, to)
+            return f"Sent your {action} of @{name} to the registrar. It decides after about an hour."
+        if action == "primary":
+            naming.set_primary(s, name)
+            return f"Your posts show {naming.name_text(name)}"
+        if action == "ask":
+            await naming.request_subname(s, name)
+            return f"Asked for {name}. The answer comes to your private posts."
+        if action == "give":
+            key = str(data.get("key", "")).strip()
+            crypto.key_from_text(key)
+            years = max(1, min(int(data.get("years", 1) or 1), 10))
+            await naming.give_subname(s, name, key, timedelta(days=365 * years))
+            return f"{name} given to {s.identity_label(key)}"
+        if action == "revoke":
+            await naming.revoke_subname(s, name)
+            return f"{name} taken back"
+        if action == "answer":
+            await s.fetch_group(s.my_inbox)
+            found = next(((m, d) for m, d in naming.name_requests(s)
+                          if m.message_id == data.get("id")), None)
+            if found is None:
+                raise SessionError("that request is not waiting any more")
+            await naming.answer_request(s, found[0], found[1], approve=bool(data.get("approve")))
+            return "Given." if data.get("approve") else "Said no."
+        raise SessionError(f"unknown action {action}")
+
+    # --- ignoring people, blocking in a hierarchy, members ---------------------
+    def ignore(self, key_text: str, label: str, on: bool) -> None:
+        crypto.key_from_text(key_text)
+        if on:
+            self.session.ignore(key_text, label)
+        else:
+            self.session.unignore(key_text)
+        self.emit("groups")
+        if self.session is not None:
+            for gid in list(self.session.data["subscribed"]):
+                self.emit("group", id=gid)
+
+    def ignored(self) -> list[dict]:
+        return [{"key": k, "label": label or self.session.identity_label(k)}
+                for k, label in self.session.ignored()]
+
+    async def block(self, gid: str, key_text: str, reason: str) -> str:
+        crypto.key_from_text(key_text)
+        where = await naming.block(self.session, gid, key_text, reason)
+        self.emit("group", id=gid)
+        return str(where)
+
+    def show_blocked(self, on: bool) -> None:
+        self.session.set_show_blocked(on)
+        for gid in list(self.session.data["subscribed"]):
+            self.emit("group", id=gid)
+
+    async def remove_member(self, gid: str, key_text: str) -> int:
+        n = await self.session.remove_member(gid, key_text)
+        self.emit("group", id=gid)
+        return n
 
 
 def find_message(s: Session, gid: str, message_id: str) -> Message | None:

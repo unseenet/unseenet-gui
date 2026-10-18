@@ -420,7 +420,10 @@ function sidebar() {
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
       sb.moderation ? h("button", { class: "item", onclick: openModeration },
         h("span", { class: "ic", text: "✓" }), h("span", { class: "nm", text: "To approve" }),
-        h("span", { class: "count", text: sb.moderation })) : null) : null,
+        h("span", { class: "count", text: sb.moderation })) : null,
+      sb.name_requests ? h("button", { class: "item", onclick: openNames },
+        h("span", { class: "ic", text: "@" }), h("span", { class: "nm", text: "Name requests" }),
+        h("span", { class: "count", text: sb.name_requests })) : null) : null,
     sb ? h("div", { class: "nav" },
       h("h3", { class: "row-h" }, h("span", { text: "chats" }),
         h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
@@ -644,6 +647,8 @@ function readerPane(g, m, msgs) {
       m.may_withdraw ? h("button", { class: "btn", title: "Withdraw the post from the network (D)", onclick: () => openWithdraw(m) }, "Withdraw", h("kbd", { text: "D" })) : null,
       !m.mine && !m.private && g.id !== "for-you" ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
+      g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
+      !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null,
       h("span", { class: "grow" }),
       h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
       h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),
@@ -884,7 +889,9 @@ function openInfo() {
       g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }), h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
       g.members && g.members.length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: `Members (${g.members.length})` }),
         g.members.map(m => h("div", { class: "member" }, h("span", { class: `av xs c${m.colour}`, text: initials(m.label) }),
-          h("span", { class: "mono", text: m.label })))] : null,
+          h("span", { class: "mono", text: m.label }),
+          g.owner && m.key !== (S.state.me || {}).key ? h("button", { class: "link", style: "margin-left:auto",
+            onclick: () => removeMember(g, m) }, "Remove") : null))] : null,
       (g.moderators || []).length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Moderators" }),
         h("p", { class: "muted", style: "margin:0", text: g.moderators.map(p => p.label).join(", ") })] : null,
       (g.posters || []).length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Posters" }),
@@ -1046,6 +1053,129 @@ function openModeration() {
         h("button", { class: "btn primary", onclick: () => act(true) }, "Approve")) : null);
   } };
   render();
+}
+
+// ---- names (UN-RFC 0019): the TUI's @ and its Ctrl+P name tools, in one dialog -------
+function openNames() {
+  let data = null, err = "", msg = "", claim = "", ask = "", give = "", giveTo = "", years = 1, busy = false;
+  const load = () => api("GET", "/api/names").then(d => { data = d; if (S.dialog) render(); })
+    .catch(e => { err = e.message; if (S.dialog) render(); });
+  load();
+  const act = async (body, confirmText) => {
+    if (confirmText && !window.confirm(confirmText)) return;
+    busy = true; err = ""; render();
+    try { const r = await api("POST", "/api/names", body); msg = r.text; await load(); await loadSidebar(); }
+    catch (x) { err = x.message; }
+    busy = false; render();
+  };
+  const when = (iso) => { try { return new Date(iso).toLocaleDateString(); } catch (_) { return iso; } };
+  const sect = (t) => h("h3", { style: "margin:12px 0 4px;font-size:14px", text: t });
+  S.dialog = { focus: "#nclaim", render: () => dialogShell({ label: "Names", wide: true },
+    h("div", { class: "dh" }, h("h2", { text: "Names" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      err ? h("p", { class: "error", text: err }) : null,
+      msg ? h("p", { class: "hint", style: "margin:0", text: msg }) : null,
+      data === null ? h("p", { class: "muted", text: "Reading the registrar over Tor …" }) : [
+        sect("Your names"),
+        data.mine.length ? data.mine.map(n => h("div", { class: "cmd" },
+          h("span", { class: "nm" }, h("span", { class: "mono", text: n.text }),
+            h("small", { text: ` ${n.kind}, until ${when(n.expires)}${n.primary && data.mine.length > 1 ? " · your posts show this one" : ""}` })),
+          !n.primary ? h("button", { class: "btn", onclick: () => act({ action: "primary", name: n.name }) }, "Show on my posts") : null,
+          n.kind !== "sub" ? h("button", { class: "btn", onclick: () => act({ action: "renew", name: n.name }) }, "Renew") : null,
+          n.kind !== "sub" ? h("button", { class: "btn", onclick: () => {
+            const to = window.prompt(`Transfer @${n.name} to which key? (ed25519:…) Your own key loses it.`);
+            if (to) act({ action: "transfer", name: n.name, to: to.trim() }); } }, "Transfer") : null,
+          n.kind !== "sub" ? h("button", { class: "btn danger", onclick: () => act({ action: "release", name: n.name },
+            `Release @${n.name}? You give it up at once; others can then claim it.`) }, "Release") : null)) :
+          h("p", { class: "muted", style: "margin:0", text: "No names yet. A name like @you shows on your posts instead of your key." }),
+        data.pending.length ? data.pending.map(p => h("p", { class: "hint", style: "margin:2px 0",
+          text: `${p.action} ${p.name}: sent ${when(p.sent)}, waiting for ${p.action === "ask" ? "its holder" : "the registrar (about an hour)"}` })) : null,
+        h("form", { class: "row", style: "gap:8px;margin-top:6px", onsubmit: (e) => { e.preventDefault();
+            const name = claim.trim().replace(/^@/, "");
+            if (!name) return;
+            const domain = name.includes(".");
+            act({ action: "claim", name }, domain ? `Claim ${name}? The registrar looks for a DNS TXT record first:\n\n_unseenet.${name}  TXT  "${data.dns_value}"\n\nAdd it at your DNS provider, then claim. Keep it there.` : null); } },
+          h("input", { id: "nclaim", class: "in", "data-k": "nclaim", value: claim, placeholder: "claim a name: lorensen, or a domain you own",
+            oninput: (e) => { claim = e.target.value; }, autocomplete: "off" }),
+          h("button", { class: "btn primary", type: "submit", disabled: busy }, "Claim")),
+        sect("A name under someone else's"),
+        h("form", { class: "row", style: "gap:8px", onsubmit: (e) => { e.preventDefault(); if (ask.trim()) act({ action: "ask", name: ask.trim() }); } },
+          h("input", { class: "in", "data-k": "nask", value: ask, placeholder: "e.g. sonia@lorensen - its holder decides",
+            oninput: (e) => { ask = e.target.value; }, autocomplete: "off" }),
+          h("button", { class: "btn", type: "submit", disabled: busy }, "Ask")),
+        h("p", { class: "hint", style: "margin:2px 0 0", text: "Every name on one identity links it to the others: use another identity for a part of your life you keep apart." }),
+        data.parents.length ? [
+          sect("Names under yours (" + data.parents.map(p => "@" + p).join(", ") + ")"),
+          data.requests.map(r => h("div", { class: "cmd" },
+            h("span", { class: "nm" }, h("span", { class: "mono", text: r.name }), h("small", { text: " asked for by " + r.who })),
+            h("button", { class: "btn primary", onclick: () => act({ action: "answer", id: r.id, approve: true }) }, "Give"),
+            h("button", { class: "btn", onclick: () => act({ action: "answer", id: r.id, approve: false }) }, "Say no"))),
+          data.given.map(g => h("div", { class: "cmd" },
+            h("span", { class: "nm" }, h("span", { class: "mono", text: g.name }), h("small", { text: ` ${g.who}, until ${when(g.expires)}` })),
+            h("button", { class: "btn", onclick: () => act({ action: "revoke", name: g.name }, `Take ${g.name} back?`) }, "Take back"))),
+          h("form", { class: "row", style: "gap:8px;margin-top:6px", onsubmit: (e) => { e.preventDefault();
+              try { const key = recipient(giveTo); if (give.trim()) act({ action: "give", name: give.trim(), key, years }); }
+              catch (x) { err = x.message; render(); } } },
+            h("input", { class: "in", "data-k": "ngive", value: give, placeholder: `sonia@${data.parents[0]}`,
+              oninput: (e) => { give = e.target.value; }, autocomplete: "off" }),
+            h("input", { class: "in", "data-k": "ngiveto", value: giveTo, list: "ncontacts", placeholder: "to: a contact or a key",
+              oninput: (e) => { giveTo = e.target.value; }, autocomplete: "off" }),
+            h("datalist", { id: "ncontacts" }, contactList().map(c => h("option", { value: c.label }))),
+            h("select", { class: "in", style: "width:auto", onchange: (e) => { years = +e.target.value; } },
+              [1, 2, 5].map(y => h("option", { value: y, selected: y === years ? "" : null, text: y + (y === 1 ? " year" : " years") }))),
+            h("button", { class: "btn", type: "submit", disabled: busy }, "Give"))] : null]),
+    h("div", { class: "df" }, h("span", { class: "mono", text: data ? data.key.slice(0, 28) + "…" : "" }), h("span", { text: "Esc close" }))) };
+  render();
+}
+
+// ---- ignoring people: your own killfile, never sent anywhere (#72) ----------------
+async function ignorePerson(key, label, on = true) {
+  await api("POST", "/api/ignore", { key, label, on });
+  toast(on ? `${label} is ignored: you no longer see their posts.` : `You see ${label} again.`);
+  await loadGroup(); await loadSidebar();
+}
+
+function openIgnored() {
+  let list = null;
+  const load = () => api("GET", "/api/ignore").then(l => { list = l; if (S.dialog) render(); });
+  load();
+  S.dialog = { render: () => dialogShell({ label: "People you ignore", wide: true },
+    h("div", { class: "dh" }, h("h2", { text: "People you ignore" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db list" },
+      list === null ? h("p", { class: "muted", text: "…" }) :
+      list.length ? list.map(p => h("div", { class: "cmd" }, h("span", { class: "nm", text: p.label }),
+        h("button", { class: "btn", onclick: async () => { await ignorePerson(p.key, p.label, false); await load(); } }, "Stop ignoring"))) :
+        h("p", { class: "muted", style: "padding:8px 0", text: "Nobody. Ignore someone from one of their posts; only you know." })),
+    h("div", { class: "df" }, h("span", { text: "Kept in your vault, never sent anywhere" }), h("span", { text: "Esc close" }))) };
+  render();
+}
+
+// ---- blocking in a hierarchy you maintain (UN-RFC 0018, 5.4) ------------------------
+function openBlock(m) {
+  const g = S.data && S.data.group;
+  if (!g || !g.maintainer || !m) return;
+  formDialog({ label: "Block in hierarchy", title: "Block " + m.who, focus: "#breason", button: "Block",
+    note: "As a maintainer you block them in your whole hierarchy, also in groups you do not own. The block and its reason are public in your hierarchy list. For illegal content, threats and the like.",
+    fields: (vals) => [h("label", { for: "breason", text: "Why (required, public)" }),
+      h("input", { id: "breason", name: "reason", class: "in", "data-k": "breason", value: vals.reason || "" })],
+    submit: async (v) => {
+      if (!(v.reason || "").trim()) throw new Error("Give a reason: it is public, so others can see why.");
+      const { hierarchy } = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/block`, { key: m.key, reason: v.reason.trim() });
+      closeDialog(); await loadGroup(); render(); toast(`${m.who} is blocked in ${hierarchy}.*`);
+    } });
+}
+
+async function toggleShowBlocked() {
+  const on = !(S.sidebar && S.sidebar.show_blocked);
+  await api("POST", "/api/show-blocked", { on });
+  await loadSidebar(); await loadGroup(); render();
+  toast(on ? "You see posts blocked by maintainers, marked." : "Posts blocked by maintainers are hidden.");
+}
+
+async function removeMember(g, m) {
+  if (!window.confirm(`Remove ${m.label} from ${g.label}? The others get a new key; ${m.label} keeps what they already read.`)) return;
+  await api("POST", `/api/groups/${encodeURIComponent(g.id)}/members/remove`, { key: m.key });
+  await loadGroup(); render(); toast(m.label + " is removed.");
 }
 
 // Withdraw a post (D): yours, or any in a group you own or moderate (UN-RFC 0004, 7).
@@ -1324,6 +1454,9 @@ function commands() {
     { name: "Create a group", key: "", run: openCreateGroup },
     { name: "Write a private post", key: "M", run: () => openWrite("", "post") },
     { name: "Contacts", key: "C", run: openContacts },
+    { name: "Names: claim yours, ask for one, give names under yours", key: "@", run: openNames },
+    { name: "People you ignore", key: "", run: openIgnored },
+    { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
     { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
     { name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },
@@ -1414,7 +1547,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   const keys = {
-    n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), c: () => openContacts(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
+    n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), c: () => openContacts(), "@": () => openNames(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
   };
   if (keys[key]) { e.preventDefault(); keys[key](); return; }
   if (g && g.view === "chat") {

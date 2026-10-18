@@ -63,3 +63,41 @@ async def test_edit_ban_roles_withdraw_and_moderate(tmp_path, monkeypatch):
     assert gid not in owner.data["groups"]
     await owner.close(); await other.close()
     server.close()
+
+
+async def test_ignore_names_and_members(tmp_path, monkeypatch):
+    monkeypatch.setattr(sess, "DEFAULT_POW", 8)
+    node = Node(Store(), NodeConfig(min_pow=8, forward_delay=(0, 0)))
+    server = await node.serve("127.0.0.1", 0)
+    addr = f"127.0.0.1:{server.sockets[0].getsockname()[1]}"
+
+    def session(name):
+        s = Session(Vault.open(tmp_path / f"{name}.vault", "pw", **KDF), status=lambda *_: None)
+        s.new_identity(name, name.title()); s.add_node(addr)
+        return s
+
+    owner, other = session("owner"), session("other")
+    await owner.ensure_inbox(); await other.ensure_inbox()
+    rt = Runtime(tmp_path / "owner.vault")
+    rt.session = owner
+    rt.emit = lambda *a, **k: None
+    key = other.identity().key_text
+
+    rt.ignore(key, "Other", True)
+    assert [p["key"] for p in rt.ignored()] == [key]
+    rt.ignore(key, "", False)
+    assert rt.ignored() == []
+
+    data = serialize.names(owner)                      # no registrar here: nothing, but no error
+    assert data["mine"] == [] and data["parents"] == [] and data["key"] == owner.identity().key_text
+    with pytest.raises(ValueError):
+        await rt.name_action({"action": "claim", "name": "NOT A NAME"})
+
+    gid = await owner.create_group("dk.lukket", "closed", min_pow=8)
+    await owner.invite(gid, key)
+    assert key in owner.members(gid)
+    epoch = await rt.remove_member(gid, key)
+    assert epoch >= 2 and key not in owner.members(gid)
+    assert serialize.roles(owner, gid)["maintainer"] is False
+    await owner.close(); await other.close()
+    server.close()
