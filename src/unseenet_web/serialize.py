@@ -66,7 +66,8 @@ def group_summary(s: Session, gid: str) -> dict:
             "short": short_group_id(gid), "title": data.get("title") or entry.get("title", ""),
             "description": data.get("description", ""), "rules": data.get("rules", ""),
             "owner": entry.get("owner", False), "may_post": s.may_post(gid),
-            "unread": s.unread_count(gid), "for_you": s.for_you_count(gid), **group_kind(s, gid)}
+            "unread": s.unread_count(gid), "for_you": s.for_you_count(gid),
+            "kinds": list(s.group_kinds(gid)), **group_kind(s, gid)}     # what it takes (UN-RFC 0028)
 
 
 def sidebar(s: Session, inbox_ready: bool) -> dict:
@@ -88,8 +89,14 @@ def threaded(msgs: list[Message]) -> list[tuple[Message, int]]:
     pos = {m.message_id: i for i, m in enumerate(msgs)}
     by_id = {m.message_id: m for m in msgs}
     threads: dict[str, list[Message]] = {}
+    run = None             # consecutive chat lines stay together, not a thread each (UN-RFC 0028)
     for m in msgs:
-        root = next((r for r in m.references if r in by_id), m.message_id)
+        root = next((r for r in m.references if r in by_id), None)
+        if root is None and m.kind == KIND_CHAT and not m.private:
+            root = run = run or m.message_id
+        else:
+            run = None
+        root = root or m.message_id
         threads.setdefault(root, []).append(m)
     out = []
     for root, items in sorted(threads.items(),
@@ -115,7 +122,7 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
             "date": m.date.isoformat() if m.date else None, "text": text.rstrip("\n"),
             "signature": (sig or "").rstrip("\n") or None, "references": m.references,
             "encrypted": m.encrypted, "private": m.private, "verified": bool(m.sender_key),
-            "kind": m.kind if m.private else None,
+            "kind": m.kind,                      # a chat line or a letter (UN-RFC 0028)
             "readable": m.readable, "error": m.error, "read": s.is_read(m),
             "for_me": s.for_me(m, mine, patterns)}
 

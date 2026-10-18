@@ -491,8 +491,10 @@ function mainArea() {
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
-      g.view !== "chat" && g.may_post ? h("button", { class: "btn primary", onclick: () => openCompose() },
-        svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
+      g.may_post && g.type !== "contact" && (g.kinds || ["letter"]).includes("letter") ?
+        h("button", { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
+          title: "A post with a subject (UN-RFC 0028)" },
+          svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
   return [head, g.view === "chat" ? chatView(d) : threadsView(d)];
 }
 
@@ -666,9 +668,9 @@ async function signatureText() {
   try { const s = await api("GET", "/api/signature"); return s.preview || ""; } catch (_) { return ""; }
 }
 
-// A post's title in the list; a chat among the letters shows its first line (UN-RFC 0028).
+// A post's title in the list; a chat line among posts or letters shows its first line (UN-RFC 0028).
 function subjectOf(m) {
-  if (m.private && m.kind === "chat") {
+  if (m.kind === "chat") {
     const first = ((m.text || "").trim().split("\n")[0] || "…");
     return "» " + (first.length > 60 ? first.slice(0, 60) + "…" : first);
   }
@@ -745,9 +747,13 @@ function chatView(d) {
     }
     grp.at = d0 || grp.at;
     const quoted = m.references.length && byId[m.references[m.references.length - 1]];
-    grp.col.append(h("div", { class: "bubble", title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
-      quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + quoted.text.slice(0, 80)) : null,
-      m.readable ? m.text : h("i", { text: m.error || "Could not be read." })));
+    const letter = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
+    grp.col.append(h("div", { class: "bubble" + (letter ? " letter" : ""), title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
+      quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
+      letter ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
+      m.readable ? m.text : h("i", { text: m.error || "Could not be read." }),
+      letter && g.type !== "contact" && g.may_post && (g.kinds || []).includes("letter") ?
+        h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) }, "Reply with a quote")) : null));
     if (m.mine) grp.lastMine = m;
   }
   flush();
@@ -775,6 +781,8 @@ function chatView(d) {
   };
   return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
     h("div", { class: "msgs", "data-scroll": "chat:" + g.id, "data-stick": "bottom" }, out),
+    g.may_post && g.type !== "contact" && g.kinds && !g.kinds.includes("chat") ?
+      h("div", { class: "chatbar hint", text: "A discussion group: it takes posts with a subject only. N writes one." }) :
     g.may_post ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); } },
       h("div", { class: "row" },
         h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
@@ -856,6 +864,9 @@ function openInfo() {
       h("dl", { class: "kv" },
         h("dt", { text: "Type" }), h("dd", { text: g.type + (g.local ? ", local (one node)" : "") }),
         h("dt", { text: "Shown as" }), h("dd", { text: g.view + (g.owner_view !== g.view ? ` (the owner chose ${g.owner_view})` : "") }),
+        h("dt", { text: "Takes" }), h("dd", { text: (g.kinds || []).length === 1 ?
+          (g.kinds[0] === "letter" ? "posts with a subject only (a discussion group)" : "chat lines only (a chat group)") :
+          "posts and chat lines" }),
         h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
         h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
         h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id })),
@@ -870,7 +881,8 @@ function openInfo() {
 async function openCompose() {
   const g = S.data && S.data.group;
   if (g && g.type === "contact") { openLetter(g.key, g.label.replace(/ √$/, "")); return; }   // N in a chat: a letter
-  if (!g || !g.may_post || g.view === "chat") return;
+  if (!g || !g.may_post) return;
+  if (g.kinds && !g.kinds.includes("letter")) { toast("A chat group: it takes chat lines only."); return; }
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
@@ -987,9 +999,9 @@ async function openLetter(key, who = "", subject = "", replyTo = null, quote = "
 }
 
 function openCreateGroup() {
-  let gtype = "open", view = "threads";
+  let gtype = "open", view = "threads", kinds = "both";
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
-    onclick: () => { if (name === "type") gtype = value; else view = value; render(); } },
+    onclick: () => { if (name === "type") gtype = value; else if (name === "kinds") kinds = value; else view = value; render(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Create a group", title: "Create a group", focus: "#gname", button: "Create",
     note: "The group belongs to your key. Creating it costs some proof-of-work, and it is sent to your node now.",
@@ -1004,12 +1016,17 @@ function openCreateGroup() {
         pick("type", "closed", gtype, "Closed", "members only, encrypted")),
       h("label", { text: "Shown as" }),
       h("div", { class: "choices row" }, pick("view", "threads", view, "≡ Threads", "posts and replies"), pick("view", "chat", view, "» Chat", "messages in order")),
+      h("label", { text: "Takes" }),
+      h("div", { class: "choices row" },
+        pick("kinds", "both", kinds, "Both", "posts and chat lines"),
+        pick("kinds", "letter", kinds, "≡ Posts only", "a discussion group"),
+        pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)"),
       h("label", { for: "gtitle", text: "Title" }),
       h("input", { id: "gtitle", name: "title", class: "in", "data-k": "gtitle", value: vals.title || "", placeholder: "One line about the group" })],
     submit: async (v) => {
       toast("Creating the group - proof-of-work takes a moment …");
-      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view, fast: !!v.fast, title: v.title });
+      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view, kinds, fast: !!v.fast, title: v.title });
       closeDialog(); await loadSidebar(); await openGroup(id); toast("The group is created.");
     } });
 }
