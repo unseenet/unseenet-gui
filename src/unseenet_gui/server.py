@@ -26,7 +26,9 @@ from pathlib import Path
 
 from aiohttp import WSMsgType, web
 
+from unseenet import __version__ as CORE_VERSION
 from unseenet.client.session import SessionError
+from unseenet.core import about as about_text
 
 from . import system
 from .runtime import NETWORK_ERRORS, Runtime
@@ -206,6 +208,12 @@ async def setup(request):
             return _error("choose a node")
         await rt.setup(display, node)
     return _json(rt.state())
+
+
+async def about(request):
+    """What Unseenet is, in plain words: the core's text, the same as the TUI's F1.
+    Asked for before the vault is open too, so a newcomer can read it first."""
+    return _json(about_text.as_dict(CORE_VERSION))
 
 
 async def known_nodes(request):
@@ -492,6 +500,7 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_get("/", index)
     r.add_get("/static/{name}", static)
     r.add_get("/api/state", state)
+    r.add_get("/api/about", about)
     r.add_post("/api/unlock", unlock)
     r.add_post("/api/setup", setup)
     r.add_get("/api/known-nodes", known_nodes)

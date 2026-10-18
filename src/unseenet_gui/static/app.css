@@ -289,6 +289,19 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 14px; font-size: 13px; margin: 0; }
 .kv dt { color: var(--muted); }
 .kv dd { margin: 0; overflow-wrap: anywhere; }
+
+/* About Unseenet: long plain-language text, easy to read */
+.dialog .db.about { gap: 10px; line-height: 1.55; font-size: 14px; }
+.about-tag { margin: 0; font-family: var(--mono); color: var(--green); }
+.about-h { margin: 10px 0 0; font-size: 15px; }
+.about-cmp { display: grid; grid-template-columns: max-content 1fr; gap: 10px 16px; margin: 0; }
+.about-cmp dt { font-weight: 600; }
+.about-cmp dd { margin: 0; }
+.about-status { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; padding: 12px 14px;
+  border-radius: 10px; border: 1px solid var(--line-2); background: var(--ink-deep); }
+.about-status .about-h { margin: 0; color: var(--amber); }
+.dialog .dh .logo { flex: none; }
+@media (max-width: 560px) { .about-cmp { grid-template-columns: 1fr; gap: 2px; } .about-cmp dd { margin-bottom: 8px; } }
 .toast { position: fixed; bottom: 44px; left: 50%; transform: translateX(-50%); padding: 10px 16px;
   border-radius: 10px; background: var(--paper); color: var(--ink); font-weight: 600; z-index: 20;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4); max-width: calc(100% - 32px); }
