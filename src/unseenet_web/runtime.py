@@ -16,7 +16,7 @@ from pathlib import Path
 
 from unseenet.client.session import Message, Session, SessionError
 from unseenet.core import crypto
-from unseenet.core.groups import personal_inbox_id
+from unseenet.core.groups import KIND_CHAT, KIND_LETTER, personal_inbox_id
 from unseenet.core.vault import Vault, VaultError
 from unseenet.nntp import NNTPError
 
@@ -227,24 +227,28 @@ class Runtime:
              signature: bool = True) -> str:
         """Start a post in the background; its progress arrives as 'post' events.
 
-        A chat message is sent like the TUI does it: the subject is its first
-        line and there is no signature."""
+        A chat line (UN-RFC 0028) has an empty subject and no signature."""
+        kinds = self.session.group_kinds(gid)
+        if (KIND_CHAT if chat else KIND_LETTER) not in kinds:
+            raise SessionError("this group takes " + ("posts with a subject only" if chat
+                                                       else "chat lines only"))
         if chat:
-            subject = body.split("\n", 1)[0][:60] + ("…" if len(body) > 60 else "")
+            subject = ""
         elif signature:
             sig = self.session.signature()
             body = body.rstrip("\n") + ("\n-- \n" + sig if sig else "")
         self._jobs += 1
         job = f"job{self._jobs}"
-        self.spawn(self._post(job, gid, subject, body, references))
+        self.spawn(self._post(job, gid, subject, body, references, KIND_CHAT if chat else KIND_LETTER))
         return job
 
-    async def _post(self, job: str, gid: str, subject: str, body: str, references: list[str]) -> None:
+    async def _post(self, job: str, gid: str, subject: str, body: str, references: list[str],
+                    kind: str = KIND_LETTER) -> None:
         s = self.session
         # CORE: no progress callback for proof-of-work yet; the client shows "working".
         self.emit("post", job=job, group=gid, state="pow")
         try:
-            msgid = await s.post(gid, subject, body, references=references or None)
+            msgid = await s.post(gid, subject, body, references=references or None, kind=kind)
         except NETWORK_ERRORS as exc:
             self.emit("post", job=job, group=gid, state="failed", error=str(exc))
             return
@@ -266,19 +270,24 @@ class Runtime:
             if msg is not None:
                 inbox = s.reply_target(msg) or inbox
                 refs = msg.references + [msg.message_id]
-        if chat or not subject:
-            subject = body.split("\n", 1)[0][:60] + ("…" if len(body) > 60 else "")
+        # UN-RFC 0028: a chat has no subject; a letter must have one
+        if chat:
+            subject = ""
+        elif not subject:
+            raise SessionError("a letter needs a subject")
         self._jobs += 1
         job = f"job{self._jobs}"
         ui_group = serialize.CONTACT + key_text if chat else s.my_inbox
-        self.spawn(self._private(job, ui_group, inbox, owner, subject, body, refs))
+        self.spawn(self._private(job, ui_group, inbox, owner, subject, body, refs,
+                                 KIND_CHAT if chat else KIND_LETTER))
         return job
 
-    async def _private(self, job, ui_group, inbox, owner, subject, body, refs) -> None:
+    async def _private(self, job, ui_group, inbox, owner, subject, body, refs, kind) -> None:
         s = self.session
         self.emit("post", job=job, group=ui_group, state="pow")
         try:
-            msgid = await s.send_private(inbox, subject, body, owner_key=owner, references=refs or None)
+            msgid = await s.send_private(inbox, subject, body, owner_key=owner, references=refs or None,
+                                         kind=kind)
         except (*NETWORK_ERRORS, ValueError) as exc:
             self.emit("post", job=job, group=ui_group, state="failed", error=str(exc))
             return
@@ -296,10 +305,10 @@ class Runtime:
         self.emit("groups")
 
     async def create_group(self, name: str, gtype: str, view: str, fast: bool,
-                           title: str, description: str) -> str:
+                           title: str, description: str, kinds: list[str] | None = None) -> str:
         gid = await self.session.create_group(
             name, gtype, title=title, description=description,
-            view=view if view in ("threads", "chat") else None, low_latency=fast)
+            view=view if view in ("threads", "chat") else None, low_latency=fast, kinds=kinds)
         await self._fetch(gid)
         return gid
 

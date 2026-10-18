@@ -391,3 +391,9 @@ details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 1
   border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
 .fullbar .grow { flex: 1; }
 @media (max-width: 620px) { .fullbar .hint { display: none; } }
+
+/* a post (a letter) among chat lines stands out with its subject (UN-RFC 0028) */
+.bubble.letter { border-left: 3px solid var(--green); border-radius: 4px 14px 14px 4px; }
+.mg.mine .bubble.letter { border-radius: 14px 4px 4px 14px; }
+.bubble .lsub { font-weight: 600; margin-bottom: 4px; }
+.bubble .lact { margin-top: 6px; font-size: 13px; }

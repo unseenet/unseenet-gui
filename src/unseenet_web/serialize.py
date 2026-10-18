@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 
 from unseenet.client.session import GroupInfo, Message, Session, split_signature
-from unseenet.core.groups import short_group_id
+from unseenet.core.groups import KIND_CHAT, short_group_id
 
 CONTACT = "contact:"            # a conversation with one key, shown as a chat (as in the TUI)
 ACCESS_ICONS = {"moderated": "√", "channel": "►", "closed": "∩"}
@@ -66,7 +66,8 @@ def group_summary(s: Session, gid: str) -> dict:
             "short": short_group_id(gid), "title": data.get("title") or entry.get("title", ""),
             "description": data.get("description", ""), "rules": data.get("rules", ""),
             "owner": entry.get("owner", False), "may_post": s.may_post(gid),
-            "unread": s.unread_count(gid), "for_you": s.for_you_count(gid), **group_kind(s, gid)}
+            "unread": s.unread_count(gid), "for_you": s.for_you_count(gid),
+            "kinds": list(s.group_kinds(gid)), **group_kind(s, gid)}     # what it takes (UN-RFC 0028)
 
 
 def sidebar(s: Session, inbox_ready: bool) -> dict:
@@ -77,9 +78,9 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
         hierarchies.setdefault(g["hierarchy"], []).append(g)
     inbox = s.my_inbox if inbox_ready else None
     people = [{"id": CONTACT + key, "key": key, "label": name, "colour": colour(key),
-               "unread": s.unread_from(key)} for key, name in s.contacts()]
+               "unread": s.unread_from(key, KIND_CHAT)} for key, name in s.contacts()]
     return {"for_you": len(s.for_you()), "people": people,
-            "inbox": {"id": inbox, "unread": s.unread_count(inbox) if inbox else 0},
+            "inbox": {"id": inbox, "unread": s.unread_letters() if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
 
 
@@ -88,8 +89,14 @@ def threaded(msgs: list[Message]) -> list[tuple[Message, int]]:
     pos = {m.message_id: i for i, m in enumerate(msgs)}
     by_id = {m.message_id: m for m in msgs}
     threads: dict[str, list[Message]] = {}
+    run = None             # consecutive chat lines stay together, not a thread each (UN-RFC 0028)
     for m in msgs:
-        root = next((r for r in m.references if r in by_id), m.message_id)
+        root = next((r for r in m.references if r in by_id), None)
+        if root is None and m.kind == KIND_CHAT and not m.private:
+            root = run = run or m.message_id
+        else:
+            run = None
+        root = root or m.message_id
         threads.setdefault(root, []).append(m)
     out = []
     for root, items in sorted(threads.items(),
@@ -115,25 +122,26 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
             "date": m.date.isoformat() if m.date else None, "text": text.rstrip("\n"),
             "signature": (sig or "").rstrip("\n") or None, "references": m.references,
             "encrypted": m.encrypted, "private": m.private, "verified": bool(m.sender_key),
+            "kind": m.kind,                      # a chat line or a letter (UN-RFC 0028)
             "readable": m.readable, "error": m.error, "read": s.is_read(m),
             "for_me": s.for_me(m, mine, patterns)}
 
 
 def group_view(s: Session, gid: str) -> dict:
     if gid == s.my_inbox:
-        msgs = s.visible(s.private_messages())
-        head = {"id": gid, "label": "Private messages", "hierarchy": "", "title":
+        msgs = s.visible(s.letters())        # letters, and chats with non-contacts (UN-RFC 0028)
+        head = {"id": gid, "label": "Letters", "hierarchy": "", "title":
                 "Only you can read these. Nodes see sealed envelopes.", "view": "threads",
                 "type": "inbox", "access": "@", "icon": "≡", "encrypted": True, "fast": False,
                 "may_post": False, "owner": True, "unread": s.unread_count(gid), "for_you": 0,
                 "rules": "", "description": "", "members": [], "private_reply": True}
     elif gid.startswith(CONTACT):
         key = gid[len(CONTACT):]
-        msgs = s.visible(s.conversation(key))
+        msgs = s.visible(s.conversation(key, KIND_CHAT))     # the chat; letters are in Letters
         head = {"id": gid, "label": s.identity_label(key, seen_name(s, key)), "hierarchy": "", "key": key,
                 "title": "Private conversation. Only the two of you can read it.",
                 "view": "chat", "type": "contact", "access": "@", "icon": "»", "encrypted": True,
-                "fast": False, "may_post": True, "owner": False, "unread": s.unread_from(key),
+                "fast": False, "may_post": True, "owner": False, "unread": s.unread_from(key, KIND_CHAT),
                 "for_you": 0, "rules": "", "description": "", "members": [],
                 "contact": bool(s.contact_name(key)), "colour": colour(key)}
     elif gid == "for-you":
