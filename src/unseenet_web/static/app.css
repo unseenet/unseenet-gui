@@ -381,3 +381,13 @@ details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 1
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cmd form.inline { display: flex; gap: 6px; align-items: center; }
 .cmd form.inline .in { width: 180px; padding: 6px 10px; }
+
+/* full-screen reading: the post gets the whole window, as in the terminal client (F) */
+.app.reading-full .side, .app.reading-full .ghead { display: none; }
+.app.reading-full .reader .scroll { padding-top: 28px; }
+.app.reading-full .reader h2, .app.reading-full .reader .post { max-width: calc(70ch + 46px); margin-left: auto; margin-right: auto; }
+.app.reading-full .reader .pbody { max-width: 70ch; margin-left: auto; margin-right: auto; font-size: 16px; line-height: 1.6; }
+.fullbar { flex: none; display: flex; align-items: center; gap: 12px; padding: 8px 24px;
+  border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.fullbar .grow { flex: 1; }
+@media (max-width: 620px) { .fullbar .hint { display: none; } }
