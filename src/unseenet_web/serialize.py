@@ -66,9 +66,15 @@ def group_summary(s: Session, gid: str) -> dict:
             "short": short_group_id(gid), "title": data.get("title") or entry.get("title", ""),
             "description": data.get("description", ""), "rules": data.get("rules", ""),
             "owner": entry.get("owner", False), "may_post": s.may_post(gid),
-            "unread": s.unread_count(gid), "for_you": s.for_you_count(gid),
+            "unread": s.unread_count(gid), **for_you(s, gid),
             "kinds": list(s.group_kinds(gid)), **roles(s, gid),            # owner and moderator tools
             **group_kind(s, gid)}     # what it takes (UN-RFC 0028)
+
+
+def for_you(s: Session, gid: str | None = None) -> dict:
+    """Unread replies to you and posts naming you, apart (unseenet #170); for_you is the total."""
+    c = s.for_you_counts(gid)
+    return {"for_you": c.total, "replies": c.replies, "mentions": c.mentions}
 
 
 def sidebar(s: Session, inbox_ready: bool) -> dict:
@@ -83,7 +89,7 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
                "label": s.contact_name(key) or s.identity_label(key, seen_name(s, key)),
                "colour": colour(key), "unread": s.unread_from(key, KIND_CHAT)}
               for key in s.chat_partners()]
-    return {"for_you": len(s.for_you()), "people": people,
+    return {**for_you(s), "people": people,
             "moderation": len(s.submissions()),           # posts waiting for you to approve
             "name_requests": _name_requests(s),           # people asking for a name under yours
             "show_blocked": bool(s.data.get("show_blocked")),
