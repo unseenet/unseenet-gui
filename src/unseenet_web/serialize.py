@@ -95,6 +95,7 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
             "name_requests": _name_requests(s),           # people asking for a name under yours
             "show_blocked": bool(s.data.get("show_blocked")),
             "markdown": markup.is_markdown(s.text_type()),       # what you write (UN-RFC 0031)
+            "notices": s.notice_settings(),                      # mention notices (UN-RFC 0032)
             "inbox": {"id": inbox, "unread": s.unread_private_posts() if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
 
@@ -144,7 +145,20 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
             "readable": m.readable, "error": m.error, "read": s.is_read(m),
             "for_me": s.for_me(m, mine, patterns), "may_withdraw": s.may_cancel(m),
             # groups it names with # (unseenet #172): # on the post, or a click, goes there
-            "groups": [r.text for r in group_refs(f"{m.subject}\n{text}")] if m.readable else []}
+            "groups": [r.text for r in group_refs(f"{m.subject}\n{text}")] if m.readable else [],
+            "notice": notice(s, m)}
+
+
+def notice(s: Session, m: Message) -> dict | None:
+    """A mention notice (UN-RFC 0032): where the post that names you is."""
+    if not s.is_notice(m):
+        return None
+    try:
+        name, fp = m.mention_group.rsplit("@", 1)
+    except ValueError:
+        return None
+    return {"group": m.mention_group, "id": m.mention_of, "label": s.group_label(m.mention_group),
+            "ref": f"#{name}@{fp}", "followed": m.mention_group in s.data["subscribed"]}
 
 
 def group_view(s: Session, gid: str) -> dict:
