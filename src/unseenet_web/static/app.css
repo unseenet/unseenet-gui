@@ -402,3 +402,7 @@ details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 1
 .item.person.stranger .nm { font-style: italic; opacity: 0.85; }
 
 .btn.danger { background: var(--red); color: #fff; border-color: var(--red); }
+
+/* the owner tools under About this group may need two rows */
+.df.btns.wrap { flex-wrap: wrap; gap: 8px; }
+.df .grow { flex: 1; }

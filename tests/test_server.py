@@ -68,3 +68,17 @@ async def test_static_serves_only_its_own_files(client, name):
 async def test_locked_session_refuses_reading(client):
     r = await client.get("/api/groups", headers={**host(client), "X-Unseenet-Token": TOKEN})
     assert r.status == 409
+
+
+@pytest.mark.parametrize("method,path", [
+    ("GET", "/api/moderation"), ("POST", "/api/moderation"),
+    ("POST", "/api/groups/x/edit"), ("POST", "/api/groups/x/remove"),
+    ("POST", "/api/groups/x/role"), ("POST", "/api/groups/x/ban"),
+    ("POST", "/api/groups/x/withdraw"), ("GET", "/api/groups/x/report"),
+    ("POST", "/api/groups/x/report")])
+async def test_owner_tools_need_the_token_and_an_open_vault(client, method, path):
+    """The owner's and moderators' tools are behind the same guards as everything else."""
+    r = await client.request(method, path, headers=host(client), json={})
+    assert r.status == 401
+    r = await client.request(method, path, headers={**host(client), "X-Unseenet-Token": TOKEN}, json={})
+    assert r.status == 409                                   # the vault is locked

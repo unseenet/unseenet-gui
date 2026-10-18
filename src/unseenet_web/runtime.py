@@ -330,6 +330,72 @@ class Runtime:
             self.spawn(self._fetch(gid))
         self.emit("groups")
 
+    # --- owners and moderators (as the TUI's Ctrl+P) -------------------------
+    async def moderation(self) -> list[dict]:
+        """Submissions waiting for groups you moderate (UN-RFC 0009 section 3)."""
+        s = self.session
+        await s.fetch_group(s.my_inbox)
+        return [serialize.submission(s, m, art) for m, art in s.submissions()]
+
+    async def moderate(self, inbox_id: str, approve: bool, reason: str = "") -> None:
+        s = self.session
+        found = next(((m, a) for m, a in s.submissions() if m.message_id == inbox_id), None)
+        if found is None:
+            raise SessionError("that submission is not waiting any more")
+        m, art = found
+        if approve:
+            await s.approve_submission(m, art)
+            await self._fetch(art.group)
+        else:
+            await s.reject_submission(m, reason)
+        self.emit("groups")
+
+    async def edit_group(self, gid: str, changes: dict) -> None:
+        await self.session.update_group(gid, **changes)
+        self.emit("group", id=gid)
+        self.emit("groups")
+
+    async def remove_group(self, gid: str, reason: str = "") -> None:
+        await self.session.remove_group(gid, reason)
+        self.emit("groups")
+
+    async def set_role(self, gid: str, role: str, key_text: str, on: bool) -> None:
+        await self.session.set_role(gid, role, key_text, on)
+        self.emit("group", id=gid)
+
+    async def ban(self, gid: str, key_text: str, on: bool, reason: str = "") -> None:
+        if on:
+            await self.session.ban(gid, key_text, reason)
+        else:
+            await self.session.unban(gid, key_text)
+        self.emit("group", id=gid)
+
+    async def withdraw(self, gid: str, message_id: str) -> None:
+        s = self.session
+        m = find_message(s, gid, message_id)
+        if m is None:
+            raise SessionError("that post is not here any more")
+        await s.cancel(m)
+        await self._fetch(gid)
+        self.emit("group", id=gid)
+
+    async def report_targets(self, gid: str, message_id: str) -> list[dict]:
+        s = self.session
+        m = find_message(s, gid, message_id)
+        if m is None:
+            raise SessionError("that post is not here any more")
+        return [{"i": i, "who": who} for i, (who, _, _) in enumerate(await s.report_targets(m))]
+
+    async def report(self, gid: str, message_id: str, chosen: list[int], note: str,
+                     anonymous: bool) -> int:
+        s = self.session
+        m = find_message(s, gid, message_id)
+        if m is None:
+            raise SessionError("that post is not here any more")
+        targets = await s.report_targets(m)
+        picked = [t for i, t in enumerate(targets) if i in set(chosen)]
+        return await s.report(m, picked, note, anonymous=anonymous)
+
 
 def find_message(s: Session, gid: str, message_id: str) -> Message | None:
     pool = (list(s.cache.get(gid, {}).values()) + s.private_messages() if gid == s.my_inbox
