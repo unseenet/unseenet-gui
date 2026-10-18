@@ -16,7 +16,7 @@ from pathlib import Path
 
 from unseenet.client.session import Message, Session, SessionError
 from unseenet.core import crypto
-from unseenet.core.groups import personal_inbox_id
+from unseenet.core.groups import KIND_CHAT, KIND_LETTER, personal_inbox_id
 from unseenet.core.vault import Vault, VaultError
 from unseenet.nntp import NNTPError
 
@@ -266,19 +266,24 @@ class Runtime:
             if msg is not None:
                 inbox = s.reply_target(msg) or inbox
                 refs = msg.references + [msg.message_id]
-        if chat or not subject:
-            subject = body.split("\n", 1)[0][:60] + ("…" if len(body) > 60 else "")
+        # UN-RFC 0028: a chat has no subject; a letter must have one
+        if chat:
+            subject = ""
+        elif not subject:
+            raise SessionError("a letter needs a subject")
         self._jobs += 1
         job = f"job{self._jobs}"
         ui_group = serialize.CONTACT + key_text if chat else s.my_inbox
-        self.spawn(self._private(job, ui_group, inbox, owner, subject, body, refs))
+        self.spawn(self._private(job, ui_group, inbox, owner, subject, body, refs,
+                                 KIND_CHAT if chat else KIND_LETTER))
         return job
 
-    async def _private(self, job, ui_group, inbox, owner, subject, body, refs) -> None:
+    async def _private(self, job, ui_group, inbox, owner, subject, body, refs, kind) -> None:
         s = self.session
         self.emit("post", job=job, group=ui_group, state="pow")
         try:
-            msgid = await s.send_private(inbox, subject, body, owner_key=owner, references=refs or None)
+            msgid = await s.send_private(inbox, subject, body, owner_key=owner, references=refs or None,
+                                         kind=kind)
         except (*NETWORK_ERRORS, ValueError) as exc:
             self.emit("post", job=job, group=ui_group, state="failed", error=str(exc))
             return
