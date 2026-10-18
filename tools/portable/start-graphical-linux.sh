@@ -1,15 +1,15 @@
 #!/bin/sh
-# Start Unseenet (web client) from this folder (Linux):
-#     sh /path/to/Unseenet/start-web-linux.sh
+# Start Unseenet (graphical client) from this folder (Linux):
+#     sh /path/to/Unseenet/start-graphical-linux.sh
 # It opens in a Chromium-family browser without tabs (Chrome, Chromium, Edge,
 # Brave) if one is installed, else in your browser. Extra arguments are passed
-# on, e.g. "sh start-web-linux.sh --self-test".
+# on, e.g. "sh start-graphical-linux.sh --self-test".
 HERE=$(cd "$(dirname "$0")" && pwd)
 ARCH=$(uname -m)
 case "$ARCH" in amd64) ARCH=x86_64 ;; arm64) ARCH=aarch64 ;; esac
-BIN="$HERE/web-linux-$ARCH/unseenet-web"
+BIN="$HERE/gui-linux-$ARCH/unseenet-gui"
 if [ ! -f "$BIN" ]; then
-    echo "Unseenet web for Linux ($ARCH) is not in this folder." >&2
+    echo "Unseenet graphical for Linux ($ARCH) is not in this folder." >&2
     exit 1
 fi
 if [ -x "$BIN" ]; then

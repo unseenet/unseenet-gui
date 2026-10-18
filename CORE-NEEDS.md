@@ -1,6 +1,6 @@
 # What this client needs from the unseenet core (for 0.4.0)
 
-unseenet-web is built on `unseenet.client.session.Session`, which already does
+unseenet-gui is built on `unseenet.client.session.Session`, which already does
 the real work: the vault, Tor, nodes, reading, posting, push, unread marks,
 "For you", contacts, private messages and moderation. The client needed no
 changes to the core.
@@ -96,8 +96,8 @@ runtime without reimplementing Tor, the vault or postage.
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without
-`creationflags`. From a windowed program (the web client's "Unseenet Web.exe")
-Tor then gets a console window of its own. unseenet-web works around it in
+`creationflags`. From a windowed program (the graphical client's "Unseenet Graphical.exe")
+Tor then gets a console window of its own. unseenet-gui works around it in
 `winfix.hide_child_consoles()`.
 
 **Proposal:** pass `creationflags=subprocess.CREATE_NO_WINDOW` on Windows when

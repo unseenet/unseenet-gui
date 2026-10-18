@@ -1,6 +1,6 @@
 """Windows: an app without a console window.
 
-The portable Windows build is a windowed program ("Unseenet Web.exe"), so
+The portable Windows build is a windowed program ("Unseenet Graphical.exe"), so
 there is no console - but a console program it starts (Tor) would get a
 console window of its own. ``hide_child_consoles`` makes every program started
 from here run without one. (unseenet's core could pass CREATE_NO_WINDOW

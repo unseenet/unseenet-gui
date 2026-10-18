@@ -1,11 +1,11 @@
-"""Start the web client: ``unseenet-web`` or ``python -m unseenet_web``.
+"""Start the graphical client: ``unseenet-gui`` or ``python -m unseenet_gui``.
 
-    unseenet-web                       open it (your browser; an app window in the portable build)
-    unseenet-web --open window         in an app window (needs pywebview)
-    unseenet-web --open app            in a Chromium-family browser without tabs or address bar
-    unseenet-web --kiosk               full screen, nothing else (the bootable image)
-    unseenet-web --no-browser          only print the address
-    unseenet-web --self-test [--offline] [--node ADDRESS]
+    unseenet-gui                       open it (your browser; an app window in the portable build)
+    unseenet-gui --open window         in an app window (needs pywebview)
+    unseenet-gui --open app            in a Chromium-family browser without tabs or address bar
+    unseenet-gui --kiosk               full screen, nothing else (the bootable image)
+    unseenet-gui --no-browser          only print the address
+    unseenet-gui --self-test [--offline] [--node ADDRESS]
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ def main(argv=None) -> None:
         from .winfix import hide_child_consoles
         hide_child_consoles()                       # no console window for Tor
     use_bundled_tor()
-    p = argparse.ArgumentParser(prog="unseenet-web", description="Unseenet in a window of its own.")
+    p = argparse.ArgumentParser(prog="unseenet-gui", description="Unseenet in a window of its own.")
     p.add_argument("--vault", default=str(default_vault()), help="encrypted vault file (the same as the TUI's)")
     p.add_argument("--port", type=int, default=0, help="local port (default: a random free one)")
     p.add_argument("--open", choices=MODES, default="auto" if frozen else "browser",
@@ -61,7 +61,7 @@ def main(argv=None) -> None:
     p.add_argument("--offline", action="store_true", help="with --self-test: do not start Tor")
     p.add_argument("--node", help="with --self-test: also reach this node over Tor")
     p.add_argument("--log", help="write messages to this file (the Windows build has no console)")
-    p.add_argument("--version", action="version", version=f"unseenet-web {__version__}")
+    p.add_argument("--version", action="version", version=f"unseenet-gui {__version__}")
     args = p.parse_args(argv)
 
     if args.log:
@@ -96,7 +96,7 @@ def main(argv=None) -> None:
             loop.call_soon_threadsafe(box["task"].cancel)
         thread.join(30)                 # the runtime closes Tor on the way out
 
-    thread = threading.Thread(target=run_server, name="unseenet-web-server", daemon=True)
+    thread = threading.Thread(target=run_server, name="unseenet-gui-server", daemon=True)
     thread.start()
     ready.wait()
     if "error" in box:

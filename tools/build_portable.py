@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a portable Unseenet web client: one folder per platform, with Tor inside.
+"""Build a portable Unseenet graphical client: one folder per platform, with Tor inside.
 
     python tools/build_portable.py --core ../unseenet                       # this platform
     python tools/build_portable.py --core ../unseenet --platform windows-x86_64 --tor-archive tor.tar.gz
@@ -11,16 +11,16 @@ pinned version) is unseenet's own: ``--core`` points at a checkout of
 github.com/unseenet/unseenet and its ``tools/build_portable.py`` is used, so
 both projects ship the same, verified Tor.
 
-A build is ``unseenet-web-<version>-<platform>.zip``::
+A build is ``unseenet-gui-<version>-<platform>.zip``::
 
     Unseenet/
-      UNSEENET-PORTABLE, README-web.txt, LICENSES/, the launcher for that platform
-      web-<platform>/unseenet-web, _internal/          (PyInstaller, one folder)
-      web-<platform>/tor/                              (Tor Expert Bundle)
+      UNSEENET-PORTABLE, README-graphical.txt, LICENSES/, the launcher for that platform
+      gui-<platform>/unseenet-gui, _internal/          (PyInstaller, one folder)
+      gui-<platform>/tor/                              (Tor Expert Bundle)
 
 On Windows the program itself is the launcher, with the Unseenet icon and no
-console window: ``Unseenet Web.exe`` at the top, its files and Tor in
-``web-windows-x86_64/``.
+console window: ``Unseenet Graphical.exe`` at the top, its files and Tor in
+``gui-windows-x86_64/``.
 
 It uses the same top folder, marker and data/ as unseenet's portable build,
 so both can be unpacked onto one stick and share the vault.
@@ -45,19 +45,19 @@ TOP = "Unseenet"
 MARKER = "UNSEENET-PORTABLE"
 PLATFORMS = ("linux-x86_64", "windows-x86_64", "macos-aarch64", "macos-x86_64")
 LAUNCHERS = {
-    "linux": ["start-web-linux.sh"],
-    "windows": [],                       # "Unseenet Web.exe" is its own launcher
-    "macos": ["Start Unseenet Web.command"],
+    "linux": ["start-graphical-linux.sh"],
+    "windows": [],                       # "Unseenet Graphical.exe" is its own launcher
+    "macos": ["Start Unseenet Graphical.command"],
 }
-WINDOWS_EXE = "Unseenet Web"
+WINDOWS_EXE = "Unseenet Graphical"
 
 
 def log(msg: str) -> None:
-    print(f"[build-web] {msg}", flush=True)
+    print(f"[build-gui] {msg}", flush=True)
 
 
 def version() -> str:
-    text = (ROOT / "src" / "unseenet_web" / "__init__.py").read_text()
+    text = (ROOT / "src" / "unseenet_gui" / "__init__.py").read_text()
     return re.search(r'__version__ = "([^"]+)"', text).group(1)
 
 
@@ -84,19 +84,19 @@ def make_ico(core: Path, target: Path) -> bool:
 
 
 def pyinstaller(plat: str, work: Path, core: Path) -> Path:
-    entry = work / "unseenet_web_entry.py"
-    entry.write_text("from unseenet_web.__main__ import main\nmain()\n")
+    entry = work / "unseenet_gui_entry.py"
+    entry.write_text("from unseenet_gui.__main__ import main\nmain()\n")
     windows = plat.startswith("windows")
     cmd = [sys.executable, "-m", "PyInstaller", "--noconfirm", "--clean", "--onedir",
            "--windowed" if windows else "--console",
-           "--name", WINDOWS_EXE if windows else "unseenet-web",
+           "--name", WINDOWS_EXE if windows else "unseenet-gui",
            "--distpath", str(work / "dist"), "--workpath", str(work / "build"), "--specpath", str(work),
            "--collect-submodules", "unseenet", "--collect-data", "unseenet",
-           "--collect-submodules", "unseenet_web", "--collect-data", "unseenet_web",
+           "--collect-submodules", "unseenet_gui", "--collect-data", "unseenet_gui",
            "--collect-submodules", "aiohttp",
            "--collect-all", "nacl", "--hidden-import", "_cffi_backend",
            "--collect-data", "certifi",
-           # not used by the web client; unseenet.boot and the TUI import them
+           # not used by the graphical client; unseenet.boot and the TUI import them
            "--exclude-module", "textual", "--exclude-module", "rich",
            "--exclude-module", "tkinter", "--exclude-module", "unittest", "--exclude-module", "PIL"]
     if not plat.startswith("linux"):
@@ -109,11 +109,11 @@ def pyinstaller(plat: str, work: Path, core: Path) -> Path:
         if windows:                              # for the window, too (winfix.set_window_icon)
             cmd += ["--add-data", f"{ico}{os.pathsep}."]
     if windows:
-        cmd += ["--contents-directory", f"web-{plat}"]
+        cmd += ["--contents-directory", f"gui-{plat}"]
     cmd.append(str(entry))
     log("running PyInstaller")
     subprocess.run(cmd, check=True, cwd=work)
-    return work / "dist" / (WINDOWS_EXE if windows else "unseenet-web")
+    return work / "dist" / (WINDOWS_EXE if windows else "unseenet-gui")
 
 
 def add_launchers(top: Path, system: str) -> None:
@@ -129,10 +129,10 @@ def common_files(top: Path) -> None:
     (top / MARKER).write_text(
         "This folder is a portable Unseenet. Its programs keep everything in data/\n"
         "beside them. Delete this file to make them use the current directory.\n")
-    shutil.copy2(TOOLS / "portable" / "README-web.txt", top / "README-web.txt")
+    shutil.copy2(TOOLS / "portable" / "README-graphical.txt", top / "README-graphical.txt")
     licenses = top / "LICENSES"
     licenses.mkdir(exist_ok=True)
-    shutil.copy2(ROOT / "LICENSE", licenses / "unseenet-web-LICENSE.txt")
+    shutil.copy2(ROOT / "LICENSE", licenses / "unseenet-gui-LICENSE.txt")
 
 
 def write_zip(stage: Path, zip_path: Path) -> None:
@@ -162,7 +162,7 @@ def build(plat: str, tor_archive: Path, out: Path, core: Path) -> Path:
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
         stage = work / "stage" / TOP
-        prog = stage / f"web-{plat}"
+        prog = stage / f"gui-{plat}"
         stage.mkdir(parents=True)
         common_files(stage)
         add_launchers(stage, plat.split("-")[0])
@@ -175,7 +175,7 @@ def build(plat: str, tor_archive: Path, out: Path, core: Path) -> Path:
         up.unpack_tor(tor_archive, prog / "tor", stage / "LICENSES")
         (prog / "tor" / "VERSION").write_text(tor_archive.name + "\n")
         out.mkdir(parents=True, exist_ok=True)
-        zip_path = out / f"unseenet-web-{version()}-{plat}.zip"
+        zip_path = out / f"unseenet-gui-{version()}-{plat}.zip"
         write_zip(stage, zip_path)
     log(f"built {zip_path} ({zip_path.stat().st_size // (1024 * 1024)} MB)")
     return zip_path
@@ -191,7 +191,7 @@ def combine(zips: list[Path], out: Path, core: Path) -> Path:
         for system in LAUNCHERS:
             add_launchers(stage, system)
         out.mkdir(parents=True, exist_ok=True)
-        zip_path = out / f"unseenet-web-{version()}-usb.zip"
+        zip_path = out / f"unseenet-gui-{version()}-usb.zip"
         write_zip(stage, zip_path)
     log(f"built {zip_path} ({zip_path.stat().st_size // (1024 * 1024)} MB)")
     return zip_path

@@ -1,6 +1,6 @@
 """The boot splash of the bootable image: the logo on Unseenet green, drawn on the framebuffer.
 
-    python -m unseenet_web.splash [PANEL]
+    python -m unseenet_gui.splash [PANEL]
 
 PANEL is a raw image made when the image is built (tools/image/make_splash.py):
 an 8-byte header (width, height as little-endian uint32) and RGBA pixels. It is

@@ -3,8 +3,8 @@
 import pytest
 from aiohttp.test_utils import TestClient, TestServer
 
-from unseenet_web.runtime import Runtime
-from unseenet_web.server import make_app
+from unseenet_gui.runtime import Runtime
+from unseenet_gui.server import make_app
 
 TOKEN = "t" * 43
 

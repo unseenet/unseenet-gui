@@ -35,7 +35,7 @@ TOKEN_PROTOCOL = "unseenet-token."
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
        "connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; "
        "frame-ancestors 'none'")
-STATIC = resources.files("unseenet_web") / "static"
+STATIC = resources.files("unseenet_gui") / "static"
 
 
 def _json(data, status: int = 200) -> web.Response:
