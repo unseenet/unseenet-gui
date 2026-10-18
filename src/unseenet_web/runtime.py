@@ -18,7 +18,7 @@ from datetime import timedelta
 
 from unseenet import names as nm
 from unseenet.client import naming
-from unseenet.client.session import Message, Session, SessionError
+from unseenet.client.session import MAX_MENTION_NOTICES, Message, Session, SessionError
 from unseenet.core import crypto
 from unseenet.core.groups import KIND_CHAT, KIND_POST, group_refs, personal_inbox_id
 from unseenet.core.vault import Vault, VaultError
@@ -228,7 +228,7 @@ class Runtime:
 
     # --- writing ------------------------------------------------------------
     def post(self, gid: str, subject: str, body: str, references: list[str], chat: bool = False,
-             signature: bool = True) -> str:
+             signature: bool = True, notify: bool | None = None) -> str:
         """Start a post in the background; its progress arrives as 'post' events.
 
         A chat line (UN-RFC 0028) has an empty subject and no signature."""
@@ -241,13 +241,31 @@ class Runtime:
         elif signature:
             sig = self.session.signature()
             body = body.rstrip("\n") + ("\n-- \n" + sig if sig else "")
+        # mention notices (UN-RFC 0032): the compose window's choice, else the setting
+        s = self.session
+        keys: list[str] = []
+        if (s.notice_settings()["send"] if notify is None else notify) and s.may_notify(gid):
+            keys = [k for _, k in s.mentioned(subject, body)][:MAX_MENTION_NOTICES]
         self._jobs += 1
         job = f"job{self._jobs}"
-        self.spawn(self._post(job, gid, subject, body, references, KIND_CHAT if chat else KIND_POST))
+        self.spawn(self._post(job, gid, subject, body, references, KIND_CHAT if chat else KIND_POST,
+                              keys))
         return job
 
+    def mentioned(self, gid: str, subject: str, body: str) -> dict:
+        """Who a post would tell (UN-RFC 0032), for the compose window."""
+        s = self.session
+        if not s.may_notify(gid):
+            return {"may": False, "names": []}
+        return {"may": True, "names": [n for n, _ in s.mentioned(subject, body)],
+                "max": MAX_MENTION_NOTICES}
+
+    def set_notices(self, send: bool | None, receive: bool | None) -> None:
+        self.session.set_notice_settings(send=send, receive=receive)
+        self.emit("groups")
+
     async def _post(self, job: str, gid: str, subject: str, body: str, references: list[str],
-                    kind: str = KIND_POST) -> None:
+                    kind: str = KIND_POST, notify: list[str] | None = None) -> None:
         s = self.session
         # CORE: no progress callback for proof-of-work yet; the client shows "working".
         self.emit("post", job=job, group=gid, state="pow")
@@ -257,6 +275,8 @@ class Runtime:
             self.emit("post", job=job, group=gid, state="failed", error=str(exc))
             return
         self.emit("post", job=job, group=gid, state="sent", message_id=msgid)
+        if notify and not s.was_submitted(gid, msgid):
+            self.spawn(s.send_mention_notices(gid, msgid, subject, kind, notify))
         await self._fetch(gid)
         self.emit("post", job=job, group=gid, state="reached", message_id=msgid)
 

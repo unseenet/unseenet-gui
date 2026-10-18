@@ -253,8 +253,25 @@ async def post(request):
         return _error("a post needs a subject")
     refs = [str(r) for r in data.get("references", [])][:50]
     # the compose window already has the signature in the text, as the TUI's does
-    job = rt.post(gid, subject, body, refs, chat=chat, signature=bool(data.get("signature", True)))
+    notify = data.get("notify")
+    job = rt.post(gid, subject, body, refs, chat=chat, signature=bool(data.get("signature", True)),
+                  notify=None if notify is None else bool(notify))
     return _json({"job": job})
+
+
+async def mentioned(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    return _json(rt.mentioned(request.match_info["gid"], str(data.get("subject", "")),
+                              str(data.get("body", ""))))
+
+
+async def notices(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    rt.set_notices(None if "send" not in data else bool(data["send"]),
+                   None if "receive" not in data else bool(data["receive"]))
+    return _json({"ok": True})
 
 
 async def private(request):
@@ -483,6 +500,8 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/groups/{gid}/read", read)
     r.add_post("/api/groups/{gid}/view", view)
     r.add_post("/api/groups/{gid}/post", post)
+    r.add_post("/api/groups/{gid}/mentioned", mentioned)
+    r.add_post("/api/notices", notices)
     r.add_post("/api/groups", create)
     r.add_post("/api/groups/{gid}/invite", invite)
     r.add_get("/api/moderation", moderation)

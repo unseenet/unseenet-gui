@@ -565,10 +565,10 @@ function threadsView(d) {
       h("span", { class: "sj" },
         m.depth ? h("span", { class: "tree", "aria-hidden": "true", text: "  ".repeat(m.depth - 1) + "└ " }) : null,
         m.for_me === "reply" ? h("span", { class: "you", text: "◄ " }) : m.for_me === "mention" ? h("span", { class: "you", text: "♦ " }) : null,
-        m.private ? h("span", { class: "muted", text: "@ " }) : m.encrypted ? h("span", { class: "muted", text: "∩ " }) : null,
+        m.private && !m.notice ? h("span", { class: "muted", text: "@ " }) : m.encrypted && !m.notice ? h("span", { class: "muted", text: "∩ " }) : null,
         // a reply with the thread's own subject: quieter, so new subjects stand out
         h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
-        g.id === "for-you" ? h("span", { class: "muted", text: "  (" + labelOf(m.group) + ")" }) : null),
+        g.id === "for-you" ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
       h("span", { class: "from mono", text: m.who }),
       h("span", { class: "date", text: when(m.date) }))),
     pend.map(([job, p]) => h("div", { class: "prow pending" }, h("span", {}),
@@ -731,6 +731,18 @@ async function goToGroup(ref) {
   render();
 }
 
+// A mention notice (UN-RFC 0032): the post, or its group first (asking before following)
+async function openMentioned(m) {
+  const n = m.notice;
+  if (!n) return;
+  markRead([m]);
+  if (!n.followed) { goToGroup(n.ref); return; }
+  S.full = false;
+  await openGroup(n.group);
+  if (S.data && S.data.messages.some(x => x.id === n.id)) { S.post = n.id; render(); }
+  else toast("The post is not there any more - perhaps it was withdrawn.");
+}
+
 // # on a post: its group, or a choice when it names several
 function groupsInPost(m) {
   const refs = (m && m.groups) || [];
@@ -792,6 +804,8 @@ function readerPane(g, m, msgs) {
         m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null)),
     h("div", { class: "pbar" },
       canReply ? h("button", { class: "btn primary", onclick: () => openReply(m, g) }, "Reply", h("kbd", { text: "R" })) : null,
+      g.id === "for-you" && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
+        m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === "for-you" ? h("button", { class: "btn", onclick: async () => {
         await openGroup(m.group); S.post = m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
       !m.mine && m.key && !(m.private && m.kind === "chat") ? h("button", { class: "btn", title: "A private chat with them",
@@ -859,12 +873,32 @@ async function openReply(m, g) {
   const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
   openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
     subject, body, cursor: top.length, private: !!g.private_reply,
-    send: (subject, text) => g.private_reply ?
+    send: (subject, text, notify) => g.private_reply ?
       doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id }, { text }) :
-      doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false }, { text }) });
+      doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify }, { text }) });
 }
 
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv }) {
+  // mention notices (UN-RFC 0032): who would be told, and a box to say no
+  const N = { may: !priv && g && g.type !== "closed", names: [], max: 5,
+    on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
+  const askWho = () => {
+    clearTimeout(N.timer);
+    N.timer = setTimeout(async () => {
+      const f = document.querySelector(".dialog form");
+      if (!f || !N.may) return;
+      try {
+        const r = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/mentioned`, { subject: f.subject.value, body: f.body.value });
+        N.may = r.may; N.names = r.names; N.max = r.max || 5;
+      } catch (_) { return; }
+      const el = document.getElementById("notify-who");
+      if (el) el.textContent = whoText();
+    }, 400);
+  };
+  const whoText = () => !N.names.length ? "" : !N.on ?
+    `Nobody is told: ${N.names.join(", ")} see it only if they follow the group.` :
+    "Told: " + N.names.slice(0, N.max).join(", ") +
+      (N.names.length > N.max ? `  (at most ${N.max}; not told: ${N.names.slice(N.max).join(", ")})` : "");
   const go = async (e) => {
     e && e.preventDefault();
     const f = document.querySelector(".dialog form");
@@ -872,8 +906,9 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     const own = b.split(/\n-- \n/)[0].split("\n").filter(ln => !/^>/.test(ln) && !/ wrote:$/.test(ln)).join("").trim();
     if (!s || !own) { toast("Write something of your own above the signature."); return; }
     closeDialog();
-    await send(s, b);
-    toast(priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds.");
+    await send(s, b, N.may ? N.on : undefined);
+    toast(priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
+      (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
   };
   S.dialog = { focus: "#body", render: () => dialogShell({ label: title, wide: true },
     h("div", { class: "dh" }, h("h2", { text: title }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
@@ -881,7 +916,11 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject }),
       h("label", { for: "body", text: "Text" }),
-      h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true" }),
+      h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true", oninput: askWho }),
+      N.may ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: N.on,
+        onchange: (e) => { N.on = e.target.checked; const el = document.getElementById("notify-who"); if (el) el.textContent = whoText(); } }),
+        " Tell the people you mention (a notice in their inbox)") : null,
+      N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
       h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
         "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
         (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),
@@ -890,6 +929,9 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
   render();
   const ta = document.getElementById("body");
   if (ta && cursor != null) { ta.focus(); ta.setSelectionRange(cursor, cursor); ta.scrollTop = 0; }
+  const sj = document.getElementById("subject");
+  if (sj) sj.addEventListener("input", askWho);
+  askWho();
 }
 
 function pendingState(p) {
@@ -1383,7 +1425,7 @@ async function openCompose() {
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
-    send: (subject, text) => doPost(g.id, { subject, body: text, signature: false }, { text }) });
+    send: (subject, text, notify) => doPost(g.id, { subject, body: text, signature: false, notify }, { text }) });
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
@@ -1613,6 +1655,14 @@ function commands() {
     { name: "Contacts", key: "C", run: openContacts },
     { name: "Names: claim yours, ask for one, give names under yours", key: "@", run: openNames },
     { name: "People you ignore", key: "", run: openIgnored },
+    { name: S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false ? "Tell people you mention" : "Stop telling people you mention", key: "",
+      run: async () => { const on = !!(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false);
+        await api("POST", "/api/notices", { send: on }); await loadSidebar();
+        toast(on ? "People you mention by name are told in their inbox (you can say no per post)." : "People you mention are no longer told; they see it if they follow the group."); } },
+    { name: S.sidebar && S.sidebar.notices && S.sidebar.notices.receive === false ? "Show mention notices" : "Stop showing mention notices", key: "",
+      run: async () => { const on = !!(S.sidebar && S.sidebar.notices && S.sidebar.notices.receive === false);
+        await api("POST", "/api/notices", { receive: on }); await loadSidebar();
+        toast(on ? "Mentions of you in groups you do not follow show in For you." : "Mention notices from others are no longer shown."); } },
     { name: S.sidebar && S.sidebar.markdown === false ? "Write Markdown (*emphasis*, `code`, :tada:)" : "Write plain text instead of Markdown", key: "",
       run: async () => { const on = !(S.sidebar && S.sidebar.markdown !== false); await api("POST", "/api/markdown", { on }); await loadSidebar();
         toast(on ? "You write Markdown: *emphasis*, **strong**, `code`, lists, :tada:" : "You write plain text: sent and shown exactly as typed."); } },
@@ -1721,6 +1771,7 @@ document.addEventListener("keydown", (e) => {
   if (key === "ArrowDown" || key === "j") { e.preventDefault(); step(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); step(-1); }
   else if (e.key === " ") { e.preventDefault(); nextUnread(); }
+  else if ((key === "Enter" || key === "f") && cur && cur.notice) { e.preventDefault(); openMentioned(cur); }
   else if (key === "Enter" || key === "f") { e.preventDefault(); S.full = true; render(); }
   else if (key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
   else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
