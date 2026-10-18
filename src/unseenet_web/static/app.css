@@ -392,8 +392,13 @@ details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 1
 .fullbar .grow { flex: 1; }
 @media (max-width: 620px) { .fullbar .hint { display: none; } }
 
-/* a post (a letter) among chat lines stands out with its subject (UN-RFC 0028) */
-.bubble.letter { border-left: 3px solid var(--green); border-radius: 4px 14px 14px 4px; }
-.mg.mine .bubble.letter { border-radius: 14px 4px 4px 14px; }
+/* a post among chat lines stands out with its subject (UN-RFC 0028) */
+.bubble.is-post { border-left: 3px solid var(--green); border-radius: 4px 14px 14px 4px; }
+.mg.mine .bubble.is-post { border-radius: 14px 4px 4px 14px; }
 .bubble .lsub { font-weight: 600; margin-bottom: 4px; }
 .bubble .lact { margin-top: 6px; font-size: 13px; }
+
+/* a chat with someone who is not a contact (UN-RFC 0028, 6.2) */
+.item.person.stranger .nm { font-style: italic; opacity: 0.85; }
+
+.btn.danger { background: var(--red); color: #fff; border-color: var(--red); }

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from unseenet.client.session import Message, Session, SessionError
 from unseenet.core import crypto
-from unseenet.core.groups import KIND_CHAT, KIND_LETTER, personal_inbox_id
+from unseenet.core.groups import KIND_CHAT, KIND_POST, personal_inbox_id
 from unseenet.core.vault import Vault, VaultError
 from unseenet.nntp import NNTPError
 
@@ -229,7 +229,7 @@ class Runtime:
 
         A chat line (UN-RFC 0028) has an empty subject and no signature."""
         kinds = self.session.group_kinds(gid)
-        if (KIND_CHAT if chat else KIND_LETTER) not in kinds:
+        if (KIND_CHAT if chat else KIND_POST) not in kinds:
             raise SessionError("this group takes " + ("posts with a subject only" if chat
                                                        else "chat lines only"))
         if chat:
@@ -239,11 +239,11 @@ class Runtime:
             body = body.rstrip("\n") + ("\n-- \n" + sig if sig else "")
         self._jobs += 1
         job = f"job{self._jobs}"
-        self.spawn(self._post(job, gid, subject, body, references, KIND_CHAT if chat else KIND_LETTER))
+        self.spawn(self._post(job, gid, subject, body, references, KIND_CHAT if chat else KIND_POST))
         return job
 
     async def _post(self, job: str, gid: str, subject: str, body: str, references: list[str],
-                    kind: str = KIND_LETTER) -> None:
+                    kind: str = KIND_POST) -> None:
         s = self.session
         # CORE: no progress callback for proof-of-work yet; the client shows "working".
         self.emit("post", job=job, group=gid, state="pow")
@@ -270,16 +270,16 @@ class Runtime:
             if msg is not None:
                 inbox = s.reply_target(msg) or inbox
                 refs = msg.references + [msg.message_id]
-        # UN-RFC 0028: a chat has no subject; a letter must have one
+        # UN-RFC 0028: a chat has no subject; a post must have one
         if chat:
             subject = ""
         elif not subject:
-            raise SessionError("a letter needs a subject")
+            raise SessionError("a post needs a subject")
         self._jobs += 1
         job = f"job{self._jobs}"
         ui_group = serialize.CONTACT + key_text if chat else s.my_inbox
         self.spawn(self._private(job, ui_group, inbox, owner, subject, body, refs,
-                                 KIND_CHAT if chat else KIND_LETTER))
+                                 KIND_CHAT if chat else KIND_POST))
         return job
 
     async def _private(self, job, ui_group, inbox, owner, subject, body, refs, kind) -> None:

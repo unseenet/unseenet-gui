@@ -288,8 +288,8 @@ async def create(request):
     name = str(data.get("name", "")).strip().lower()
     if not name:
         return _error("a group needs a name")
-    # what the group takes (UN-RFC 0028): "both" (the default), "letter" or "chat"
-    kinds = {"both": None, "letter": ["letter"], "chat": ["chat"]}.get(str(data.get("kinds", "both")))
+    # what the group takes (UN-RFC 0028): "both" (the default), "post" or "chat"
+    kinds = {"both": None, "post": ["post"], "chat": ["chat"]}.get(str(data.get("kinds", "both")))
     gid = await rt.create_group(name, gtype, str(data.get("view", "threads")), bool(data.get("fast")),
                                 str(data.get("title", "")).strip(), str(data.get("description", "")).strip(),
                                 kinds)
