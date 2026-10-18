@@ -412,7 +412,7 @@ function sidebar() {
   return h("nav", { class: "side", "aria-label": "Groups", "data-scroll": "side" },
     h("div", { class: "brand" }, logo(30), "Unseenet"),
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
-      h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl K" })),
+      h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl P" })),
     sb ? h("div", { class: "nav" },
       item("for-you", "◄", "For you", sb.for_you ? h("span", { class: "foryou", text: `◄${sb.for_you}` }) : null),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
@@ -461,7 +461,7 @@ function statusbar() {
     h("span", { class: "keys" },
       chat ? [k("Esc", "shortcuts"), k("Enter", "write")] :
         [k("N", "new"), k("R", "reply"), k("↑↓", "posts"), k("Space", "next unread"), k("Enter", "full screen")],
-      k("V", "chat/threads"), k("?", "about group"), k("Ctrl K", "commands")),
+      k("V", "chat/threads"), k("?", "about group"), k("Ctrl P", "commands")),
     h("span", { class: "grow" }),
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     h("span", { class: "st", title: S.state.status },
@@ -1388,7 +1388,9 @@ function openPalette() {
 document.addEventListener("keydown", (e) => {
   if (!S.state || !S.state.unlocked || S.state.setup) return;
   const ctrl = e.ctrlKey || e.metaKey;
-  if (ctrl && (e.key === "k" || e.key === "p")) { e.preventDefault(); if (S.dialog) closeDialog(); else openPalette(); return; }
+  // letters work with Shift or Caps Lock too (the hints show capitals); only D is Shift+D, as in the TUI
+  const key = e.key.length === 1 && e.key !== "D" ? e.key.toLowerCase() : e.key;
+  if (ctrl && (key === "p" || key === "k")) { e.preventDefault(); if (S.dialog) closeDialog(); else openPalette(); return; }
   if (e.key === "Escape") {
     if (S.dialog) { e.preventDefault(); closeDialog(); return; }
     if (typing(document.activeElement)) { document.activeElement.blur(); return; }
@@ -1407,25 +1409,25 @@ document.addEventListener("keydown", (e) => {
       " ": () => { if (sc && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4) sc.scrollBy({ top: sc.clientHeight * 0.9 }); else nextUnread(); },
       r: () => { if (cur && (g.may_post || g.private_reply) && g.id !== "for-you") openReply(cur, g); },
       m: () => { if (cur && !cur.mine && cur.key) { S.full = false; openGroup("contact:" + cur.key); } },
-    }[e.key];
+    }[key];
     if (k) { e.preventDefault(); k(); }
     return;
   }
   const keys = {
     n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), c: () => openContacts(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
   };
-  if (keys[e.key]) { e.preventDefault(); keys[e.key](); return; }
+  if (keys[key]) { e.preventDefault(); keys[key](); return; }
   if (g && g.view === "chat") {
     if (e.key === "Enter") { const el = document.querySelector('[data-k="chat"]'); if (el) { e.preventDefault(); el.focus(); } }
     return;
   }
   if (!S.data || !S.data.messages.length) return;
   const cur = S.data.messages.find(x => x.id === S.post);
-  if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); step(1); }
+  if (key === "ArrowDown" || key === "j") { e.preventDefault(); step(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); step(-1); }
   else if (e.key === " ") { e.preventDefault(); nextUnread(); }
-  else if (e.key === "Enter" || e.key === "f") { e.preventDefault(); S.full = true; render(); }
-  else if (e.key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
+  else if (key === "Enter" || key === "f") { e.preventDefault(); S.full = true; render(); }
+  else if (key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
   else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
 });
 
