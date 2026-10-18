@@ -362,6 +362,45 @@ async def report(request):
     return _json({"sent": sent})
 
 
+# --- names, ignoring, blocking, members --------------------------------------------
+async def names(request):
+    rt = _unlocked(request)
+    if request.method == "POST":
+        return _json({"text": await rt.name_action(await _body(request))})
+    return _json(await rt.names())
+
+
+async def ignore(request):
+    rt = _unlocked(request)
+    if request.method == "POST":
+        data = await _body(request)
+        rt.ignore(str(data.get("key", "")).strip(), str(data.get("label", "")), bool(data.get("on", True)))
+        return _json({"ok": True})
+    return _json(rt.ignored())
+
+
+async def block(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    where = await rt.block(request.match_info["gid"], str(data.get("key", "")).strip(),
+                           str(data.get("reason", "")).strip())
+    return _json({"hierarchy": where})
+
+
+async def show_blocked(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    rt.show_blocked(bool(data.get("on")))
+    return _json({"ok": True})
+
+
+async def remove_member(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    epoch = await rt.remove_member(request.match_info["gid"], str(data.get("key", "")).strip())
+    return _json({"epoch": epoch})
+
+
 async def invite(request):
     rt = _unlocked(request)
     data = await _body(request)
@@ -443,6 +482,13 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/groups/{gid}/withdraw", withdraw)
     r.add_get("/api/groups/{gid}/report", report)
     r.add_post("/api/groups/{gid}/report", report)
+    r.add_get("/api/names", names)
+    r.add_post("/api/names", names)
+    r.add_get("/api/ignore", ignore)
+    r.add_post("/api/ignore", ignore)
+    r.add_post("/api/groups/{gid}/block", block)
+    r.add_post("/api/show-blocked", show_blocked)
+    r.add_post("/api/groups/{gid}/members/remove", remove_member)
     r.add_post("/api/private", private)
     r.add_post("/api/contacts", contacts)
     r.add_get("/api/signature", signature)

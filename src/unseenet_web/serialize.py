@@ -85,6 +85,8 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
               for key in s.chat_partners()]
     return {"for_you": len(s.for_you()), "people": people,
             "moderation": len(s.submissions()),           # posts waiting for you to approve
+            "name_requests": _name_requests(s),           # people asking for a name under yours
+            "show_blocked": bool(s.data.get("show_blocked")),
             "inbox": {"id": inbox, "unread": s.unread_private_posts() if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
 
@@ -191,10 +193,53 @@ def roles(s: Session, gid: str) -> dict:
             "posters": people(s, data.get("posters", [])),
             "banned": [{**p, "reason": r} for (k, r), p in
                        zip(s.banned(gid), people(s, [k for k, _ in s.banned(gid)]))],
-            "moderates": s.moderates(gid)}
+            "moderates": s.moderates(gid),
+            # you maintain a hierarchy this group is in: you may block people in all of it
+            "maintainer": _maintains(s, gid)}
+
+
+def _maintains(s: Session, gid: str) -> bool:
+    from unseenet.client import naming
+    me = s.identity().key_text
+    try:
+        return any(h.maintainer == me for h in naming.governing(s, gid))
+    except Exception:  # noqa: BLE001 - lists not read yet
+        return False
 
 
 def browse_entry(s: Session, g: GroupInfo) -> dict:
     return {"id": g.group_id, "label": s.group_label(g.group_id), "description": g.description,
             "subscribed": g.subscribed, "nodes": len(g.nodes),
             **group_kind(s, g.group_id)}
+
+
+def names(s: Session) -> dict:
+    """Your names, what is waiting, and the names you give under yours (UN-RFC 0019)."""
+    from unseenet import names as nm
+    from unseenet.client import naming
+    me = s.identity().key_text
+    mine = naming.my_names(s)
+    primary = naming.preferred(s, me, mine).name if mine else None
+    held = {c.name for c in mine}
+    return {
+        "key": me,
+        "dns_value": nm.dns_record_value(me),
+        "mine": [{"name": c.name, "text": naming.name_text(c.name), "kind": c.kind,
+                  "expires": c.expires.isoformat(), "primary": c.name == primary} for c in mine],
+        "pending": [{"name": n, "action": a, "sent": when} for n, a, when in naming.pending(s)
+                    if n not in held],
+        "parents": naming.parents_i_hold(s),
+        "given": [{"name": c.name, "key": c.key, "who": s.identity_label(c.key),
+                   "expires": c.expires.isoformat()} for c in naming.names_given(s)],
+        "requests": [{"id": m.message_id, "name": d.get("name", ""), "key": d.get("key", ""),
+                      "who": s.identity_label(d.get("key", ""), m.from_name)}
+                     for m, d in naming.name_requests(s)],
+    }
+
+
+def _name_requests(s: Session) -> int:
+    from unseenet.client import naming
+    try:
+        return len(naming.name_requests(s))
+    except Exception:  # noqa: BLE001
+        return 0

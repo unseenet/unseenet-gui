@@ -75,7 +75,10 @@ async def test_locked_session_refuses_reading(client):
     ("POST", "/api/groups/x/edit"), ("POST", "/api/groups/x/remove"),
     ("POST", "/api/groups/x/role"), ("POST", "/api/groups/x/ban"),
     ("POST", "/api/groups/x/withdraw"), ("GET", "/api/groups/x/report"),
-    ("POST", "/api/groups/x/report")])
+    ("POST", "/api/groups/x/report"),
+    ("GET", "/api/names"), ("POST", "/api/names"), ("GET", "/api/ignore"), ("POST", "/api/ignore"),
+    ("POST", "/api/groups/x/block"), ("POST", "/api/show-blocked"),
+    ("POST", "/api/groups/x/members/remove")])
 async def test_owner_tools_need_the_token_and_an_open_vault(client, method, path):
     """The owner's and moderators' tools are behind the same guards as everything else."""
     r = await client.request(method, path, headers=host(client), json={})
