@@ -67,7 +67,8 @@ def group_summary(s: Session, gid: str) -> dict:
             "description": data.get("description", ""), "rules": data.get("rules", ""),
             "owner": entry.get("owner", False), "may_post": s.may_post(gid),
             "unread": s.unread_count(gid), "for_you": s.for_you_count(gid),
-            "kinds": list(s.group_kinds(gid)), **group_kind(s, gid)}     # what it takes (UN-RFC 0028)
+            "kinds": list(s.group_kinds(gid)), **roles(s, gid),            # owner and moderator tools
+            **group_kind(s, gid)}     # what it takes (UN-RFC 0028)
 
 
 def sidebar(s: Session, inbox_ready: bool) -> dict:
@@ -83,6 +84,7 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
                "colour": colour(key), "unread": s.unread_from(key, KIND_CHAT)}
               for key in s.chat_partners()]
     return {"for_you": len(s.for_you()), "people": people,
+            "moderation": len(s.submissions()),           # posts waiting for you to approve
             "inbox": {"id": inbox, "unread": s.unread_private_posts() if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
 
@@ -127,7 +129,7 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
             "encrypted": m.encrypted, "private": m.private, "verified": bool(m.sender_key),
             "kind": m.kind,                      # a chat line or a post (UN-RFC 0028)
             "readable": m.readable, "error": m.error, "read": s.is_read(m),
-            "for_me": s.for_me(m, mine, patterns)}
+            "for_me": s.for_me(m, mine, patterns), "may_withdraw": s.may_cancel(m)}
 
 
 def group_view(s: Session, gid: str) -> dict:
@@ -167,6 +169,29 @@ def group_view(s: Session, gid: str) -> dict:
         rows = threaded(msgs)
     return {"group": head,
             "messages": [{**message(s, m, my_keys, mine, patterns), "depth": d} for m, d in rows]}
+
+
+def submission(s: Session, m: Message, art) -> dict:
+    """A post waiting for a moderator's approval (UN-RFC 0009 section 3)."""
+    key = art.get("Author-Key", "")
+    text = split_signature(art.body)[0].rstrip("\n") if not art.get("Encrypted") else ""
+    return {"id": m.message_id, "group": art.group, "group_label": s.group_label(art.group),
+            "subject": art.get("Subject", ""), "who": s.identity_label(key, art.get("From", "")),
+            "key": key, "text": text, "date": m.date.isoformat() if m.date else None}
+
+
+def people(s: Session, keys: list[str]) -> list[dict]:
+    return [{"key": k, "label": s.identity_label(k, seen_name(s, k)), "colour": colour(k)} for k in keys]
+
+
+def roles(s: Session, gid: str) -> dict:
+    """Who may do what in a group, for its owner's tools."""
+    data = s.manifest_data(gid)
+    return {"moderators": people(s, data.get("moderators", [])),
+            "posters": people(s, data.get("posters", [])),
+            "banned": [{**p, "reason": r} for (k, r), p in
+                       zip(s.banned(gid), people(s, [k for k, _ in s.banned(gid)]))],
+            "moderates": s.moderates(gid)}
 
 
 def browse_entry(s: Session, g: GroupInfo) -> dict:

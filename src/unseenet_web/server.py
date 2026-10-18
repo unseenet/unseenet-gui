@@ -296,6 +296,72 @@ async def create(request):
     return _json({"id": gid})
 
 
+# --- owners and moderators: the TUI's Ctrl+P tools -------------------------------
+async def moderation(request):
+    rt = _unlocked(request)
+    if request.method == "POST":
+        data = await _body(request)
+        await rt.moderate(str(data.get("id", "")), bool(data.get("approve")),
+                          str(data.get("reason", "")).strip())
+        return _json({"ok": True})
+    return _json(await rt.moderation())
+
+
+async def edit_group(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    allowed = ("title", "description", "rules", "view", "kinds", "low_latency")
+    changes = {k: data[k] for k in allowed if k in data}
+    if "kinds" in changes:              # "both", "post" or "chat", as when creating a group
+        changes["kinds"] = {"both": ["chat", "post"], "post": ["post"], "chat": ["chat"]}.get(
+            str(changes["kinds"]), ["chat", "post"])
+    await rt.edit_group(request.match_info["gid"], changes)
+    return _json({"ok": True})
+
+
+async def remove_group(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    if data.get("confirm") != "remove":
+        return _error('type "remove" to confirm')
+    await rt.remove_group(request.match_info["gid"], str(data.get("reason", "")).strip())
+    return _json({"ok": True})
+
+
+async def role(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    await rt.set_role(request.match_info["gid"], str(data.get("role", "")),
+                      str(data.get("key", "")).strip(), bool(data.get("on", True)))
+    return _json({"ok": True})
+
+
+async def ban(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    await rt.ban(request.match_info["gid"], str(data.get("key", "")).strip(),
+                 bool(data.get("on", True)), str(data.get("reason", "")).strip())
+    return _json({"ok": True})
+
+
+async def withdraw(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    await rt.withdraw(request.match_info["gid"], str(data.get("id", "")))
+    return _json({"ok": True})
+
+
+async def report(request):
+    rt = _unlocked(request)
+    gid = request.match_info["gid"]
+    if request.method == "GET":
+        return _json(await rt.report_targets(gid, request.query.get("id", "")))
+    data = await _body(request)
+    sent = await rt.report(gid, str(data.get("id", "")), [int(i) for i in data.get("targets", [])],
+                           str(data.get("note", "")).strip(), bool(data.get("anonymous")))
+    return _json({"sent": sent})
+
+
 async def invite(request):
     rt = _unlocked(request)
     data = await _body(request)
@@ -368,6 +434,15 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/groups/{gid}/post", post)
     r.add_post("/api/groups", create)
     r.add_post("/api/groups/{gid}/invite", invite)
+    r.add_get("/api/moderation", moderation)
+    r.add_post("/api/moderation", moderation)
+    r.add_post("/api/groups/{gid}/edit", edit_group)
+    r.add_post("/api/groups/{gid}/remove", remove_group)
+    r.add_post("/api/groups/{gid}/role", role)
+    r.add_post("/api/groups/{gid}/ban", ban)
+    r.add_post("/api/groups/{gid}/withdraw", withdraw)
+    r.add_get("/api/groups/{gid}/report", report)
+    r.add_post("/api/groups/{gid}/report", report)
     r.add_post("/api/private", private)
     r.add_post("/api/contacts", contacts)
     r.add_get("/api/signature", signature)

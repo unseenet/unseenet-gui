@@ -416,7 +416,11 @@ function sidebar() {
     sb ? h("div", { class: "nav" },
       item("for-you", "◄", "For you", sb.for_you ? h("span", { class: "foryou", text: `◄${sb.for_you}` }) : null),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
-        sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null) : null,
+        sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
+      // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
+      sb.moderation ? h("button", { class: "item", onclick: openModeration },
+        h("span", { class: "ic", text: "✓" }), h("span", { class: "nm", text: "To approve" }),
+        h("span", { class: "count", text: sb.moderation })) : null) : null,
     sb ? h("div", { class: "nav" },
       h("h3", { class: "row-h" }, h("span", { text: "chats" }),
         h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
@@ -636,6 +640,10 @@ function readerPane(g, m, msgs) {
       !m.mine && m.key && !g.private_reply ? h("button", { class: "btn", title: "A private post with a subject",
         onclick: () => openPost(m.key, m.who.replace(/ √$/, "")) }, "Write a post") : null,
       !m.mine && m.key && !m.contact ? h("button", { class: "btn", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
+      // the post's tools, as in the TUI: withdraw (D), report, ban its author (owner)
+      m.may_withdraw ? h("button", { class: "btn", title: "Withdraw the post from the network (D)", onclick: () => openWithdraw(m) }, "Withdraw", h("kbd", { text: "D" })) : null,
+      !m.mine && !m.private && g.id !== "for-you" ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
+      g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       h("span", { class: "grow" }),
       h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
       h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),
@@ -876,9 +884,208 @@ function openInfo() {
       g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }), h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
       g.members && g.members.length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: `Members (${g.members.length})` }),
         g.members.map(m => h("div", { class: "member" }, h("span", { class: `av xs c${m.colour}`, text: initials(m.label) }),
-          h("span", { class: "mono", text: m.label })))] : null),
-    g.owner && g.type === "closed" ? h("div", { class: "df btns" }, h("button", { class: "btn primary", onclick: openInvite }, "Invite someone")) : null) };
+          h("span", { class: "mono", text: m.label })))] : null,
+      (g.moderators || []).length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Moderators" }),
+        h("p", { class: "muted", style: "margin:0", text: g.moderators.map(p => p.label).join(", ") })] : null,
+      (g.posters || []).length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Posters" }),
+        h("p", { class: "muted", style: "margin:0", text: g.posters.map(p => p.label).join(", ") })] : null),
+    // what you can do here: everyone may leave; the owner has the group's tools (as the TUI's Ctrl+P)
+    h("div", { class: "df btns wrap" },
+      g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: openInvite }, "Invite someone") : null,
+      g.owner ? h("button", { class: "btn", onclick: openEditGroup }, "Edit group") : null,
+      g.owner && g.type !== "closed" ? h("button", { class: "btn", onclick: openRoles }, "Moderators and posters") : null,
+      g.owner ? h("button", { class: "btn", onclick: () => openBanned() }, `Banned (${(g.banned || []).length})`) : null,
+      g.owner ? h("button", { class: "btn danger", onclick: openRemoveGroup }, "Remove group") : null,
+      h("span", { class: "grow" }),
+      g.id !== "for-you" ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Unsubscribe") : null)) };
   render();
+}
+
+// ---- the owner's and moderators' tools (the TUI's Ctrl+P) ----------------------
+async function leaveGroup(g) {
+  await api("POST", "/api/subscribe", { id: g.id, on: false });
+  closeDialog(); S.gid = null; S.data = null; await loadSidebar();
+  toast("You no longer follow " + g.label + ". G finds it again.");
+}
+
+function openEditGroup() {
+  const g = S.data && S.data.group;
+  if (!g || !g.owner) return;
+  let view = g.owner_view || g.view, kinds = (g.kinds || []).length === 1 ? g.kinds[0] : "both";
+  const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
+    onclick: () => { if (name === "kinds") kinds = value; else view = value; render(); } },
+    h("span", {}, h("span", { text: label }), h("small", { text: small })));
+  formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
+    values: { title: g.title || "", description: g.description || "", rules: g.rules || "" },
+    note: "Saved as a new version of the group's manifest, signed with your key and sent to your node. The type, owner and ID cannot change.",
+    fields: (vals) => [
+      h("label", { for: "etitle", text: "Title" }),
+      h("input", { id: "etitle", name: "title", class: "in", "data-k": "etitle", value: vals.title }),
+      h("label", { for: "edesc", text: "Description" }),
+      h("input", { id: "edesc", name: "description", class: "in", "data-k": "edesc", value: vals.description }),
+      h("label", { text: "Shown as" }),
+      h("div", { class: "choices row" }, pick("view", "threads", view, "≡ Threads", "posts and replies"), pick("view", "chat", view, "» Chat", "messages in order")),
+      h("label", { text: "Takes" }),
+      h("div", { class: "choices row" },
+        pick("kinds", "both", kinds, "Both", "posts and chat lines"),
+        pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
+        pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
+      h("label", { for: "erules", text: "Rules - shown to people before they post" }),
+      h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules })],
+    submit: async (v) => {
+      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/edit`,
+        { title: v.title.trim(), description: v.description.trim(), rules: v.rules.trim(), view, kinds });
+      closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
+    } });
+}
+
+function openRemoveGroup() {
+  const g = S.data && S.data.group;
+  if (!g || !g.owner) return;
+  formDialog({ label: "Remove group", title: "Remove " + g.label + " from the network", focus: "#rconfirm", button: "Remove for good",
+    note: "Every node is asked to delete the group and all its posts. This cannot be undone, and nodes that ignore it may keep a copy.",
+    fields: (vals) => [
+      h("label", { for: "rreason", text: "Why (optional, shown to the nodes)" }),
+      h("input", { id: "rreason", name: "reason", class: "in", "data-k": "rreason", value: vals.reason || "" }),
+      h("label", { for: "rconfirm", text: 'Type "remove" to confirm' }),
+      h("input", { id: "rconfirm", name: "confirm", class: "in mono", "data-k": "rconfirm", value: vals.confirm || "", autocomplete: "off" })],
+    submit: async (v) => {
+      if ((v.confirm || "").trim().toLowerCase() !== "remove") throw new Error('Type "remove" to confirm.');
+      toast("Removing - proof-of-work takes a moment …");
+      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/remove`, { confirm: "remove", reason: (v.reason || "").trim() });
+      closeDialog(); S.gid = null; S.data = null; await loadSidebar(); toast(g.label + " is removed.");
+    } });
+}
+
+// A list of people with a role (moderators, posters) or a ban, and a way to add one.
+function peopleDialog({ title, note, list, add, remove, addLabel, removeLabel, reason }) {
+  let err = "", key = "", why = "";
+  S.dialog = { focus: "#pkey", render: () => dialogShell({ label: title, wide: true },
+    h("div", { class: "dh" }, h("h2", { text: title }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db list" },
+      note ? h("p", { class: "hint", style: "margin:0 0 6px", text: note }) : null,
+      list().length ? list().map(p => h("div", { class: "cmd" },
+        h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+        h("span", { class: "nm" }, h("span", { text: p.label }), p.reason ? h("small", { text: " - " + p.reason }) : null),
+        h("button", { class: "btn", onclick: async () => {
+          try { await remove(p.key); await loadGroup(); render(); } catch (x) { err = x.message; render(); } } }, removeLabel))) :
+        h("p", { class: "muted", style: "padding:8px 0", text: "Nobody yet." }),
+      err ? h("p", { class: "error", text: err }) : null,
+      h("form", { class: "row", style: "gap:8px;margin-top:8px", onsubmit: async (e) => {
+          e.preventDefault();
+          try { await add(recipient(key), why); key = ""; why = ""; err = ""; await loadGroup(); render(); }
+          catch (x) { err = x.message; render(); } } },
+        h("input", { id: "pkey", class: "in", "data-k": "pkey", list: "pcontacts", value: key, placeholder: "a contact's name, or a key",
+          oninput: (e) => { key = e.target.value; }, autocomplete: "off" }),
+        h("datalist", { id: "pcontacts" }, contactList().map(c => h("option", { value: c.label }))),
+        reason ? h("input", { class: "in", "data-k": "pwhy", value: why, placeholder: "why (optional)", oninput: (e) => { why = e.target.value; } }) : null,
+        h("button", { class: "btn primary", type: "submit" }, addLabel))),
+    h("div", { class: "df" }, h("span", { text: "Changes are a new version of the manifest, signed by you" }), h("span", { text: "Esc close" }))) };
+  render();
+}
+
+function openRoles() {
+  const g = S.data && S.data.group;
+  if (!g || !g.owner) return;
+  const path = `/api/groups/${encodeURIComponent(g.id)}/role`;
+  let role = g.type === "channel" ? "posters" : "moderators";
+  peopleDialog({ title: (g.type === "channel" ? "Posters" : "Moderators") + " in " + g.label,
+    note: g.type === "channel" ? "Posters may write in your channel." :
+      g.type === "moderated" ? "Moderators approve posts (To approve in the sidebar) and may withdraw any post." :
+      "Moderators may withdraw any post in the group.",
+    list: () => (S.data.group[role] || []),
+    add: (key) => api("POST", path, { role, key, on: true }),
+    remove: (key) => api("POST", path, { role, key, on: false }),
+    addLabel: g.type === "channel" ? "Make poster" : "Make moderator", removeLabel: "Remove" });
+}
+
+function openBanned(prefill = "") {
+  const g = S.data && S.data.group;
+  if (!g || !g.owner) return;
+  const path = `/api/groups/${encodeURIComponent(g.id)}/ban`;
+  peopleDialog({ title: "Banned from " + g.label, reason: true,
+    note: "Banned keys cannot post here. Nodes refuse their posts; the ban and the reason are public in the manifest.",
+    list: () => (S.data.group.banned || []),
+    add: (key, reason) => api("POST", path, { key, on: true, reason }),
+    remove: (key) => api("POST", path, { key, on: false }),
+    addLabel: "Ban", removeLabel: "Lift ban" });
+  if (prefill) setTimeout(() => { const i = document.getElementById("pkey"); if (i) { i.value = prefill; i.dispatchEvent(new Event("input")); } });
+}
+
+// The moderation queue: posts sent to groups you moderate, waiting for you.
+function openModeration() {
+  let list = null, err = "", at = 0, reason = "";
+  const load = () => api("GET", "/api/moderation").then(l => { list = l; at = Math.min(at, Math.max(0, l.length - 1)); if (S.dialog) render(); })
+    .catch(e => { err = e.message; if (S.dialog) render(); });
+  load();
+  const act = async (approve) => {
+    const s = list[at];
+    try {
+      await api("POST", "/api/moderation", { id: s.id, approve, reason });
+      toast(approve ? "Approved and posted." : "Rejected."); reason = "";
+      await load(); await loadSidebar();
+    } catch (x) { err = x.message; render(); }
+  };
+  S.dialog = { render: () => {
+    const s = list && list[at];
+    return dialogShell({ label: "To approve", wide: true },
+      h("div", { class: "dh" }, h("h2", { text: "To approve" + (list ? ` (${list.length})` : "") }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "db" },
+        err ? h("p", { class: "error", text: err }) : null,
+        list === null ? h("p", { class: "muted", text: "Fetching your inbox …" }) :
+        !s ? h("p", { class: "muted", text: "Nothing waiting. Posts sent to groups you moderate show up here." }) : [
+          h("p", { class: "hint", style: "margin:0", text: `${at + 1} of ${list.length} · in ${s.group_label} · from ${s.who}` }),
+          h("h3", { style: "margin:4px 0", text: s.subject || "(no subject)" }),
+          h("div", { class: "pbody", style: "margin:0;max-height:40vh;overflow:auto" }, renderBody(s.text || "")),
+          h("input", { class: "in", "data-k": "mreason", value: reason, placeholder: "Why not (optional, sent to them if you reject)",
+            oninput: (e) => { reason = e.target.value; } })]),
+      s ? h("div", { class: "df btns" },
+        list.length > 1 ? h("button", { class: "btn", onclick: () => { at = (at + 1) % list.length; reason = ""; render(); } }, "Next") : null,
+        h("span", { class: "grow" }),
+        h("button", { class: "btn", onclick: () => act(false) }, "Reject"),
+        h("button", { class: "btn primary", onclick: () => act(true) }, "Approve")) : null);
+  } };
+  render();
+}
+
+// Withdraw a post (D): yours, or any in a group you own or moderate (UN-RFC 0004, 7).
+function openWithdraw(m) {
+  const g = S.data && S.data.group;
+  if (!g || !m || !m.may_withdraw) return;
+  formDialog({ label: "Withdraw post", title: "Withdraw “" + subjectOf(m) + "”", focus: ".dialog .btn.primary", button: "Withdraw",
+    note: "Every node is asked to delete it. People who read it already keep their copy, and nodes or programs that ignore withdrawals can keep it.",
+    fields: () => [h("p", { style: "margin:0", text: m.mine ? "Your post." : "A post by " + m.who + "." })],
+    submit: async () => {
+      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/withdraw`, { id: m.id });
+      closeDialog(); S.post = null; await loadGroup(); render(); toast("Withdrawn.");
+    } });
+}
+
+// Report a post to the people who can act on it (#74).
+function openReport(m) {
+  const g = S.data && S.data.group;
+  if (!g || !m) return;
+  let targets = null, err = "";
+  const chosen = new Set();
+  api("GET", `/api/groups/${encodeURIComponent(g.id)}/report?id=${encodeURIComponent(m.id)}`)
+    .then(t => { targets = t; t.forEach(x => chosen.add(x.i)); if (S.dialog) render(); })
+    .catch(e => { err = e.message; if (S.dialog) render(); });
+  formDialog({ label: "Report post", title: "Report “" + subjectOf(m) + "”", focus: "#rnote", button: "Report",
+    note: "For posts that break the group's rules or the law. In an emergency, contact the police: nobody on Unseenet can see who anyone is.",
+    fields: (vals) => [
+      targets === null ? h("p", { class: "muted", text: err || "Finding who can act on it …" }) :
+        targets.map(t => h("label", { class: "check" }, h("input", { type: "checkbox", checked: chosen.has(t.i),
+          onchange: (e) => { if (e.target.checked) chosen.add(t.i); else chosen.delete(t.i); } }), " " + t.who)),
+      h("label", { for: "rnote", text: "What is wrong with it? (optional)" }),
+      h("input", { id: "rnote", name: "note", class: "in", "data-k": "rnote", value: vals.note || "" }),
+      h("label", { class: "check" }, h("input", { type: "checkbox", name: "anonymous", checked: !!vals.anonymous }),
+        " Anonymous - they cannot see who reported it or answer you")],
+    submit: async (v) => {
+      if (!chosen.size) throw new Error("Choose at least one.");
+      const { sent } = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/report`,
+        { id: m.id, targets: [...chosen], note: (v.note || "").trim(), anonymous: !!v.anonymous });
+      closeDialog(); toast(`Reported to ${sent}.`);
+    } });
 }
 
 async function openCompose() {
@@ -1103,6 +1310,10 @@ async function openSignature() {
     submit: async (v) => { await api("POST", "/api/signature", { template: v.template }); closeDialog(); toast("Signature saved."); } });
 }
 
+function selectedPost() {
+  return (S.data && S.data.group && S.data.group.view !== "chat" && S.data.messages.find(x => x.id === S.post)) || null;
+}
+
 function commands() {
   const g = S.data && S.data.group;
   const cmds = [
@@ -1113,6 +1324,15 @@ function commands() {
     { name: "Create a group", key: "", run: openCreateGroup },
     { name: "Write a private post", key: "M", run: () => openWrite("", "post") },
     { name: "Contacts", key: "C", run: openContacts },
+    // the owner's and moderators' tools, as in the TUI's Ctrl+P
+    { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
+    { name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },
+    { name: "Moderators and posters", key: "", when: g && g.owner && g.type !== "closed", run: openRoles },
+    { name: "Banned from this group", key: "", when: g && g.owner, run: () => openBanned() },
+    { name: "Remove this group from the network", key: "", when: g && g.owner, run: openRemoveGroup },
+    { name: "Unsubscribe from this group", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type), run: () => leaveGroup(g) },
+    { name: "Withdraw the selected post", key: "D", when: selectedPost() && selectedPost().may_withdraw, run: () => openWithdraw(selectedPost()) },
+    { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
@@ -1206,6 +1426,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === " ") { e.preventDefault(); nextUnread(); }
   else if (e.key === "Enter" || e.key === "f") { e.preventDefault(); S.full = true; render(); }
   else if (e.key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
+  else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
 });
 
 // ---- events from the server --------------------------------------------
