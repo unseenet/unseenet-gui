@@ -417,14 +417,15 @@ function sidebar() {
       sb.inbox.id ? item(sb.inbox.id, "@", "Letters",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null) : null,
     sb ? h("div", { class: "nav" },
-      h("h3", { class: "row-h" }, h("span", { text: "people" }),
+      h("h3", { class: "row-h" }, h("span", { text: "chats" }),
         h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
       sb.people.length ? sb.people.map(p => h("button", {
-        class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}`, onclick: () => openGroup(p.id) },
+        class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`, onclick: () => openGroup(p.id),
+        title: p.contact ? null : "Not a contact - open the chat to add them" },
         h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
         h("span", { class: "nm", text: p.label }),
         p.unread ? h("span", { class: "count", text: p.unread }) : null)) :
-        h("p", { class: "hint", style: "margin:0 10px", text: "Add people as contacts, then write to them here." })) : null,
+        h("p", { class: "hint", style: "margin:0 10px", text: "Your chats, one per person. Add people as contacts, or start a chat with +." })) : null,
     sb ? sb.hierarchies.map(hier => h("div", { class: "nav" },
       h("h3", { text: hier.name + ".*" }),
       hier.groups.map(g => item(g.id, (g.access || "") + g.icon, g.label, [

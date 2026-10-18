@@ -77,8 +77,11 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
     for g in sorted(groups, key=lambda g: g["label"]):
         hierarchies.setdefault(g["hierarchy"], []).append(g)
     inbox = s.my_inbox if inbox_ready else None
-    people = [{"id": CONTACT + key, "key": key, "label": name, "colour": colour(key),
-               "unread": s.unread_from(key, KIND_CHAT)} for key, name in s.contacts()]
+    # one chat per person: contacts, and anyone else you have chatted with (UN-RFC 0028, 6.2)
+    people = [{"id": CONTACT + key, "key": key, "contact": bool(s.contact_name(key)),
+               "label": s.contact_name(key) or s.identity_label(key, seen_name(s, key)),
+               "colour": colour(key), "unread": s.unread_from(key, KIND_CHAT)}
+              for key in s.chat_partners()]
     return {"for_you": len(s.for_you()), "people": people,
             "inbox": {"id": inbox, "unread": s.unread_letters() if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
