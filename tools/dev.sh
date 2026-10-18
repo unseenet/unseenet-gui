@@ -24,4 +24,4 @@ if [ ! -f "$DEV/andreas.vault" ]; then
   python tools/seed_dev.py "$DEV"
 fi
 echo "Passphrase for every vault in $DEV: test"
-unseenet-web --vault "$DEV/andreas.vault" "$@"
+unseenet-gui --vault "$DEV/andreas.vault" "$@"

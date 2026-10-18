@@ -3,9 +3,9 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "unseenet-web"
+name = "unseenet-gui"
 dynamic = ["version"]
-description = "A local web client for Unseenet: groups and chat in a window, Tor and keys stay in the unseenet core"
+description = "The graphical client for Unseenet: groups and chat in a window, Tor and keys stay in the unseenet core"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
@@ -26,20 +26,20 @@ window = ["pywebview>=5"]
 dev = ["pytest>=8", "pytest-asyncio>=0.23"]
 
 [project.scripts]
-unseenet-web = "unseenet_web.__main__:main"
+unseenet-gui = "unseenet_gui.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/unseenet/unseenet-web"
+Homepage = "https://github.com/unseenet/unseenet-gui"
 Unseenet = "https://unseenet.org/"
 
 [tool.setuptools.dynamic]
-version = { attr = "unseenet_web.__version__" }
+version = { attr = "unseenet_gui.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-unseenet_web = ["static/*"]
+unseenet_gui = ["static/*"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

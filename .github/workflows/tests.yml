@@ -15,4 +15,4 @@ jobs:
           python-version: "3.13"
       - run: pip install . pytest pytest-asyncio
       - run: python -m pytest -q
-      - run: node --check src/unseenet_web/static/app.js
+      - run: node --check src/unseenet_gui/static/app.js

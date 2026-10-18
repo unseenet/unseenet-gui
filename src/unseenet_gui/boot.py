@@ -1,8 +1,8 @@
 """The graphical session of the bootable image (tools/image).
 
-    python -m unseenet_web.boot              the session on tty1: cage (a kiosk
+    python -m unseenet_gui.boot              the session on tty1: cage (a kiosk
                                              Wayland compositor) showing the client full screen
-    python -m unseenet_web.boot --self-test  check the running system (CI, and the
+    python -m unseenet_gui.boot --self-test  check the running system (CI, and the
                                              "Self-test" entry of the boot loader)
 
 Like unseenet's text image, it is one FAT partition labelled UNSEENET with a data/
@@ -50,7 +50,7 @@ def session_env(media: Path | None, layout: str) -> dict:
 
 
 def kiosk_command() -> list[str]:
-    return ["cage", "-d", "-s", "--", PY, "-m", "unseenet_web", "--kiosk"]
+    return ["cage", "-d", "-s", "--", PY, "-m", "unseenet_gui", "--kiosk"]
 
 
 def text_menu() -> None:
@@ -118,7 +118,7 @@ def self_test() -> int:
     check("network", bool(addrs), ", ".join(f"{i} {a}" for i, a in addrs) or "no address")
 
     # The real thing: the client in the kiosk, its page loaded and its script running.
-    with tempfile.TemporaryDirectory(prefix="unseenet-web-selftest-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="unseenet-gui-selftest-") as tmp:
         marker = Path(tmp) / "page-loaded"
         env = session_env(None, "us")
         env.update(UNSEENET_HOME=tmp, UNSEENET_WEB_MARKER=str(marker))

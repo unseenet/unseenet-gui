@@ -1,4 +1,4 @@
-"""``unseenet-web --self-test``: does this build work? Used by CI on every build.
+"""``unseenet-gui --self-test``: does this build work? Used by CI on every build.
 
 Checks that everything the client loads is there, finds Tor, serves the page
 and its API with the token (and refuses without), and - unless --offline -
@@ -30,7 +30,7 @@ def _get(url: str, token: str | None = None) -> tuple[int, bytes]:
 async def _server_check() -> bool:
     from .server import serve
     ready: asyncio.Future = asyncio.get_running_loop().create_future()
-    with tempfile.TemporaryDirectory(prefix="unseenet-web-selftest-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="unseenet-gui-selftest-") as tmp:
         task = asyncio.create_task(serve(Path(tmp) / "test.vault", 0, ready.set_result))
         url = await asyncio.wait_for(ready, 20)
         base, token = url.split("/#t=")
@@ -55,7 +55,7 @@ def self_test(network: bool = True, node: str | None = None) -> int:
     from unseenet import portable
     from unseenet.core.tor import TorError, TorProcess
 
-    print(f"Unseenet web {__version__} on core {core_version}, Python {sys.version.split()[0]} on {sys.platform}")
+    print(f"Unseenet graphical {__version__} on core {core_version}, Python {sys.version.split()[0]} on {sys.platform}")
     try:
         import aiohttp  # noqa: F401
         import nacl.bindings  # noqa: F401
@@ -90,7 +90,7 @@ def self_test(network: bool = True, node: str | None = None) -> int:
     print("Starting Tor and connecting to the Tor network (up to two minutes) ...")
 
     async def run() -> int:
-        with tempfile.TemporaryDirectory(prefix="unseenet-web-selftest-") as tmp:
+        with tempfile.TemporaryDirectory(prefix="unseenet-gui-selftest-") as tmp:
             tor = TorProcess(Path(tmp), binary)
             try:
                 await tor.start(timeout=120)

@@ -8,8 +8,8 @@ from unseenet.core.store import Store
 from unseenet.core.vault import Vault
 from unseenet.node.server import Node, NodeConfig
 
-from unseenet_web import serialize
-from unseenet_web.runtime import Runtime
+from unseenet_gui import serialize
+from unseenet_gui.runtime import Runtime
 
 KDF = {"ops": 1, "mem": 8192 * 1024}
 

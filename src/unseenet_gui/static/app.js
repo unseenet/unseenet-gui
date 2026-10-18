@@ -1,4 +1,4 @@
-/* Unseenet web client.
+/* Unseenet graphical client.
  *
  * Talks only to the local server it was opened from. Everything a person
  * wrote is put on the page with textContent, never as HTML, and links in
@@ -173,7 +173,7 @@ function view() {
 function noToken() {
   return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
     brandHead("Open Unseenet from its own window."),
-    h("p", { class: "muted", text: "This page needs the one-time address that unseenet-web prints when it starts. " +
+    h("p", { class: "muted", text: "This page needs the one-time address that unseenet-gui prints when it starts. " +
       "Start it again, or open the address it printed." })));
 }
 

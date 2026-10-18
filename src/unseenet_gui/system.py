@@ -1,7 +1,7 @@
 """The bootable image's own settings, from inside the client: network, keyboard, power.
 
 Only active when the client runs on the bootable image (``UNSEENET_WEB_BOOTABLE=1``,
-set by ``unseenet_web.boot``). The Wi-Fi and media helpers are unseenet's own
+set by ``unseenet_gui.boot``). The Wi-Fi and media helpers are unseenet's own
 (``unseenet.boot``), so the text image and this one behave the same.
 """
 
@@ -16,7 +16,7 @@ KEYBOARDS = [("us", "English (US)"), ("dk", "Dansk"), ("de", "Deutsch"), ("gb", 
              ("nl", "Nederlands"), ("es", "Español"), ("it", "Italiano"), ("ch", "Schweiz"),
              ("pl", "Polski"), ("pt", "Português"), ("be", "Belgique"), ("cz", "Čeština")]
 RESTART = 3                       # exit code: start the session again (a new keyboard layout)
-RESTART_FLAG = Path("/run/unseenet/restart-session")   # read by unseenet_web.boot (cage may not pass the code)
+RESTART_FLAG = Path("/run/unseenet/restart-session")   # read by unseenet_gui.boot (cage may not pass the code)
 
 
 def enabled() -> bool:

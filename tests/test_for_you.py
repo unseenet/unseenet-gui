@@ -2,7 +2,7 @@
 
 from unseenet.client.session import ForYouCount
 
-from unseenet_web import serialize
+from unseenet_gui import serialize
 
 
 class FakeSession:

@@ -81,7 +81,7 @@ def show_window(url: str, fullscreen: bool = False) -> None:
 def show_app(url: str, browser: str, profile_parent: Path | None) -> None:
     """A browser window without browser chrome; blocks until it is closed."""
     parent = profile_parent if profile_parent and profile_parent.is_dir() else None
-    profile = Path(tempfile.mkdtemp(prefix="unseenet-web-profile-", dir=parent))
+    profile = Path(tempfile.mkdtemp(prefix="unseenet-gui-profile-", dir=parent))
     try:
         subprocess.run([browser, f"--app={url}", f"--user-data-dir={profile}", "--incognito",
                         "--no-first-run", "--no-default-browser-check", "--disable-sync",

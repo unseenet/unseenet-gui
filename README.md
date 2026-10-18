@@ -48,11 +48,11 @@ boots it in QEMU on every build.
 ## How it works
 
 ```
- browser window ──HTTP/WebSocket──▶ unseenet-web ──▶ unseenet core ──Tor──▶ nodes
+ browser window ──HTTP/WebSocket──▶ unseenet-gui ──▶ unseenet core ──Tor──▶ nodes
  (127.0.0.1 only)                   (local server)   vault, keys, postage
 ```
 
-`unseenet-web` is a small local server around the core's `Session` - the same
+`unseenet-gui` is a small local server around the core's `Session` - the same
 one the TUI uses. It opens the same encrypted vault, starts the same bundled
 Tor and talks to the same nodes. The browser only draws what you would see on
 screen: **keys, signing, encryption and postage never leave Python**, and the
@@ -65,16 +65,16 @@ between them without learning anything new: the same keys, the same icons
 ## Download
 
 Every push to `main` is built and self-tested; the newest builds are the
-[development pre-release](https://github.com/unseenet/unseenet-web/releases/tag/dev).
+[development pre-release](https://github.com/unseenet/unseenet-gui/releases/tag/dev).
 
 - **Portable** - unzip and start, from a USB stick or a folder. Tor is included,
   and everything stays in `data/` beside the programs.
-  `unseenet-web-…-usb.zip` has every platform; or take only yours:
-  - Windows: `Unseenet Web.exe` (an app window through WebView2, no console)
-  - macOS: `Start Unseenet Web.command` (an app window)
-  - Linux: `sh start-web-linux.sh` (Chromium, Chrome, Edge or Brave without
+  `unseenet-gui-…-usb.zip` has every platform; or take only yours:
+  - Windows: `Unseenet Graphical.exe` (an app window through WebView2, no console)
+  - macOS: `Start Unseenet Graphical.command` (an app window)
+  - Linux: `sh start-graphical-linux.sh` (Chromium, Chrome, Edge or Brave without
     tabs if you have one, else your browser)
-- **Bootable** - `unseenet-web-…-x86_64.img.xz`: write it to a USB stick (for
+- **Bootable** - `unseenet-gui-…-x86_64.img.xz`: write it to a USB stick (for
   example with Raspberry Pi Imager, balenaEtcher or
   `xz -dc FILE | sudo dd of=/dev/sdX bs=4M`), boot from it, and Unseenet starts
   full screen and runs from memory. Set up Wi-Fi and the keyboard on the first
@@ -91,9 +91,9 @@ build, so the terminal client and this one can share a stick and a vault.
 You need Python 3.11+.
 
 ```sh
-pip install "unseenet-web @ git+https://github.com/unseenet/unseenet-web"
-unseenet-web                        # opens your browser
-unseenet-web --vault /path/to/unseenet.vault
+pip install "unseenet-gui @ git+https://github.com/unseenet/unseenet-gui"
+unseenet-gui                        # opens your browser
+unseenet-gui --vault /path/to/unseenet.vault
 ```
 
 It uses the same vault as the TUI (`unseenet.vault` in the current folder, or
@@ -103,8 +103,8 @@ same in both. Do not run both on the same vault at the same time.
 ### In its own window
 
 ```sh
-pip install "unseenet-web[window] @ git+https://github.com/unseenet/unseenet-web"
-unseenet-web --window
+pip install "unseenet-gui[window] @ git+https://github.com/unseenet/unseenet-gui"
+unseenet-gui --window
 ```
 
 This uses [pywebview](https://pywebview.flowrl.com/): the system's web view
@@ -115,7 +115,7 @@ libraries.
 ### A playground without Tor
 
 ```sh
-git clone https://github.com/unseenet/unseenet-web && cd unseenet-web
+git clone https://github.com/unseenet/unseenet-gui && cd unseenet-gui
 pip install -e .
 tools/dev.sh            # a local node, three people, groups and a closed chat
 ```
@@ -187,7 +187,7 @@ are listed in [CORE-NEEDS.md](CORE-NEEDS.md) as candidates for unseenet 0.4.0.
 ## Layout
 
 ```
-src/unseenet_web/
+src/unseenet_gui/
   __main__.py     command line: how to open it, --self-test
   opening.py      app window, browser in app mode, or the browser
   server.py       the local HTTP/WebSocket server and its guards
