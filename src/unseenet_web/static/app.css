@@ -406,3 +406,21 @@ details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 1
 /* the owner tools under About this group may need two rows */
 .df.btns.wrap { flex-wrap: wrap; gap: 8px; }
 .df .grow { flex: 1; }
+
+/* Markdown (UN-RFC 0031): the core's safe tree, styled to sit in the reader */
+.md .text, .md .attrib { white-space: normal; }
+.md .mdh { margin: 14px 0 6px; line-height: 1.25; }
+.md h3.mdh { font-size: 19px; } .md h4.mdh { font-size: 16px; } .md h5.mdh { font-size: 14px; }
+.md ul, .md ol { margin: 6px 0; padding-left: 24px; }
+.md li > .text { margin: 2px 0; }
+.md code, .bubble code { font-family: var(--mono); font-size: 0.92em; padding: 1px 5px; border-radius: 4px;
+  background: var(--ink-sel); }
+.mdcode { font-family: var(--mono); font-size: 13px; line-height: 1.45; padding: 10px 12px; margin: 8px 0;
+  border-radius: 6px; background: var(--ink-deep); overflow-x: auto; white-space: pre; }
+.mdcode code { background: none; padding: 0; }
+.mdhr { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+blockquote.quote-block.md { margin: 8px 0; padding: 2px 0 2px 12px; border-left: 3px solid var(--line); color: var(--muted); }
+.mdlink { color: var(--green); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.mdlink .addr { font-family: var(--mono); font-size: 0.85em; color: var(--muted); text-decoration: none; }
+.mdimg { font-style: italic; color: var(--muted); }
+.emoji { font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }

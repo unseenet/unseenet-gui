@@ -387,6 +387,14 @@ async def block(request):
     return _json({"hierarchy": where})
 
 
+async def markdown(request):
+    rt = _unlocked(request)
+    data = await _body(request)
+    rt.session.set_markdown(bool(data.get("on", True)))
+    rt.emit("groups")
+    return _json({"ok": True})
+
+
 async def show_blocked(request):
     rt = _unlocked(request)
     data = await _body(request)
@@ -488,6 +496,7 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/ignore", ignore)
     r.add_post("/api/groups/{gid}/block", block)
     r.add_post("/api/show-blocked", show_blocked)
+    r.add_post("/api/markdown", markdown)
     r.add_post("/api/groups/{gid}/members/remove", remove_member)
     r.add_post("/api/private", private)
     r.add_post("/api/contacts", contacts)
