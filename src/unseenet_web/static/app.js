@@ -408,7 +408,7 @@ function sidebar() {
     class: `item ${cls}${S.gid === gid ? " on" : ""}`, onclick: () => openGroup(gid),
     "aria-current": S.gid === gid ? "page" : null },
     h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
-  return h("nav", { class: "side", "aria-label": "Groups" },
+  return h("nav", { class: "side", "aria-label": "Groups", "data-scroll": "side" },
     h("div", { class: "brand" }, logo(30), "Unseenet"),
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl K" })),
@@ -873,7 +873,7 @@ function openBrowse() {
         h("input", { id: "browse", "data-k": "browse", placeholder: "Groups on your nodes …", value: filter,
           oninput: (e) => { filter = e.target.value.toLowerCase(); render(); } }),
         h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-      h("div", { class: "db list" },
+      h("div", { class: "db list", "data-scroll": "browse" },
         err ? h("p", { class: "error", text: err }) : null,
         list === null && !err ? h("p", { class: "muted", style: "padding:12px", text: "Asking your nodes over Tor …" }) : null,
         shown.map(g => h("div", { class: "cmd" },
@@ -1041,7 +1041,7 @@ function openPalette() {
             else if (e.key === "Enter") { e.preventDefault(); const c = shown()[sel]; if (c) run(c); }
           } }),
         h("kbd", { text: "Esc" })),
-      h("div", { class: "db list" },
+      h("div", { class: "db list", "data-scroll": "palette" },
         acts.length ? [h("div", { class: "sect", text: "Commands" }), acts.map(row)] : null,
         grps.length ? [h("div", { class: "sect", text: "Your groups" }), grps.map(row)] : null,
         !list.length ? h("p", { class: "muted", style: "padding:12px", text: "Nothing matches." }) : null),
