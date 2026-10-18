@@ -608,6 +608,87 @@ function renderBody(text) {
   return out;
 }
 
+// ---- Markdown and emoji (UN-RFC 0031): the core's safe tree as DOM, as the TUI shows it ----
+// Nothing here loads anything: images come only from attachments (and until those
+// exist, show their description), and links open only on a click, with a warning
+// before leaving Tor.
+function messageBody(m) {
+  if (!m.readable) return h("p", { class: "text bad", text: m.error || "Could not be read." });
+  return m.markdown ? h("div", { class: "md" }, renderTree(m.tree || [])) : renderBody(m.text || "");
+}
+
+function renderTree(blocks) {
+  const out = [];
+  blocks.forEach((b, i) => {
+    const next = blocks[i + 1];
+    if (b.t === "p") {
+      const txt = inlineText(b.c);
+      // "Sonia wrote:" before a quote: the attribution, as in plain text
+      out.push(h("p", { class: next && next.t === "quote" && /(wrote|skrev):$/.test(txt) ? "attrib" : "text" }, renderInline(b.c)));
+    } else if (b.t === "h") out.push(h("h" + Math.min(b.n + 2, 5), { class: "mdh" }, renderInline(b.c)));
+    else if (b.t === "code") out.push(h("pre", { class: "mdcode", "data-lang": b.lang || null }, h("code", { text: b.v })));
+    else if (b.t === "hr") out.push(h("hr", { class: "mdhr" }));
+    else if (b.t === "quote") {
+      const inner = renderTree(b.c), lines = (inlineTextDeep(b.c).match(/\n/g) || []).length + b.c.length;
+      out.push(lines > 8 ? h("details", { class: "quote-block md" }, h("summary", { text: `Quoted text (${lines} lines)` }), inner)
+        : h("blockquote", { class: "quote-block md" }, inner));
+    } else if (b.t === "ul" || b.t === "ol") {
+      out.push(h(b.t, b.t === "ol" && b.start !== 1 ? { start: b.start } : {}, b.items.map(item => h("li", {}, renderTree(item)))));
+    }
+  });
+  return out;
+}
+
+// A chat line: its paragraphs inline, as one bubble (the chat subset has no blocks but code).
+function renderChatLine(m) {
+  const blocks = m.tree || [];
+  return blocks.map((b, i) => [i ? h("br") : null,
+    b.t === "code" ? h("pre", { class: "mdcode" }, h("code", { text: b.v })) :
+    b.t === "p" ? h("span", {}, renderInline(b.c)) : h("div", { class: "md" }, renderTree([b]))]);
+}
+
+function renderInline(nodes) {
+  return nodes.map(n => {
+    switch (n.t) {
+      case "text": return document.createTextNode(n.v);
+      case "br": return h("br");
+      case "code": return h("code", { text: n.v });
+      case "em": return h("em", {}, renderInline(n.c));
+      case "strong": return h("strong", {}, renderInline(n.c));
+      case "del": return h("del", {}, renderInline(n.c));
+      case "emoji": return h("span", { class: "emoji", title: ":" + n.name + ":", text: n.v });
+      case "image": return h("span", { class: "mdimg", title: "An attachment - attachments come with UN-RFC 0027", text: "[image: " + (n.alt || "no description") + "]" });
+      case "link": {
+        const shown = inlineText(n.c);
+        return h("a", { class: "mdlink", href: n.href, title: n.href, rel: "noopener noreferrer",
+          onclick: (e) => { e.preventDefault(); openLink(n.href); } },
+          renderInline(n.c), shown.trim() !== n.href ? h("span", { class: "addr", text: " " + n.href }) : null);
+      }
+      default: return null;
+    }
+  });
+}
+
+function inlineText(nodes) {
+  return (nodes || []).map(n => n.v !== undefined ? n.v : n.c ? inlineText(n.c) : n.t === "br" ? "\n" : "").join("");
+}
+function inlineTextDeep(blocks) {
+  return blocks.map(b => b.c && b.t !== "quote" ? inlineText(b.c) : b.c ? inlineTextDeep(b.c) : b.v || "").join("\n");
+}
+
+// A link opens only on a click; leaving Tor is said first (section 3.4).
+function openLink(href) {
+  let url;
+  try { url = new URL(href); } catch (_) { return; }
+  if (url.protocol === "unseenet:" || url.protocol === "news:") {
+    copy(href, "The link is copied.");
+    return;
+  }
+  if (!url.hostname.endsWith(".onion") &&
+      !window.confirm(`Open ${href}?\n\nThis is on the ordinary web, not a .onion address. Unless this browser is Tor Browser, the site sees your real address.`)) return;
+  window.open(href, "_blank", "noopener,noreferrer");
+}
+
 function readerPane(g, m, msgs) {
   const marks = [];
   if (m.mine) marks.push(h("span", { class: "sm", text: "you" }));
@@ -632,7 +713,7 @@ function readerPane(g, m, msgs) {
           parent ? h("button", { class: "inreply", onclick: () => { S.post = parent.id; render(); } },
             "In reply to ", h("span", { class: "mono", text: parent.who })) : null)),
       h("div", { class: "pbody" },
-        m.readable ? renderBody(m.text) : h("p", { class: "text bad", text: m.error || "Could not be read." }),
+        messageBody(m),
         m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null)),
     h("div", { class: "pbar" },
       canReply ? h("button", { class: "btn primary", onclick: () => openReply(m, g) }, "Reply", h("kbd", { text: "R" })) : null,
@@ -726,8 +807,9 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject }),
       h("label", { for: "body", text: "Text" }),
       h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true" }),
-      h("p", { class: "hint", style: "margin:0", text: priv ? "Sealed to them: only they can read it." :
-        "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added." })),
+      h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
+        "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
+        (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),
     h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
       h("button", { class: "btn primary", onclick: go }, priv ? "Send" : "Post", h("kbd", { text: "Ctrl S" })))) };
   render();
@@ -767,7 +849,7 @@ function chatView(d) {
     grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : ""), title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
-      m.readable ? m.text : h("i", { text: m.error || "Could not be read." }),
+      m.readable ? (m.markdown ? renderChatLine(m) : m.text) : h("i", { text: m.error || "Could not be read." }),
       isPost && g.type !== "contact" && g.may_post && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) }, "Reply with a quote")) : null));
     if (m.mine) grp.lastMine = m;
@@ -1043,7 +1125,7 @@ function openModeration() {
         !s ? h("p", { class: "muted", text: "Nothing waiting. Posts sent to groups you moderate show up here." }) : [
           h("p", { class: "hint", style: "margin:0", text: `${at + 1} of ${list.length} · in ${s.group_label} · from ${s.who}` }),
           h("h3", { style: "margin:4px 0", text: s.subject || "(no subject)" }),
-          h("div", { class: "pbody", style: "margin:0;max-height:40vh;overflow:auto" }, renderBody(s.text || "")),
+          h("div", { class: "pbody", style: "margin:0;max-height:40vh;overflow:auto" }, messageBody({ ...s, readable: true })),
           h("input", { class: "in", "data-k": "mreason", value: reason, placeholder: "Why not (optional, sent to them if you reject)",
             oninput: (e) => { reason = e.target.value; } })]),
       s ? h("div", { class: "df btns" },
@@ -1456,6 +1538,9 @@ function commands() {
     { name: "Contacts", key: "C", run: openContacts },
     { name: "Names: claim yours, ask for one, give names under yours", key: "@", run: openNames },
     { name: "People you ignore", key: "", run: openIgnored },
+    { name: S.sidebar && S.sidebar.markdown === false ? "Write Markdown (*emphasis*, `code`, :tada:)" : "Write plain text instead of Markdown", key: "",
+      run: async () => { const on = !(S.sidebar && S.sidebar.markdown !== false); await api("POST", "/api/markdown", { on }); await loadSidebar();
+        toast(on ? "You write Markdown: *emphasis*, **strong**, `code`, lists, :tada:" : "You write plain text: sent and shown exactly as typed."); } },
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
     { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },

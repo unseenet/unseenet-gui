@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 
 from unseenet.client.session import GroupInfo, Message, Session, split_signature
+from unseenet.core import markup
 from unseenet.core.groups import KIND_CHAT, short_group_id
 
 CONTACT = "contact:"            # a conversation with one key, shown as a chat (as in the TUI)
@@ -87,6 +88,7 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
             "moderation": len(s.submissions()),           # posts waiting for you to approve
             "name_requests": _name_requests(s),           # people asking for a name under yours
             "show_blocked": bool(s.data.get("show_blocked")),
+            "markdown": markup.is_markdown(s.text_type()),       # what you write (UN-RFC 0031)
             "inbox": {"id": inbox, "unread": s.unread_private_posts() if inbox else 0},
             "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
 
@@ -130,6 +132,9 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
             "signature": (sig or "").rstrip("\n") or None, "references": m.references,
             "encrypted": m.encrypted, "private": m.private, "verified": bool(m.sender_key),
             "kind": m.kind,                      # a chat line or a post (UN-RFC 0028)
+            # the text as a safe tree, Markdown or plain, rendered as the TUI does (UN-RFC 0031)
+            "tree": markup.body(text.rstrip("\n"), m.content_type, m.kind) if m.readable else [],
+            "markdown": markup.is_markdown(m.content_type),
             "readable": m.readable, "error": m.error, "read": s.is_read(m),
             "for_me": s.for_me(m, mine, patterns), "may_withdraw": s.may_cancel(m)}
 
@@ -179,6 +184,8 @@ def submission(s: Session, m: Message, art) -> dict:
     text = split_signature(art.body)[0].rstrip("\n") if not art.get("Encrypted") else ""
     return {"id": m.message_id, "group": art.group, "group_label": s.group_label(art.group),
             "subject": art.get("Subject", ""), "who": s.identity_label(key, art.get("From", "")),
+            "tree": markup.body(text, art.get("Content-Type", ""), markup_kind(art)),
+            "markdown": markup.is_markdown(art.get("Content-Type", "")),
             "key": key, "text": text, "date": m.date.isoformat() if m.date else None}
 
 
@@ -243,3 +250,8 @@ def _name_requests(s: Session) -> int:
         return len(naming.name_requests(s))
     except Exception:  # noqa: BLE001
         return 0
+
+
+def markup_kind(art) -> str:
+    from unseenet.core.groups import message_kind
+    return message_kind(art)
