@@ -428,6 +428,10 @@ async def browse(request):
     return _json(await _unlocked(request).browse())
 
 
+async def group_ref(request):
+    return _json(await _unlocked(request).group_ref(request.query.get("ref", "")))
+
+
 async def subscribe(request):
     rt = _unlocked(request)
     data = await _body(request)
@@ -504,6 +508,7 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/signature", signature)
     r.add_get("/api/browse", browse)
     r.add_post("/api/subscribe", subscribe)
+    r.add_get("/api/group-ref", group_ref)
     r.add_post("/api/refresh", refresh)
     r.add_get("/api/events", events)
     r.add_get("/api/system", system_status)

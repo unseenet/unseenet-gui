@@ -607,7 +607,7 @@ function renderBody(text) {
         const before = para.slice(0, -1).join("\n");
         if (before.trim()) out.push(h("p", { class: "text", text: before }));
         out.push(h("p", { class: "attrib", text: para[para.length - 1] }));
-      } else if (t.trim() || out.length) out.push(h("p", { class: "text", text: t }));
+      } else if (t.trim() || out.length) out.push(h("p", { class: "text" }, linkGroups(t)));
       continue;
     }
     const q = [];
@@ -662,7 +662,7 @@ function renderChatLine(m) {
 function renderInline(nodes) {
   return nodes.map(n => {
     switch (n.t) {
-      case "text": return document.createTextNode(n.v);
+      case "text": return linkGroups(n.v);
       case "br": return h("br");
       case "code": return h("code", { text: n.v });
       case "em": return h("em", {}, renderInline(n.c));
@@ -679,6 +679,69 @@ function renderInline(nodes) {
       default: return null;
     }
   });
+}
+
+// ---- #group references (unseenet #172) ----------------------------------
+// The same rule as the core's group_refs(): '#' and a group name (a-z, digits, + _ -
+// and dots), maybe '@' and the start of the owner's fingerprint. Not '# heading',
+// not '#170', not inside a word or a URL.
+const GROUP_REF = /(?<![\p{L}\p{N}_@#\/&.+-])#(?=[a-z0-9+_.-]*[a-z])([a-z0-9][a-z0-9+_-]*(?:\.[a-z0-9][a-z0-9+_-]*)*)(?:@([a-z2-7]{4,16}))?(?![\p{L}\p{N}_+@-]|\.[\p{L}\p{N}_])/gu;
+
+function linkGroups(text) {
+  const out = [];
+  let last = 0;
+  for (const m of (text || "").matchAll(GROUP_REF)) {
+    if (m.index > last) out.push(text.slice(last, m.index));
+    const ref = m[0];
+    out.push(h("a", { class: "mdlink gref", href: "#", title: "Go to " + ref.slice(1),
+      onclick: (e) => { e.preventDefault(); e.stopPropagation(); goToGroup(ref); } }, ref));
+    last = m.index + ref.length;
+  }
+  if (last < (text || "").length) out.push(text.slice(last));
+  return out;
+}
+
+// Open a group a post names: one you follow opens; one you do not is shown first,
+// and you choose to follow it - never without asking (as the TUI's #).
+async function goToGroup(ref) {
+  let found;
+  try { found = await api("GET", "/api/group-ref?ref=" + encodeURIComponent(ref)); }
+  catch (x) { toast(x.message); return; }
+  if (!found.length) { toast(`No group called ${ref.slice(1).split("@")[0]} on your nodes.`); return; }
+  if (found[0].subscribed) { S.full = false; openGroup(found[0].id); return; }
+  const several = found.length > 1;
+  S.dialog = { focus: "[data-k='follow:0']", render: () => dialogShell({ label: ref },
+    h("div", { class: "dh" }, h("h2", {}, several ? `Groups called ${ref.slice(1)}` : `Follow ${found[0].label}?`),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db list" },
+      several ? h("p", { class: "hint", style: "margin:0 0 8px", text: "Groups with the same name have different owners: check the fingerprint." }) : null,
+      found.map((g, i) => h("div", { class: "cmd" },
+        h("span", { class: "mono muted", style: "width:28px", text: (g.access || "") + (g.icon || "") }),
+        h("span", { class: "nm" }, h("span", { class: "mono", text: several ? g.short : g.label }), " ",
+          h("small", { text: g.description || "" }),
+          g.warning && !(several && g.warning.startsWith("There is more than one")) ?   // said once, above
+            h("small", { class: "muted", style: "display:block", text: g.warning }) : null,
+          g.type === "closed" ? h("small", { class: "muted", style: "display:block", text: "Closed: you can read it only if its owner invites you." }) : null),
+        h("button", { class: "btn primary", "data-k": "follow:" + i, onclick: async () => {
+          try { await api("POST", "/api/subscribe", { id: g.id, on: true }); }
+          catch (x) { toast(x.message); return; }
+          closeDialog(); S.full = false; await loadSidebar(); openGroup(g.id); } }, "Follow")))),
+    h("div", { class: "df btns" }, h("span", { class: "mono muted", text: several ? "" : found[0].id }),
+      h("button", { class: "btn", onclick: closeDialog }, "Cancel"))) };
+  render();
+}
+
+// # on a post: its group, or a choice when it names several
+function groupsInPost(m) {
+  const refs = (m && m.groups) || [];
+  if (!refs.length) { toast("This post names no group. Write e.g. #dk.snak to name one."); return; }
+  if (refs.length === 1) { goToGroup(refs[0]); return; }
+  S.dialog = { focus: "[data-k='ref:0']", render: () => dialogShell({ label: "Groups in this post" },
+    h("div", { class: "dh" }, h("h2", {}, "Groups in this post"),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db list" }, refs.map((r, i) => h("button", { class: "cmd", "data-k": "ref:" + i,
+      onclick: () => { closeDialog(); goToGroup(r); } }, h("span", { class: "nm mono", text: r }))))) };
+  render();
 }
 
 function inlineText(nodes) {
@@ -861,7 +924,7 @@ function chatView(d) {
     grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : ""), title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
-      m.readable ? (m.markdown ? renderChatLine(m) : m.text) : h("i", { text: m.error || "Could not be read." }),
+      m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
       isPost && g.type !== "contact" && g.may_post && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) }, "Reply with a quote")) : null));
     if (m.mine) grp.lastMine = m;
@@ -1562,6 +1625,7 @@ function commands() {
     { name: "Remove this group from the network", key: "", when: g && g.owner, run: openRemoveGroup },
     { name: "Unsubscribe from this group", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type), run: () => leaveGroup(g) },
     { name: "Withdraw the selected post", key: "D", when: selectedPost() && selectedPost().may_withdraw, run: () => openWithdraw(selectedPost()) },
+    { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
     { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
@@ -1639,6 +1703,7 @@ document.addEventListener("keydown", (e) => {
       " ": () => { if (sc && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4) sc.scrollBy({ top: sc.clientHeight * 0.9 }); else nextUnread(); },
       r: () => { if (cur && (g.may_post || g.private_reply) && g.id !== "for-you") openReply(cur, g); },
       m: () => { if (cur && !cur.mine && cur.key) { S.full = false; openGroup("contact:" + cur.key); } },
+      "#": () => groupsInPost(cur),
     }[key];
     if (k) { e.preventDefault(); k(); }
     return;
@@ -1659,6 +1724,7 @@ document.addEventListener("keydown", (e) => {
   else if (key === "Enter" || key === "f") { e.preventDefault(); S.full = true; render(); }
   else if (key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
   else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
+  else if (e.key === "#" && cur) { e.preventDefault(); groupsInPost(cur); }
 });
 
 // ---- events from the server --------------------------------------------
