@@ -137,6 +137,9 @@ function render() {
   root.querySelectorAll("[data-scroll]").forEach(el => {
     scrolls[el.dataset.scroll] = { top: el.scrollTop, bottom: el.scrollHeight - el.scrollTop - el.clientHeight < 40 };
   });
+  // the selected row stays where it was on screen when posts come in above it
+  const row = root.querySelector(".ptable .prow.on");
+  const anchor = row ? { id: row.dataset.id, off: row.offsetTop - row.parentElement.scrollTop } : null;
   root.replaceChildren(view());
   if (S.dialog) document.getElementById("root").append(S.dialog.render());
   root.querySelectorAll("[data-scroll]").forEach(el => {
@@ -144,6 +147,8 @@ function render() {
     if (el.dataset.stick === "bottom" && (!was || was.bottom)) el.scrollTop = el.scrollHeight;
     else if (was) el.scrollTop = was.top;
   });
+  const now = root.querySelector(".ptable .prow.on");
+  if (anchor && now && now.dataset.id === anchor.id) now.parentElement.scrollTop = now.offsetTop - anchor.off;
   // A dialog takes the focus from the page behind it; inside a dialog, keep the field you were in.
   const inDialog = active && active.closest && active.closest(".dialog");
   const again = key && (!S.dialog || inDialog) && root.querySelector(`[data-k="${CSS.escape(key)}"]`);
@@ -355,7 +360,7 @@ async function loadSidebar() {
 }
 
 async function openGroup(gid, rerender = true) {
-  if (S.gid !== gid) { S.post = null; S.full = false; S.mobileReading = false; }
+  if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; }
   S.gid = gid;
   await loadGroup();
   if (rerender) render();
@@ -386,8 +391,13 @@ function markRead(msgs) {
   }, 600);
 }
 
+// Full-screen reading, as the terminal client's reader (F): the post gets the whole window.
+function reading() {
+  return !!(S.full && S.data && S.data.group && S.data.group.view !== "chat" && S.data.messages.length);
+}
+
 function appScreen() {
-  return h("div", { class: "app" },
+  return h("div", { class: "app" + (reading() ? " reading-full" : "") },
     h("div", { class: "body" }, sidebar(), h("main", { class: "main" }, mainArea())),
     statusbar());
 }
@@ -398,7 +408,7 @@ function sidebar() {
     class: `item ${cls}${S.gid === gid ? " on" : ""}`, onclick: () => openGroup(gid),
     "aria-current": S.gid === gid ? "page" : null },
     h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
-  return h("nav", { class: "side", "aria-label": "Groups" },
+  return h("nav", { class: "side", "aria-label": "Groups", "data-scroll": "side" },
     h("div", { class: "brand" }, logo(30), "Unseenet"),
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl K" })),
@@ -496,8 +506,13 @@ function threadsOf(msgs) {
   return out;
 }
 
+// The selected post; if it is (briefly) not in the list, stay where you were
+// instead of jumping to the first unread.
 function currentPost(msgs) {
-  return msgs.find(m => m.id === S.post) || msgs.find(m => !m.read) || msgs[0];
+  const m = msgs.find(m => m.id === S.post);
+  if (m) { S.postAt = msgs.indexOf(m); return m; }
+  if (S.post && S.postAt != null) return msgs[Math.min(S.postAt, msgs.length - 1)];
+  return msgs.find(m => !m.read) || msgs[0];
 }
 
 function threadsView(d) {
@@ -593,6 +608,9 @@ function readerPane(g, m, msgs) {
   const canReply = (g.may_post || g.private_reply) && g.id !== "for-you" && m.readable && m.key;
   const pos = msgs.indexOf(m);
   return h("article", { class: "reader", "aria-label": "Post" },
+    S.full ? h("div", { class: "fullbar" },
+      h("span", { class: "mono", text: g.label }), h("span", { class: "grow" }),
+      h("span", { class: "hint", text: "N next · P previous · Space page, then next unread · R reply · Esc back" })) : null,
     h("div", { class: "scroll", "data-scroll": "post:" + m.id },
       h("h2", { text: m.subject || "(no subject)" }),
       h("div", { class: "post" }, avatar(m),
@@ -613,8 +631,8 @@ function readerPane(g, m, msgs) {
       h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),
       h("button", { class: "btn icon", "aria-label": "Next post", title: "Next (↓)", onclick: () => step(1) }, "↓"),
       h("button", { class: "btn", title: "Space", onclick: nextUnread }, "Next unread", h("kbd", { text: "Space" })),
-      h("button", { class: "btn icon", "aria-label": S.full ? "Back to the list" : "Read full screen",
-        title: S.full ? "Back to the list (Esc)" : "Full screen (Enter)", onclick: () => { S.full = !S.full; render(); } }, S.full ? "▾" : "▴")));
+      h("button", { class: "btn", title: S.full ? "Back to the list (Esc)" : "Read full screen (F or Enter)",
+        onclick: () => { S.full = !S.full; render(); } }, S.full ? "Back" : "Full screen", h("kbd", { text: S.full ? "Esc" : "F" }))));
 }
 
 function step(delta) {
@@ -791,8 +809,12 @@ async function copy(text, done) {
 // ---- dialogs ------------------------------------------------------------
 function closeDialog() { S.dialog = null; render(); }
 
+// A click outside a dialog closes it only when the click also began outside it,
+// so a click that starts on a button, or text you select, never closes it.
+let downOnScrim = false;
 function dialogShell(props, ...kids) {
-  return h("div", { class: "scrim", onclick: (e) => { if (e.target === e.currentTarget) closeDialog(); } },
+  return h("div", { class: "scrim", onmousedown: (e) => { downOnScrim = e.target === e.currentTarget; },
+    onclick: (e) => { if (downOnScrim && e.target === e.currentTarget) closeDialog(); downOnScrim = false; } },
     h("div", { class: "dialog" + (props.wide ? " wide" : ""), role: "dialog", "aria-modal": "true", "aria-label": props.label }, kids));
 }
 
@@ -836,7 +858,7 @@ async function openCompose() {
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
-    send: (subject, text) => { S.post = null; return doPost(g.id, { subject, body: text, signature: false }, { text }); } });
+    send: (subject, text) => doPost(g.id, { subject, body: text, signature: false }, { text }) });
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
@@ -851,14 +873,16 @@ function openBrowse() {
         h("input", { id: "browse", "data-k": "browse", placeholder: "Groups on your nodes …", value: filter,
           oninput: (e) => { filter = e.target.value.toLowerCase(); render(); } }),
         h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-      h("div", { class: "db list" },
+      h("div", { class: "db list", "data-scroll": "browse" },
         err ? h("p", { class: "error", text: err }) : null,
         list === null && !err ? h("p", { class: "muted", style: "padding:12px", text: "Asking your nodes over Tor …" }) : null,
         shown.map(g => h("div", { class: "cmd" },
           h("span", { class: "mono muted", style: "width:28px", text: (g.access || "") + g.icon }),
           h("span", { class: "nm" }, h("span", { class: "mono", text: g.label }), " ", h("small", { text: g.description })),
-          h("button", { class: g.subscribed ? "btn" : "btn primary", onclick: async () => {
-            await api("POST", "/api/subscribe", { id: g.id, on: !g.subscribed });
+          h("button", { class: g.subscribed ? "btn" : "btn primary", "data-k": "sub:" + g.id, onclick: async (e) => {
+            e.stopPropagation();          // Follow and Leave stay in the list, as in the terminal client
+            try { await api("POST", "/api/subscribe", { id: g.id, on: !g.subscribed }); }
+            catch (x) { toast(x.message); return; }
             g.subscribed = !g.subscribed; await loadSidebar(); } }, g.subscribed ? "Leave" : "Follow")))),
       h("div", { class: "df" }, h("span", { text: (list ? list.length : 0) + " groups" }), h("span", { text: "Esc close" })));
   } };
@@ -1017,7 +1041,7 @@ function openPalette() {
             else if (e.key === "Enter") { e.preventDefault(); const c = shown()[sel]; if (c) run(c); }
           } }),
         h("kbd", { text: "Esc" })),
-      h("div", { class: "db list" },
+      h("div", { class: "db list", "data-scroll": "palette" },
         acts.length ? [h("div", { class: "sect", text: "Commands" }), acts.map(row)] : null,
         grps.length ? [h("div", { class: "sect", text: "Your groups" }), grps.map(row)] : null,
         !list.length ? h("p", { class: "muted", style: "padding:12px", text: "Nothing matches." }) : null),
@@ -1039,6 +1063,20 @@ document.addEventListener("keydown", (e) => {
   }
   if (S.dialog || typing(document.activeElement) || ctrl || e.altKey) return;
   const g = S.data && S.data.group;
+  if (reading()) {                     // the terminal client's reader keys
+    const cur = S.data.messages.find(x => x.id === S.post);
+    const sc = document.querySelector(".reader .scroll");
+    const back = () => { S.full = false; render(); };
+    const k = {
+      n: () => step(1), p: () => step(-1), j: () => step(1), ArrowDown: () => step(1), ArrowUp: () => step(-1),
+      q: back, f: back, Enter: back,
+      " ": () => { if (sc && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4) sc.scrollBy({ top: sc.clientHeight * 0.9 }); else nextUnread(); },
+      r: () => { if (cur && (g.may_post || g.private_reply) && g.id !== "for-you") openReply(cur, g); },
+      m: () => { if (cur && !cur.mine && cur.key) { S.full = false; openGroup("contact:" + cur.key); } },
+    }[e.key];
+    if (k) { e.preventDefault(); k(); }
+    return;
+  }
   const keys = {
     n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
   };
@@ -1052,7 +1090,7 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); step(1); }
   else if (e.key === "ArrowUp") { e.preventDefault(); step(-1); }
   else if (e.key === " ") { e.preventDefault(); nextUnread(); }
-  else if (e.key === "Enter") { e.preventDefault(); S.full = !S.full; render(); }
+  else if (e.key === "Enter" || e.key === "f") { e.preventDefault(); S.full = true; render(); }
   else if (e.key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
 });
 
@@ -1089,8 +1127,7 @@ function connectEvents() {
       p.state = e.state; p.error = e.error;
       if (e.state === "reached") {
         delete S.pending[e.job];
-        if (S.gid === p.group && p.body && !p.chat) S.post = e.message_id;
-        if (S.gid === p.group) await loadGroup();
+        if (S.gid === p.group) await loadGroup();   // your own post shows up; the selection stays put
       }
       if (e.state === "failed") toast("Not sent: " + (e.error || "unknown error"));
       render();
