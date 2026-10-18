@@ -73,6 +73,7 @@ const ICON = {
   lock: "M7 11V7a5 5 0 0 1 10 0v4M5 11h14v10H5z",
   back: "M15 18l-6-6 6-6",
   x: "M18 6L6 18M6 6l12 12",
+  people: "M16 20v-2a4 4 0 0 0-8 0v2M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
 };
 
 async function api(method, path, body) {
@@ -414,10 +415,11 @@ function sidebar() {
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl K" })),
     sb ? h("div", { class: "nav" },
       item("for-you", "◄", "For you", sb.for_you ? h("span", { class: "foryou", text: `◄${sb.for_you}` }) : null),
-      sb.inbox.id ? item(sb.inbox.id, "@", "Letters",
+      sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null) : null,
     sb ? h("div", { class: "nav" },
       h("h3", { class: "row-h" }, h("span", { text: "chats" }),
+        h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
         h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
       sb.people.length ? sb.people.map(p => h("button", {
         class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`, onclick: () => openGroup(p.id),
@@ -486,13 +488,13 @@ function mainArea() {
       g.type === "contact" ? [
         h("button", { class: "btn", onclick: () => openAddContact(g.key, g.contact ? g.label.replace(/ √$/, "") : "") }, g.contact ? "Rename" : "Add contact"),
         h("button", { class: "btn", onclick: () => copy(g.key, "Their key is copied.") }, "Copy key"),
-        h("button", { class: "btn primary", title: "A letter with a subject instead of a chat line (N)",
-          onclick: () => openLetter(g.key, g.label.replace(/ √$/, "")) }, "Write a letter", h("kbd", { text: "N" }))] : null,
+        h("button", { class: "btn primary", title: "A post with a subject instead of a chat line (N)",
+          onclick: () => openPost(g.key, g.label.replace(/ √$/, "")) }, "Write a post", h("kbd", { text: "N" }))] : null,
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
-      g.may_post && g.type !== "contact" && (g.kinds || ["letter"]).includes("letter") ?
+      g.may_post && g.type !== "contact" && (g.kinds || ["post"]).includes("post") ?
         h("button", { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
           title: "A post with a subject (UN-RFC 0028)" },
           svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
@@ -631,8 +633,8 @@ function readerPane(g, m, msgs) {
         await openGroup(m.group); S.post = m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
       !m.mine && m.key && !(m.private && m.kind === "chat") ? h("button", { class: "btn", title: "A private chat with them",
         onclick: () => openGroup("contact:" + m.key) }, "Chat") : null,
-      !m.mine && m.key && !g.private_reply ? h("button", { class: "btn", title: "A private letter with a subject",
-        onclick: () => openLetter(m.key, m.who.replace(/ √$/, "")) }, "Write a letter") : null,
+      !m.mine && m.key && !g.private_reply ? h("button", { class: "btn", title: "A private post with a subject",
+        onclick: () => openPost(m.key, m.who.replace(/ √$/, "")) }, "Write a post") : null,
       !m.mine && m.key && !m.contact ? h("button", { class: "btn", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
       h("span", { class: "grow" }),
       h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
@@ -669,7 +671,7 @@ async function signatureText() {
   try { const s = await api("GET", "/api/signature"); return s.preview || ""; } catch (_) { return ""; }
 }
 
-// A post's title in the list; a chat line among posts or letters shows its first line (UN-RFC 0028).
+// A post's title in the list; a chat line among posts shows its first line (UN-RFC 0028).
 function subjectOf(m) {
   if (m.kind === "chat") {
     const first = ((m.text || "").trim().split("\n")[0] || "…");
@@ -748,12 +750,12 @@ function chatView(d) {
     }
     grp.at = d0 || grp.at;
     const quoted = m.references.length && byId[m.references[m.references.length - 1]];
-    const letter = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
-    grp.col.append(h("div", { class: "bubble" + (letter ? " letter" : ""), title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
+    const isPost = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
+    grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : ""), title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
-      letter ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
+      isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
       m.readable ? m.text : h("i", { text: m.error || "Could not be read." }),
-      letter && g.type !== "contact" && g.may_post && (g.kinds || []).includes("letter") ?
+      isPost && g.type !== "contact" && g.may_post && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) }, "Reply with a quote")) : null));
     if (m.mine) grp.lastMine = m;
   }
@@ -866,7 +868,7 @@ function openInfo() {
         h("dt", { text: "Type" }), h("dd", { text: g.type + (g.local ? ", local (one node)" : "") }),
         h("dt", { text: "Shown as" }), h("dd", { text: g.view + (g.owner_view !== g.view ? ` (the owner chose ${g.owner_view})` : "") }),
         h("dt", { text: "Takes" }), h("dd", { text: (g.kinds || []).length === 1 ?
-          (g.kinds[0] === "letter" ? "posts with a subject only (a discussion group)" : "chat lines only (a chat group)") :
+          (g.kinds[0] === "post" ? "posts with a subject only (a discussion group)" : "chat lines only (a chat group)") :
           "posts and chat lines" }),
         h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
         h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
@@ -881,9 +883,9 @@ function openInfo() {
 
 async function openCompose() {
   const g = S.data && S.data.group;
-  if (g && g.type === "contact") { openLetter(g.key, g.label.replace(/ √$/, "")); return; }   // N in a chat: a letter
+  if (g && g.type === "contact") { openPost(g.key, g.label.replace(/ √$/, "")); return; }   // N in a chat: a post
   if (!g || !g.may_post) return;
-  if (g.kinds && !g.kinds.includes("letter")) { toast("A chat group: it takes chat lines only."); return; }
+  if (g.kinds && !g.kinds.includes("post")) { toast("A chat group: it takes chat lines only."); return; }
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
@@ -952,27 +954,74 @@ function openAddContact(key, name) {
     } });
 }
 
-// Write to someone by their key: a letter (a subject, read on its own) or a chat
+// Your contacts, from the sidebar's chats (contacts are always among them).
+function contactList() {
+  return ((S.sidebar && S.sidebar.people) || []).filter(p => p.contact);
+}
+
+// Who "To" means: a key, or a contact by name or the start of one (as the TUI's m).
+function recipient(typed) {
+  const t = (typed || "").trim();
+  if (!t) throw new Error("Who to? A contact's name, or their key.");
+  if (t.startsWith("ed25519:")) return t;
+  const low = t.toLowerCase(), all = contactList();
+  const exact = all.filter(c => c.label.toLowerCase() === low);
+  const found = exact.length ? exact : all.filter(c => c.label.toLowerCase().startsWith(low));
+  if (found.length === 1) return found[0].key;
+  throw new Error(found.length ? "Several contacts start like that: " + found.map(c => c.label).join(", ") :
+    "No contact by that name. Paste their key instead.");
+}
+
+// The address book (C), as the TUI's c: chat, write a post, rename, remove.
+function openContacts() {
+  let removing = null;                         // Remove asks once more, on the button itself
+  S.dialog = { focus: ".dialog .btn.primary", render: () => {
+    const list = contactList();
+    return dialogShell({ label: "Contacts", wide: true },
+      h("div", { class: "dh" }, h("h2", { text: "Contacts" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "db list" },
+        list.length ? list.map(c => h("div", { class: "cmd" },
+          h("span", { class: `av xs c${c.colour}`, "aria-hidden": "true", text: initials(c.label) }),
+          h("span", { class: "nm", text: c.label }),
+          h("button", { class: "btn primary", onclick: () => { closeDialog(); openGroup(c.id); } }, "Chat"),
+          h("button", { class: "btn", onclick: () => { closeDialog(); openPost(c.key, c.label); } }, "Write a post"),
+          h("button", { class: "btn", onclick: () => openAddContact(c.key, c.label) }, "Rename"),
+          h("button", { class: removing === c.key ? "btn danger" : "btn",
+            title: removing === c.key ? "The contact is forgotten; your chat and posts stay" : null,
+            onclick: async () => {
+              if (removing !== c.key) { removing = c.key; render(); return; }
+              removing = null;
+              await api("POST", "/api/contacts", { key: c.key, remove: true });
+              toast(c.label + " is no longer a contact."); await loadSidebar(); } },
+            removing === c.key ? "Really remove?" : "Remove"))) :
+        h("p", { class: "muted", style: "padding:12px", text: "No contacts yet. Open a post and choose Add contact to give its author a name of your own." })),
+      h("div", { class: "df" }, h("span", { text: list.length + " contacts" }), h("span", { text: "Esc close" })));
+  } };
+  render();
+}
+
+// Write to someone by their key: a post (a subject, read on its own) or a chat
 // (a line in a running conversation). UN-RFC 0028; the same choice as in the TUI.
-function openWrite(key = "", kind = "letter") {
-  if (kind === "letter" && key) { openLetter(key); return; }
+function openWrite(key = "", kind = "post") {
+  if (kind === "post" && key) { openPost(key); return; }
   formDialog({ values: { key, body: "", subject: "" },
-    label: kind === "chat" ? "Chat with someone" : "Write a letter",
-    title: kind === "chat" ? "Chat with someone" : "Write a letter",
+    label: kind === "chat" ? "Chat with someone" : "Write a post",
+    title: kind === "chat" ? "Chat with someone" : "Write a post",
     focus: key ? (kind === "chat" ? "#wtext" : "#wsubject") : "#wkey", button: kind === "chat" ? "Send" : "Write …",
-    note: kind === "chat" ? "Sealed to their key: the node cannot read it, nor see who sent it. To write a letter instead: M." :
-      "Next you write the letter in the compose window. To chat instead: Ctrl P, Chat with someone.",
+    note: kind === "chat" ? "Sealed to their key: the node cannot read it, nor see who sent it. To write a post instead: M." :
+      "Next you write the post in the compose window. To chat instead: Ctrl P, Chat with someone.",
     fields: (vals) => [
-      h("label", { for: "wkey", text: "Their key" }),
-      h("input", { id: "wkey", name: "key", class: "in mono", value: vals.key, "data-k": "wkey", placeholder: "ed25519:… - they find it with K", autocomplete: "off" }),
+      h("label", { for: "wkey", text: "To" }),
+      h("input", { id: "wkey", name: "key", class: "in", value: vals.key, "data-k": "wkey", list: "wcontacts",
+        placeholder: "a contact's name, or a key (ed25519:… - they find it with K)", autocomplete: "off" }),
+      h("datalist", { id: "wcontacts" }, contactList().map(c => h("option", { value: c.label }))),
       kind === "chat" ? [
         h("label", { for: "wtext", text: "Message" }),
         h("textarea", { id: "wtext", name: "body", class: "in", "data-k": "wtext", style: "min-height:120px", value: vals.body })] :
       [h("label", { for: "wsubject", text: "Subject" }),
         h("input", { id: "wsubject", name: "subject", class: "in", "data-k": "wsubject", value: vals.subject, autocomplete: "off" })]],
     submit: async (v) => {
-      const k = v.key.trim();
-      if (!k) throw new Error("Their key, please.");
+      const k = recipient(v.key);                 // a contact's name (or its start), or a key
       if (kind === "chat") {
         const body = (v.body || "").trim();
         if (!body) throw new Error("Write a message, please.");
@@ -982,17 +1031,17 @@ function openWrite(key = "", kind = "letter") {
         await doSend("/api/private", gid, { key: k, body, chat: true }, { text: body, chat: true });
       } else {
         closeDialog();
-        openLetter(k, "", (v.subject || "").trim());
+        openPost(k, "", (v.subject || "").trim());
       }
     } });
 }
 
-// The compose window for a letter: subject, text, your signature; sent to their inbox.
-async function openLetter(key, who = "", subject = "", replyTo = null, quote = "") {
+// The compose window for a post: subject, text, your signature; sent to their inbox.
+async function openPost(key, who = "", subject = "", replyTo = null, quote = "") {
   const sig = await signatureText();
   const top = quote;
   const inbox = S.sidebar && S.sidebar.inbox.id;
-  openComposeWindow({ g: null, title: "Letter to " + (who || key.slice(0, 20) + "…"), subject, private: true,
+  openComposeWindow({ g: null, title: "Post to " + (who || key.slice(0, 20) + "…"), subject, private: true,
     body: top + "\n" + (sig ? "-- \n" + sig + "\n" : ""), cursor: top.length,
     send: (subject, text) => doSend("/api/private", inbox,
       { key, subject, body: text, ...(replyTo ? { reply_to: replyTo } : {}) }, { text }) });
@@ -1020,7 +1069,7 @@ function openCreateGroup() {
       h("label", { text: "Takes" }),
       h("div", { class: "choices row" },
         pick("kinds", "both", kinds, "Both", "posts and chat lines"),
-        pick("kinds", "letter", kinds, "≡ Posts only", "a discussion group"),
+        pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
         pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)"),
       h("label", { for: "gtitle", text: "Title" }),
@@ -1062,7 +1111,8 @@ function commands() {
     { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
     { name: "Find groups on your nodes", key: "G", run: openBrowse },
     { name: "Create a group", key: "", run: openCreateGroup },
-    { name: "Write a letter (paste their key)", key: "M", run: () => openWrite("", "letter") },
+    { name: "Write a private post", key: "M", run: () => openWrite("", "post") },
+    { name: "Contacts", key: "C", run: openContacts },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
@@ -1072,7 +1122,7 @@ function commands() {
     { name: theme() === "light" ? "Use the dark theme" : "Use the light theme", key: "", run: () => { theme(theme() === "light" ? "dark" : "light"); render(); } },
     { name: "Show my key", key: "K", run: openKey },
     { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
-    { name: "Letters", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
+    { name: "Private posts", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
     { name: "Chat with someone", key: "", run: () => openWrite("", "chat") },
     { name: "For you: replies and mentions", key: "", run: () => openGroup("for-you") },
   ].filter(c => c.when === undefined || c.when);
@@ -1142,7 +1192,7 @@ document.addEventListener("keydown", (e) => {
     return;
   }
   const keys = {
-    n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
+    n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), c: () => openContacts(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
   };
   if (keys[e.key]) { e.preventDefault(); keys[e.key](); return; }
   if (g && g.view === "chat") {
