@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 
+from unseenet.client.grouptree import group_tree
 from unseenet.client.session import GroupInfo, Message, Session, split_signature
 from unseenet.core import markup
 from unseenet.core.groups import KIND_CHAT, group_refs, short_group_id
@@ -97,7 +98,19 @@ def sidebar(s: Session, inbox_ready: bool) -> dict:
             "markdown": markup.is_markdown(s.text_type()),       # what you write (UN-RFC 0031)
             "notices": s.notice_settings(),                      # mention notices (UN-RFC 0032)
             "inbox": {"id": inbox, "unread": s.unread_private_posts() if inbox else 0},
-            "hierarchies": [{"name": h, "groups": gs} for h, gs in sorted(hierarchies.items())]}
+            "hierarchies": [{"name": h, "groups": gs, "tree": group_tree_dict(h, gs)}
+                            for h, gs in sorted(hierarchies.items())]}
+
+
+def group_tree_dict(top: str, groups: list[dict]) -> dict:
+    """The TUI's group tree (unseenet.client.grouptree) for the browser: under ``alt.*``
+    names without ``alt.``, and a shared part of a name as a folder. Groups are given by
+    ID; the full dicts are in the hierarchy's ``groups``."""
+    def walk(node) -> dict:
+        return {"label": node.label, "path": node.path, "own": node.own_label,
+                "groups": [g["id"] for g in node.items],
+                "children": [walk(c) for c in node.children]}
+    return walk(group_tree(top, [(g["label"].split("@")[0], g) for g in groups]))
 
 
 def threaded(msgs: list[Message]) -> list[tuple[Message, int]]:
