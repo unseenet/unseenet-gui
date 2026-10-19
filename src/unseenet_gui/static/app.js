@@ -363,6 +363,7 @@ async function loadSidebar() {
 async function openGroup(gid, rerender = true) {
   if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; }
   S.gid = gid;
+  revealGroup(gid);
   await loadGroup();
   if (rerender) render();
   const g = S.data && S.data.group;
@@ -417,10 +418,11 @@ function forYouMarks(c) {
 
 function sidebar() {
   const sb = S.sidebar, me = S.state.me || {};
-  const item = (gid, ic, label, extra, cls = "") => h("button", {
+  const item = (gid, ic, label, extra, cls = "", title = null) => h("button", {
     class: `item ${cls}${S.gid === gid ? " on" : ""}`, onclick: () => openGroup(gid),
-    "aria-current": S.gid === gid ? "page" : null },
-    h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
+    "aria-current": S.gid === gid ? "page" : null, title },
+    h("span", { class: "ic", text: ic }),
+    typeof label === "string" ? h("span", { class: "nm", text: label }) : h("span", { class: "nm" }, label), extra);
   return h("nav", { class: "side", "aria-label": "Groups", "data-scroll": "side" },
     h("div", { class: "brand" }, logo(30), "Unseenet"),
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
@@ -447,11 +449,7 @@ function sidebar() {
         h("span", { class: "nm", text: p.label }),
         p.unread ? h("span", { class: "count", text: p.unread }) : null)) :
         h("p", { class: "hint", style: "margin:0 10px", text: "Your chats, one per person. Add people as contacts, or start a chat with +." })) : null,
-    sb ? sb.hierarchies.map(hier => h("div", { class: "nav" },
-      h("h3", { text: hier.name + ".*" }),
-      hier.groups.map(g => item(g.id, (g.access || "") + g.icon, g.label, [
-        forYouMarks(g),
-        g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""))))) :
+    sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
       h("p", { class: "muted", text: "Loading your groups …" }),
     sb && !sb.hierarchies.length ? h("div", { class: "nav" },
       h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
@@ -462,6 +460,83 @@ function sidebar() {
         h("div", { class: "hint" }, h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
           S.state.connected ? "Tor · " + shortNode(S.state.node) : "Not connected")),
       h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
+}
+
+// ---- the group tree (unseenet.client.grouptree, as in the TUI) ------------------------
+// Under alt.* names lose "alt."; a part two groups share is a folder that folds
+// (.history with .egypt and .denmark). Folding is kept per browser; a hierarchy starts
+// open, a folder closed unless the open group is in it.
+const FOLDS_KEY = "unseenet-folds";
+let folds = null;
+function foldState() {
+  if (folds) return folds;
+  try { folds = JSON.parse(localStorage.getItem(FOLDS_KEY) || "{}") || {}; } catch (_) { folds = {}; }
+  return folds;
+}
+function setFold(path, open) {
+  foldState()[path] = open;
+  try { localStorage.setItem(FOLDS_KEY, JSON.stringify(folds)); } catch (_) { /* not kept */ }
+}
+function treeHas(node, gid) {
+  return node.groups.includes(gid) || node.children.some(c => treeHas(c, gid));
+}
+function treeGroups(node) {
+  return node.groups.concat(...node.children.map(treeGroups));
+}
+function isOpen(node, root) {
+  const f = foldState();
+  return node.path in f ? f[node.path] : (root || treeHas(node, S.gid));
+}
+// a group opened from search or a link shows in its folder even if that was folded
+function revealGroup(gid) {
+  for (const hier of (S.sidebar ? S.sidebar.hierarchies : [])) {
+    const walk = node => {
+      if (!treeHas(node, gid)) return;
+      if (node.children.length && foldState()[node.path] === false) setFold(node.path, true);
+      node.children.forEach(walk);
+    };
+    if (hier.tree) walk(hier.tree);
+  }
+}
+
+function dotted(name) {           // ".history.egypt" with a quiet leading dot
+  return name.startsWith(".") ? [h("span", { class: "dot-pre", text: "." }), name.slice(1)] : name;
+}
+
+function hierarchyNav(hier, item) {
+  const byId = Object.fromEntries(hier.groups.map(g => [g.id, g]));
+  const unreadIn = node => treeGroups(node).reduce((n, id) => n + ((byId[id] || {}).unread || 0), 0);
+  const leaf = (id, shown) => {
+    const g = byId[id];
+    if (!g) return null;
+    const at = g.label.indexOf("@");
+    return item(g.id, (g.access || "") + g.icon, dotted(shown + (at >= 0 ? g.label.slice(at) : "")), [
+      forYouMarks(g),
+      g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""), g.label);
+  };
+  const contents = node => [
+    node.groups.map(id => leaf(id, node.own)),                   // alt.history inside .history
+    node.children.map(c => c.children.length ? folder(c) : c.groups.map(id => leaf(id, "." + c.label)))];
+  const folder = node => {
+    const open = isOpen(node, false), unread = unreadIn(node);
+    return h("div", { class: "fold" },
+      h("button", { class: "item group folder" + (unread ? " unread" : ""), "aria-expanded": open ? "true" : "false",
+        title: node.path + ".*", onclick: () => { setFold(node.path, !open); render(); } },
+        h("span", { class: "ic", text: open ? "▾" : "▸" }), h("span", { class: "nm" }, dotted("." + node.label)),
+        !open && unread ? h("span", { class: "count", text: unread }) : null),
+      open ? h("div", { class: "sub" }, contents(node)) : null);
+  };
+  if (!hier.tree) return h("div", { class: "nav" }, h("h3", { text: hier.name + ".*" }),
+    hier.groups.map(g => leaf(g.id, g.label)));
+  const root = hier.tree, open = isOpen(root, true), unread = unreadIn(root);
+  return h("div", { class: "nav" },
+    h("h3", { class: "row-h fold-h" },
+      h("button", { class: "fold-t", "aria-expanded": open ? "true" : "false",
+        title: open ? "Fold " + hier.name + ".*" : "Unfold " + hier.name + ".*",
+        onclick: () => { setFold(root.path, !open); render(); } },
+        h("span", { class: "car", text: open ? "▾" : "▸" }), hier.name + ".*"),
+      !open && unread ? h("span", { class: "count", text: unread }) : null),
+    open ? contents(root) : null);
 }
 
 function shortNode(address) {
