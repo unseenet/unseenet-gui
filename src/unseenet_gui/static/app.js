@@ -1189,7 +1189,9 @@ function openInfo() {
         h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
         h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
         h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id })),
-      g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }), h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
+      g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }),
+        g.rules_markdown ? h("div", { class: "md rules" }, renderTree(g.rules_tree || []))
+          : h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
       g.members && g.members.length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: `Members (${g.members.length})` }),
         g.members.map(m => h("div", { class: "member" }, h("span", { class: `av xs c${m.colour}`, text: initials(m.label) }),
           h("span", { class: "mono", text: m.label }),
@@ -1226,7 +1228,9 @@ function openEditGroup() {
     onclick: () => { if (name === "kinds") kinds = value; else view = value; render(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
-    values: { title: g.title || "", description: g.description || "", rules: g.rules || "" },
+    values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
+      // Markdown if the rules already are, or - for new rules - if you write posts in Markdown
+      markdown: g.rules ? !!g.rules_markdown : !(S.sidebar && S.sidebar.markdown === false) },
     note: "Saved as a new version of the group's manifest, signed with your key and sent to your node. The type, owner and ID cannot change.",
     fields: (vals) => [
       h("label", { for: "etitle", text: "Title" }),
@@ -1241,10 +1245,12 @@ function openEditGroup() {
         pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
         pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
       h("label", { for: "erules", text: "Rules - shown to people before they post" }),
-      h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules })],
+      h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules }),
+      h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
+        " Markdown: # headings, - lists, **strong**, [links](https://…), :tada: (no pictures)")],
     submit: async (v) => {
       await api("POST", `/api/groups/${encodeURIComponent(g.id)}/edit`,
-        { title: v.title.trim(), description: v.description.trim(), rules: v.rules.trim(), view, kinds });
+        { title: v.title.trim(), description: v.description.trim(), rules: v.rules.trim(), markdown: !!v.markdown, view, kinds });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
 }

@@ -67,6 +67,10 @@ def group_summary(s: Session, gid: str) -> dict:
     return {"members": members, "id": gid, "label": label, "hierarchy": label.split("@")[0].split(".")[0],
             "short": short_group_id(gid), "title": data.get("title") or entry.get("title", ""),
             "description": data.get("description", ""), "rules": data.get("rules", ""),
+            # the rules as the TUI shows them: Markdown without images, or plain (UN-RFC 0014 2.1)
+            "rules_markdown": markup.is_markdown(data.get("rules_type")),
+            "rules_tree": (markup.manifest_text(data.get("rules", ""), data.get("rules_type"))
+                           if data.get("rules") else []),
             "owner": entry.get("owner", False), "may_post": s.may_post(gid),
             "unread": s.unread_count(gid), **for_you(s, gid),
             "kinds": list(s.group_kinds(gid)), **roles(s, gid),            # owner and moderator tools

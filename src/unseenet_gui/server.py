@@ -29,6 +29,7 @@ from aiohttp import WSMsgType, web
 from unseenet import __version__ as CORE_VERSION
 from unseenet.client.session import SessionError
 from unseenet.core import about as about_text
+from unseenet.core import markup
 
 from . import system
 from .runtime import NETWORK_ERRORS, Runtime
@@ -337,6 +338,8 @@ async def edit_group(request):
     data = await _body(request)
     allowed = ("title", "description", "rules", "view", "kinds", "low_latency")
     changes = {k: data[k] for k in allowed if k in data}
+    if "markdown" in data and "rules" in changes:     # Markdown or plain rules (UN-RFC 0014 2.1)
+        changes["rules_type"] = markup.text_type_for(bool(data["markdown"]), str(changes["rules"]))
     if "kinds" in changes:              # "both", "post" or "chat", as when creating a group
         changes["kinds"] = {"both": ["chat", "post"], "post": ["post"], "chat": ["chat"]}.get(
             str(changes["kinds"]), ["chat", "post"])

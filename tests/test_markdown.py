@@ -33,3 +33,25 @@ async def test_posts_carry_their_tree(tmp_path, monkeypatch):
     assert serialize.sidebar(s, False)["markdown"] is False
     await s.close()
     server.close()
+
+
+async def test_markdown_rules_reach_the_browser_without_images(tmp_path, monkeypatch):
+    """Group rules in Markdown (UN-RFC 0014 2.1, unseenet #211), as the TUI shows them."""
+    from unseenet.core import markup
+    monkeypatch.setattr(sess, "DEFAULT_POW", 8)
+    node = Node(Store(), NodeConfig(min_pow=8, forward_delay=(0, 0)))
+    server = await node.serve("127.0.0.1", 0)
+    s = Session(Vault.open(tmp_path / "me.vault", "pw", **KDF), status=lambda *_: None)
+    s.new_identity("me", "Me"); s.add_node(f"127.0.0.1:{server.sockets[0].getsockname()[1]}")
+    gid = await s.create_group("dk.regler", "open", min_pow=8)
+    await s.update_group(gid, rules="# Regler\n\n- vær **søde**\n\n![x](blob:" + "a" * 32 + ")",
+                         rules_type=markup.text_type_for(True, "x"))
+    head = serialize.group_summary(s, gid)
+    assert head["rules_markdown"] is True
+    assert [b["t"] for b in head["rules_tree"]] == ["h", "ul", "p"]
+    assert head["rules_tree"][2]["c"] == [{"t": "text", "v": "[image: x]"}]   # no blobs in manifests
+    await s.update_group(gid, rules="*bare tekst*", rules_type=None)
+    head = serialize.group_summary(s, gid)
+    assert head["rules_markdown"] is False and head["rules"] == "*bare tekst*"
+    await s.close()
+    server.close()
