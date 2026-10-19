@@ -38,6 +38,15 @@ async def test_api_with_token(client):
     assert data["unlocked"] is False and data["vault_exists"] is False
 
 
+async def test_about_before_unlocking(client):
+    """The plain-words About comes from the core and can be read before the vault is open."""
+    r = await client.get("/api/about", headers={**host(client), "X-Unseenet-Token": TOKEN})
+    assert r.status == 200
+    data = await r.json()
+    assert data["sections"] and data["status"]["title"] and data["links"]["source"]
+    assert {c["name"] for c in data["comparisons"]["items"]} >= {"Discord", "Matrix", "Nostr"}
+
+
 async def test_other_hosts_are_refused(client):
     """DNS rebinding: a page on evil.example resolving to 127.0.0.1 sends its own Host."""
     r = await client.get("/", headers={"Host": f"evil.example:{client.server.port}"})

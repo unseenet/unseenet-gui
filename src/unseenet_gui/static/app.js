@@ -222,7 +222,8 @@ function unlockScreen() {
       h("div", { text: "Tor starts when the vault is open." }),
       h("div", { class: "muted", text: "Nothing leaves this computer except through Tor. The window loads nothing from the internet." })),
     h("p", { class: "note" }, h("strong", { text: "Pre-alpha. " }),
-      "The code has not had a security review. Do not rely on it to protect anyone yet.")));
+      "The code has not had a security review. Do not rely on it to protect anyone yet. ",
+      h("button", { class: "link", type: "button", onclick: openAbout }, "What is Unseenet?"))));
 }
 
 // ---- the bootable image: network, keyboard, power ------------------------------
@@ -1143,6 +1144,34 @@ function openKey() {
   render();
 }
 
+// What Unseenet is, in plain words. The text is the core's (unseenet.core.about),
+// the same as the TUI's F1, so every client says the same. Works before unlocking too.
+let ABOUT = null;
+async function openAbout() {
+  if (!ABOUT) {
+    try { ABOUT = await api("GET", "/api/about"); }
+    catch (err) { toast("Could not load the about text: " + err.message); return; }
+  }
+  const a = ABOUT;
+  const para = (t) => h("p", { style: "margin:0", text: t });
+  const head = (t) => h("h3", { class: "about-h", text: t });
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "About Unseenet", wide: true },
+    h("div", { class: "dh" }, logo(26), h("h2", { text: "About Unseenet" }),
+      h("span", { class: "muted mono", style: "font-size:12px", text: a.version }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db about" },
+      h("p", { class: "about-tag", text: a.tagline }),
+      a.sections.map(s => [head(s.title), s.paragraphs.map(para)]),
+      head(a.comparisons.title),
+      h("p", { class: "muted", style: "margin:0", text: a.comparisons.intro }),
+      h("dl", { class: "about-cmp" }, a.comparisons.items.map(c => [h("dt", { text: c.name }), h("dd", { text: c.text })])),
+      h("div", { class: "about-status" }, head(a.status.title), a.status.paragraphs.map(para))),
+    h("div", { class: "df btns" },
+      h("button", { class: "btn", onclick: () => openLink(a.links.source) }, "GitHub"),
+      h("button", { class: "btn primary", onclick: () => openLink(a.links.docs) }, "Documentation"))) };
+  render();
+}
+
 function openInfo() {
   const g = S.data && S.data.group;
   if (!g || !g.type) return;
@@ -1760,6 +1789,7 @@ function commands() {
     { name: "Shut down the computer", key: "", when: S.state.bootable, run: () => power("poweroff") },
     { name: theme() === "light" ? "Use the dark theme" : "Use the light theme", key: "", run: () => { theme(theme() === "light" ? "dark" : "light"); render(); } },
     { name: "Show my key", key: "K", run: openKey },
+    { name: "About Unseenet: what it is, why, and how it protects you", key: "F1", run: openAbout },
     { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
     { name: "Private posts", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
     { name: "Chat with someone", key: "", run: () => openWrite("", "chat") },
@@ -1805,6 +1835,7 @@ function openPalette() {
 
 // ---- keys -----------------------------------------------------------------
 document.addEventListener("keydown", (e) => {
+  if (e.key === "F1" && TOKEN && S.state) { e.preventDefault(); if (!S.dialog) openAbout(); return; }   // as the TUI
   if (!S.state || !S.state.unlocked || S.state.setup) return;
   const ctrl = e.ctrlKey || e.metaKey;
   // letters work with Shift or Caps Lock too (the hints show capitals); only D is Shift+D, as in the TUI
