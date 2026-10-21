@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import os
+import sys
 from pathlib import Path
 
 from datetime import timedelta
@@ -146,6 +147,9 @@ class Runtime:
     async def _known_nodes(self) -> None:
         with contextlib.suppress(*NETWORK_ERRORS, ValueError):
             await self.session.refresh_known_nodes()
+        with contextlib.suppress(*NETWORK_ERRORS, ValueError, AttributeError):   # unseenet#264
+            if await self.session.refresh_releases():
+                self.emit("update")
         with contextlib.suppress(*NETWORK_ERRORS, ValueError):
             if await self.session.refresh_naming():
                 self.emit("groups")
@@ -198,7 +202,48 @@ class Runtime:
                          "fp": ident.fingerprint[:4], "label": s.identity_label(ident.key_text, s.display_name())}
             out["node"] = s.node
             out["nodes"] = s.nodes
+        out["update"] = self.update_info()
         return out
+
+    # --- a newer release (unseenet#264) ---
+    _stick: "Path | None | bool" = False             # not looked for yet
+
+    def update_info(self) -> dict | None:
+        """{"version", "channel", "here"} when a signed release is newer than this
+        program; "here": this is a stick or portable folder that can update itself."""
+        s = self.session
+        if s is None or sys.platform == "emscripten" or not hasattr(s, "update_offer"):
+            return None                              # the web client updates by itself
+        offer = s.update_offer()
+        if not offer:
+            return None
+        if self._stick is False:
+            from unseenet.update import find_stick
+            self._stick = find_stick()
+        return {**offer, "here": self._stick is not None}
+
+    async def run_update(self) -> dict:
+        """Run the updater (unseenet.update) for this stick or folder, over its own Tor."""
+        info = self.update_info()
+        if not info or not info["here"]:
+            return {"ok": False, "output": "Nothing to update here."}
+        if self.session is not None:
+            self.session.save()
+        cmd = ([sys.executable, "update"] if getattr(sys, "frozen", False)
+               else [sys.executable, "-m", "unseenet.update"])
+        cmd += ["--media", str(self._stick), "--channel", info["channel"], "--yes"]
+        self.set_status(f"Updating to Unseenet {info['version']} ...")
+        proc = await asyncio.create_subprocess_exec(*cmd, stdout=asyncio.subprocess.PIPE,
+                                                    stderr=asyncio.subprocess.STDOUT)
+        lines: list[str] = []
+        async for raw in proc.stdout:
+            for line in raw.decode("utf-8", "replace").replace("\r", "\n").splitlines():
+                if line.strip():
+                    lines.append(line.strip())
+                    self.emit("update-progress", text=line.strip()[:200])
+        code = await proc.wait()
+        self.set_status("Updated - start Unseenet again" if code == 0 else "The update did not finish")
+        return {"ok": code == 0, "output": "\n".join(lines[-12:])}
 
     def groups(self) -> dict:
         return serialize.sidebar(self.session, self._inbox_ready)

@@ -162,6 +162,7 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
   font-size: 12px; color: var(--muted); }
 .statusbar kbd { background: none; padding: 0; color: var(--paper); font-size: 12px; }
 .statusbar .grow { flex: 1; }
+.statusbar .link.update { color: var(--amber); font-weight: 600; }
 .statusbar .keys { display: flex; gap: 4px 18px; flex-wrap: wrap; }
 .statusbar .st { display: flex; align-items: center; gap: 6px; max-width: 50%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

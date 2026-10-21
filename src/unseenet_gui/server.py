@@ -217,6 +217,11 @@ async def about(request):
     return _json(about_text.as_dict(CORE_VERSION))
 
 
+async def run_update(request):
+    """Update this stick or portable folder to the newest signed release (unseenet#264)."""
+    return _json(await _unlocked(request).run_update())
+
+
 async def known_nodes(request):
     rt = _unlocked(request)
     return _json([{"address": n.address, "name": n.name, "description": n.description,
@@ -507,6 +512,7 @@ def make_app(runtime: Runtime, token: str) -> web.Application:
     r.add_post("/api/unlock", unlock)
     r.add_post("/api/setup", setup)
     r.add_get("/api/known-nodes", known_nodes)
+    r.add_post("/api/update", run_update)
     r.add_get("/api/groups", groups)
     r.add_get("/api/groups/{gid}", messages)
     r.add_post("/api/groups/{gid}/read", read)

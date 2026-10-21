@@ -94,3 +94,21 @@ async def test_owner_tools_need_the_token_and_an_open_vault(client, method, path
     assert r.status == 401
     r = await client.request(method, path, headers={**host(client), "X-Unseenet-Token": TOKEN}, json={})
     assert r.status == 409                                   # the vault is locked
+
+
+def test_update_offer_only_where_it_can_update(tmp_path, monkeypatch):
+    """unseenet#264: a newer signed release is shown; the button only on a stick or folder."""
+    from unseenet import __version__
+    from unseenet.client.session import Session
+    from unseenet.core.vault import Vault
+    import unseenet.update
+    rt = Runtime(tmp_path / "v.vault")
+    rt.session = Session(Vault.open(tmp_path / "v.vault", "pw", ops=1, mem=8192 * 1024),
+                         status=lambda *_: None)
+    assert rt.update_info() is None
+    channel = "dev" if ".dev" in __version__ else "stable"
+    rt.session.data["releases"] = {channel: {"version": "99.0"}}
+    monkeypatch.setattr(unseenet.update, "find_stick", lambda: None)
+    assert rt.update_info() == {"version": "99.0", "channel": channel, "here": False}
+    rt._stick = tmp_path
+    assert rt.update_info()["here"] is True
