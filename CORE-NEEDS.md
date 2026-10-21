@@ -12,6 +12,8 @@ coming Android client the same foundation.
 
 ## 1. A client runtime: startup, refresh and push
 
+**Status:** in the core (`ClientRuntime`, unseenet#276); moving onto it is #30.
+
 **Today:** `UnseenetApp.start()`, `refresh_groups()`, `update_known_nodes()` and
 `watch_loop()` in `client/tui.py`. Copied as `Runtime.start()`, `refresh()`,
 `_known_nodes()` and `_watch()` in `runtime.py`.
@@ -26,6 +28,8 @@ fallback.
 `Session`) that does all of this and reports what happens as events.
 
 ## 2. Typed events instead of one status callback
+
+**Status:** in the core (`Session.on`, `client.events`, unseenet#275); moving onto it is #29.
 
 **Today:** `Session(vault, status=print)` - one string callback.
 
@@ -46,6 +50,8 @@ be emitted from `Session` where it already calls `self.status(...)`.
 
 ## 3. Threads
 
+**Status:** done. The core has it (`Session.threads`, unseenet#273), and this client uses it (#27).
+
 **Today:** `UnseenetApp._threaded()` in the TUI. Copied as
 `serialize.threaded()`.
 
@@ -53,6 +59,8 @@ be emitted from `Session` where it already calls `self.status(...)`.
 and depth, so every client threads posts the same way.
 
 ## 4. The view of a group
+
+**Status:** done. `Session.view_of` / `set_view` (unseenet#273), used here (#27).
 
 **Today:** `UnseenetApp.view_of()`: your own choice (`data["views"]`), else the
 owner's (`manifest["view"]`), else threads. Copied as `serialize.view_of()`.
@@ -62,6 +70,8 @@ Setting it is done by writing `data["views"]` directly.
 
 ## 5. Icons and the group list
 
+**Status:** in the core (`Session.subscribed_groups`, unseenet#274); moving onto it is #28.
+
 **Today:** `group_icons()` and `_groups_from_vault()` in the TUI.
 
 **Proposal:** `Session.subscribed_groups() -> list[GroupInfo]` with type, view,
@@ -70,6 +80,8 @@ characters stay a client decision.
 
 ## 6. A stable dict form for Message and GroupInfo
 
+**Status:** in the core (`to_dict`, unseenet#274); moving onto it is #28.
+
 **Today:** dataclasses with `bytes` and `datetime`. Each client has to decide
 how to turn them into JSON (`serialize.message()`).
 
@@ -77,6 +89,8 @@ how to turn them into JSON (`serialize.message()`).
 versioned shape. This is also what the local API below sends.
 
 ## 7. Chat messages
+
+**Status:** done. `Session.send_chat` (unseenet#273) sends chat lines here (#27); a private chat that answers a given post still uses `send_private`.
 
 **Today:** the TUI's `send_chat()` derives the subject from the first line and
 adds no signature; a post from the compose window gets the signature. Copied
