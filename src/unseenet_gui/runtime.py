@@ -267,7 +267,7 @@ class Runtime:
         wanted = set(ids)
         if gid == s.my_inbox or gid.startswith(serialize.CONTACT):
             pool = s.private_messages()
-        elif gid == "for-you":                       # posts from all your groups
+        elif gid == serialize.FOR_YOU:               # posts from all your groups
             pool = [m for msgs in s.cache.values() for m in msgs.values()]
         else:
             pool = list(s.cache.get(gid, {}).values())
@@ -278,9 +278,7 @@ class Runtime:
         self.emit("groups")
 
     def set_view(self, gid: str, view: str) -> None:
-        views = self.session.data.setdefault("views", {})   # the same place the TUI keeps it
-        views[gid] = view
-        self.session.save()
+        self.session.set_view(serialize.core_id(gid), view)     # the core's, as in the TUI
 
     # --- writing ------------------------------------------------------------
     def post(self, gid: str, subject: str, body: str, references: list[str], chat: bool = False,
@@ -326,7 +324,10 @@ class Runtime:
         # CORE: no progress callback for proof-of-work yet; the client shows "working".
         self.emit("post", job=job, group=gid, state="pow")
         try:
-            msgid = await s.post(gid, subject, body, references=references or None, kind=kind)
+            if kind == KIND_CHAT and not references:      # a chat line, as in the TUI (#27)
+                msgid = await s.send_chat(gid, body)
+            else:
+                msgid = await s.post(gid, subject, body, references=references or None, kind=kind)
         except NETWORK_ERRORS as exc:
             self.emit("post", job=job, group=gid, state="failed", error=str(exc))
             return
@@ -366,8 +367,11 @@ class Runtime:
         s = self.session
         self.emit("post", job=job, group=ui_group, state="pow")
         try:
-            msgid = await s.send_private(inbox, subject, body, owner_key=owner, references=refs or None,
-                                         kind=kind)
+            if kind == KIND_CHAT and not refs and inbox == personal_inbox_id(owner):
+                msgid = await s.send_chat(ui_group, body)    # the core's chat line (#27)
+            else:                       # an answer to a given post or reply inbox: as before
+                msgid = await s.send_private(inbox, subject, body, owner_key=owner,
+                                             references=refs or None, kind=kind)
         except (*NETWORK_ERRORS, ValueError) as exc:
             self.emit("post", job=job, group=ui_group, state="failed", error=str(exc))
             return

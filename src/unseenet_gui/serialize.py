@@ -1,20 +1,25 @@
 """Session objects as plain JSON for the browser.
 
-CORE: ``Message`` and ``GroupInfo`` have no stable dict form yet, and the
-threading and the sidebar layout live in the TUI. These belong in the core
-(0.4.0), so every client shows the same threads and the same groups.
+Threads, views and the order of a group's rows come from the core
+(``Session.threads``, ``Session.view_of``, unseenet #139, #27), so this
+client shows them as the TUI does.
+
+CORE: ``Message`` and ``GroupInfo`` have a stable dict form in the core now
+(``to_dict``); moving onto it is #28.
 """
 
 from __future__ import annotations
 
 import hashlib
 
+from unseenet.client import threads as core_threads
 from unseenet.client.grouptree import group_tree
 from unseenet.client.session import GroupInfo, Message, Session, split_signature
 from unseenet.core import markup
 from unseenet.core.groups import KIND_CHAT, group_refs, short_group_id
 
-CONTACT = "contact:"            # a conversation with one key, shown as a chat (as in the TUI)
+CONTACT = core_threads.CONTACT  # a conversation with one key, shown as a chat (as in the TUI)
+FOR_YOU = "for-you"            # the browser's name for the core's "for-you:" (threads.FOR_YOU)
 ACCESS_ICONS = {"moderated": "√", "channel": "►", "closed": "∩"}
 VIEW_ICONS = {"chat": "»", "data": "¤", "threads": "≡"}
 
@@ -24,14 +29,14 @@ def colour(key_text: str | None) -> int:
     return hashlib.sha256((key_text or "").encode()).digest()[0] % 6
 
 
+def core_id(gid: str) -> str:
+    """The core's ID for a group the browser names (only "For you" differs)."""
+    return core_threads.FOR_YOU if gid == FOR_YOU else gid
+
+
 def view_of(s: Session, gid: str) -> str:
-    """The TUI's view_of: your own choice, else the owner's, else threads."""
-    if gid == s.my_inbox:
-        return "threads"
-    views = s.data.get("views", {})
-    if gid in views:
-        return views[gid]
-    return s.manifest_data(gid).get("view", "threads")
+    """Your own choice, else the owner's, else threads: the core's view_of."""
+    return s.view_of(core_id(gid))
 
 
 def group_kind(s: Session, gid: str) -> dict:
@@ -117,29 +122,6 @@ def group_tree_dict(top: str, groups: list[dict]) -> dict:
     return walk(group_tree(top, [(g["label"].split("@")[0], g) for g in groups]))
 
 
-def threaded(msgs: list[Message]) -> list[tuple[Message, int]]:
-    """The TUI's _threaded: threads newest first, each in the order it came."""
-    pos = {m.message_id: i for i, m in enumerate(msgs)}
-    by_id = {m.message_id: m for m in msgs}
-    threads: dict[str, list[Message]] = {}
-    run = None             # consecutive chat lines stay together, not a thread each (UN-RFC 0028)
-    for m in msgs:
-        root = next((r for r in m.references if r in by_id), None)
-        if root is None and m.kind == KIND_CHAT and not m.private:
-            root = run = run or m.message_id
-        else:
-            run = None
-        root = root or m.message_id
-        threads.setdefault(root, []).append(m)
-    out = []
-    for root, items in sorted(threads.items(),
-                              key=lambda kv: max(pos[x.message_id] for x in kv[1]), reverse=True):
-        for m in sorted(items, key=lambda x: pos[x.message_id]):
-            depth = 0 if m.message_id == root else min(len(m.references), 4)
-            out.append((m, depth))
-    return out
-
-
 def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns: list) -> dict:
     text, sig = split_signature(m.body) if m.readable else ("", None)
     if m.to_key:
@@ -180,7 +162,6 @@ def notice(s: Session, m: Message) -> dict | None:
 
 def group_view(s: Session, gid: str) -> dict:
     if gid == s.my_inbox:
-        msgs = s.visible(s.private_posts())        # posts, and chats with non-contacts (UN-RFC 0028)
         head = {"id": gid, "label": "Private posts", "hierarchy": "", "title":
                 "Only you can read these. Nodes see sealed envelopes.", "view": "threads",
                 "type": "inbox", "access": "@", "icon": "≡", "encrypted": True, "fast": False,
@@ -188,31 +169,28 @@ def group_view(s: Session, gid: str) -> dict:
                 "rules": "", "description": "", "members": [], "private_reply": True}
     elif gid.startswith(CONTACT):
         key = gid[len(CONTACT):]
-        msgs = s.visible(s.conversation(key, KIND_CHAT))     # the chat; posts are in Private posts
         head = {"id": gid, "label": s.identity_label(key, seen_name(s, key)), "hierarchy": "", "key": key,
                 "title": "Private conversation. Only the two of you can read it.",
                 "view": "chat", "type": "contact", "access": "@", "icon": "»", "encrypted": True,
                 "fast": False, "may_post": True, "owner": False, "unread": s.unread_from(key, KIND_CHAT),
                 "for_you": 0, "rules": "", "description": "", "members": [],
                 "contact": bool(s.contact_name(key)), "colour": colour(key)}
-    elif gid == "for-you":
-        msgs = list(reversed(s.for_you(unread_only=False)[:200]))
+    elif gid == FOR_YOU:
         head = {"id": gid, "label": "For you", "hierarchy": "", "title":
                 "Replies to your posts and posts that name you, from all your groups",
                 "view": "threads", "type": None, "access": "", "icon": "◄", "encrypted": False,
                 "fast": False, "may_post": False, "owner": False, "unread": 0, "for_you": 0,
                 "rules": "", "description": "", "members": []}
     else:
-        msgs = s.visible(sorted(s.cache.get(gid, {}).values(), key=lambda m: m.number))
         head = group_summary(s, gid)
     my_keys = {s.identity(n).key_text for n in s.data["identities"]}
     mine, patterns = s.my_message_ids(), s._mention_patterns()
-    if head["view"] == "chat":
-        rows = [(m, 0) for m in msgs]
-    elif gid == "for-you":
-        rows = [(m, 0) for m in reversed(msgs)]
+    if head["view"] == "chat" and not gid.startswith(CONTACT):
+        # a group read as a chat: every line in the order it came, not threaded
+        rows = [(m, 0) for m in s.visible(sorted(s.cache.get(gid, {}).values(),
+                                                  key=lambda m: m.number))]
     else:
-        rows = threaded(msgs)
+        rows = s.threads(core_id(gid))     # the same rows as in every client (#139)
     return {"group": head,
             "messages": [{**message(s, m, my_keys, mine, patterns), "depth": d} for m, d in rows]}
 
