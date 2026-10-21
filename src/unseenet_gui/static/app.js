@@ -33,6 +33,8 @@ const S = {
   state: null, sidebar: null, gid: null, data: null, thread: null, replyTo: null,
   pending: {}, drafts: {}, dialog: null, status: "", error: "", busy: false,
   knownNodes: null, setupNode: null, ws: null, mobileReading: false,
+  pane: "groups",          // on a phone: one pane at a time - "groups", or the group
+  moreTools: false,        // on a phone: the post's less used tools shown
 };
 
 // ---- helpers ------------------------------------------------------------
@@ -361,14 +363,19 @@ async function loadSidebar() {
   render();
 }
 
+const PHONE = window.matchMedia("(max-width: 760px)");     // the same width as app.css
+PHONE.addEventListener?.("change", () => render());
+
 async function openGroup(gid, rerender = true) {
-  if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; }
+  if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; S.moreTools = false; }
+  if (rerender) S.pane = "group";      // the first group opened by itself leaves a phone on the list
   S.gid = gid;
   revealGroup(gid);
   await loadGroup();
   if (rerender) render();
   const g = S.data && S.data.group;
-  if (g && g.view === "chat") setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
+  // a phone would pop up its keyboard over the chat: there you tap the input yourself
+  if (g && g.view === "chat" && !PHONE.matches) setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
 }
 
 async function loadGroup() {
@@ -400,7 +407,8 @@ function reading() {
 }
 
 function appScreen() {
-  return h("div", { class: "app" + (reading() ? " reading-full" : "") },
+  const pane = S.gid && S.pane !== "groups" ? "group" : "groups";   // phones show one (app.css)
+  return h("div", { class: "app pane-" + pane + (reading() ? " reading-full" : "") },
     h("div", { class: "body" }, sidebar(), h("main", { class: "main" }, mainArea())),
     statusbar());
 }
@@ -575,7 +583,8 @@ function mainArea() {
   ];
   const canSwitch = g.type && g.type !== "inbox" && g.type !== "contact";
   const head = h("header", { class: "ghead" },
-    S.mobileReading ? h("button", { class: "btn icon back", "aria-label": "Back to threads", onclick: () => { S.mobileReading = false; render(); } }, svg(ICON.back)) : null,
+    S.mobileReading ? h("button", { class: "btn icon back", "aria-label": "Back to threads", onclick: () => { S.mobileReading = false; render(); } }, svg(ICON.back)) :
+      h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
     h("div", { class: "t" },
       h("div", { class: "row" }, h("h1", { text: g.label }), chips),
       g.title ? h("p", { text: g.title }) : null),
@@ -589,6 +598,7 @@ function mainArea() {
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
+      h("button", { class: "btn icon pal-btn", "aria-label": "More: all commands", onclick: () => openPalette() }, "⋯"),
       g.may_post && g.type !== "contact" && (g.kinds || ["post"]).includes("post") ?
         h("button", { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
           title: "A post with a subject (UN-RFC 0028)" },
@@ -884,6 +894,9 @@ function readerPane(g, m, msgs) {
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === "for-you" ? h("button", { class: "btn", onclick: async () => {
         await openGroup(m.group); S.post = m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
+      h("button", { class: "btn icon more-btn", "aria-label": "More", "aria-expanded": S.moreTools ? "true" : "false",
+        onclick: () => { S.moreTools = !S.moreTools; render(); } }, "⋯"),
+      h("span", { class: "sec-tools" + (S.moreTools ? " open" : "") },
       !m.mine && m.key && !(m.private && m.kind === "chat") ? h("button", { class: "btn", title: "A private chat with them",
         onclick: () => openGroup("contact:" + m.key) }, "Chat") : null,
       !m.mine && m.key && !g.private_reply ? h("button", { class: "btn", title: "A private post with a subject",
@@ -894,13 +907,13 @@ function readerPane(g, m, msgs) {
       !m.mine && !m.private && g.id !== "for-you" ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
-      !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null,
+      !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null),
       h("span", { class: "grow" }),
       h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
       h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),
       h("button", { class: "btn icon", "aria-label": "Next post", title: "Next (↓)", onclick: () => step(1) }, "↓"),
       h("button", { class: "btn", title: "Space", onclick: nextUnread }, "Next unread", h("kbd", { text: "Space" })),
-      h("button", { class: "btn", title: S.full ? "Back to the list (Esc)" : "Read full screen (F or Enter)",
+      h("button", { class: "btn full-btn", title: S.full ? "Back to the list (Esc)" : "Read full screen (F or Enter)",
         onclick: () => { S.full = !S.full; render(); } }, S.full ? "Back" : "Full screen", h("kbd", { text: S.full ? "Esc" : "F" }))));
 }
 
@@ -987,7 +1000,9 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
   };
   S.dialog = { focus: "#body", render: () => dialogShell({ label: title, wide: true },
-    h("div", { class: "dh" }, h("h2", { text: title }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "dh" }, h("h2", { text: title }),
+      h("button", { class: "btn primary dh-send", onclick: go }, priv ? "Send" : "Post"),   // phones: above the keyboard
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject }),
@@ -1829,12 +1844,13 @@ function openPalette() {
             else if (e.key === "ArrowUp") { e.preventDefault(); sel--; render(); }
             else if (e.key === "Enter") { e.preventDefault(); const c = shown()[sel]; if (c) run(c); }
           } }),
-        h("kbd", { text: "Esc" })),
+        h("kbd", { text: "Esc" }),
+        h("button", { class: "btn icon pal-close", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),   // phones: no Esc key
       h("div", { class: "db list", "data-scroll": "palette" },
         acts.length ? [h("div", { class: "sect", text: "Commands" }), acts.map(row)] : null,
         grps.length ? [h("div", { class: "sect", text: "Your groups" }), grps.map(row)] : null,
         !list.length ? h("p", { class: "muted", style: "padding:12px", text: "Nothing matches." }) : null),
-      h("div", { class: "df" }, h("span", { text: "↑↓ move" }), h("span", { text: "Enter run" }), h("span", { text: "Esc close" })));
+      h("div", { class: "df keys-only" }, h("span", { text: "↑↓ move" }), h("span", { text: "Enter run" }), h("span", { text: "Esc close" })));
   } };
   render();
 }

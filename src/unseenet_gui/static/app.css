@@ -447,3 +447,88 @@ blockquote.quote-block.md { margin: 8px 0; padding: 2px 0 2px 12px; border-left:
 .mdlink .addr { font-family: var(--mono); font-size: 0.85em; color: var(--muted); text-decoration: none; }
 .mdimg { font-style: italic; color: var(--muted); }
 .emoji { font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }
+
+/* ---- phones: one pane at a time (unseenet-gui #22) ----------------------------------
+   Groups → posts → the post, each full screen, back arrows at the top; only what you
+   need now, the rest behind ⋯; writing full screen with Post/Send at the top, so the
+   on-screen keyboard never hides it. Same width as PHONE in app.js.
+
+   Rules for every view, also the ones to come (feeds, pages, ...):
+   - it fills the group pane (.content); a second column becomes its own pane with a
+     back arrow, never a squeezed column;
+   - one primary action stays visible (New post, Reply, Send); others go behind ⋯
+     (the palette, or a .sec-tools group that ⋯ opens);
+   - an input that people type in sits at the bottom of the screen (chat) or its send
+     button sits at the top (a full-screen dialog), so the keyboard never hides it;
+   - no hover-only controls, no keyboard hints; targets at least 44 px. */
+.ghead .back-groups, .dh-send, .more-btn, .pal-btn, .pal-close { display: none; }
+.sec-tools { display: contents; }
+@media (max-width: 760px) {
+  .app { height: 100dvh; }
+  .body { flex-direction: column; }
+  .side { flex: 1 1 auto; max-height: none; width: 100%; border: none; }
+  .me { display: flex; }
+  .app.pane-group .side { display: none; }
+  .app.pane-groups .main { display: none; }
+
+  /* touch: no keyboard hints, bigger targets */
+  kbd { display: none !important; }
+  .item { min-height: 44px; }
+  .btn { min-height: 40px; }
+  .search { min-height: 44px; }
+
+  /* the group's header: one line of title, the actions that matter */
+  .ghead { padding: 8px 12px; gap: 6px 8px; flex-wrap: nowrap; }
+  .ghead .back-groups { display: inline-flex; flex: none; }
+  .ghead .t { flex: 1 1 auto; min-width: 0; }
+  .ghead .row { flex-wrap: nowrap; }
+  .ghead h1 { font-size: 17px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ghead .chip { display: none; }
+  .ghead p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+  .ghead .actions { flex: none; display: flex; gap: 6px; }
+  .ghead .actions .btn { padding: 0 10px; }
+  .ghead .actions .btn:not(.primary):not(.icon) { display: none; }   /* Show as chat etc.: behind ⋯ */
+  .ghead .actions .pal-btn { display: inline-flex; }
+  .ghead .actions .btn.icon[aria-label="About this group"] { display: none; }   /* behind ⋯ too */
+  .ghead .actions .btn.primary svg { margin: 0; }
+
+  /* the list of posts: two lines each, subject first */
+  .ptable { flex: 1 1 auto; border-bottom: none; }
+  .prow.head { display: none; }
+  .prow { grid-template-columns: 12px minmax(0, 1fr) auto; grid-template-areas: "flag sj date" ". from from";
+    gap: 2px 8px; min-height: 56px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+  .prow .flag { grid-area: flag; }
+  .prow .sj { grid-area: sj; font-size: 15px; }
+  .prow .from { display: block; grid-area: from; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow .date { grid-area: date; font-size: 12px; color: var(--muted); }
+
+  /* reading a post: the text, and Reply / ↑ ↓ / Next unread / ⋯ at the bottom */
+  .scroll { padding: 16px 14px; }
+  .reader h2 { font-size: 19px; }
+  .reader .pbody { margin-left: 0; font-size: 15px; }
+  .pbar { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); gap: 6px; }
+  .pbar .hint, .pbar .full-btn { display: none; }
+  .more-btn { display: inline-flex; }
+  .sec-tools { display: none; }
+  .sec-tools.open { display: flex; flex-wrap: wrap; gap: 6px; order: 10; width: 100%; }
+
+  /* chat */
+  .chatbar { padding: 8px 10px calc(8px + env(safe-area-inset-bottom)); }
+  .chatbar > .hint { display: none; }
+  .chatbar input { font-size: 16px; }      /* 16px: iOS does not zoom into the field */
+
+  /* dialogs, and writing: the whole screen */
+  .scrim { padding: 0; align-items: stretch; }
+  .dialog, .dialog.wide { max-width: none; max-height: none; height: 100dvh; border-radius: 0; border: none; }
+  .dialog .dh { position: sticky; top: 0; z-index: 1; background: var(--ink); }
+  .dialog .db { flex: 1 1 auto; min-height: 0; }
+  .dialog .df { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+  .dialog .in, .dialog textarea.in { font-size: 16px; }
+  .dh-send, .pal-close { display: inline-flex; }
+  .dialog .df.keys-only { display: none; }
+  .compose-body, .dialog textarea.in { min-height: 0; flex: 1 1 auto; height: 40dvh; }
+
+  /* the status bar: one quiet line */
+  .statusbar { padding: 4px 12px; font-size: 12px; }
+  .statusbar .st { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
