@@ -11,7 +11,9 @@ DEV=dev
 if [ "$1" = "clean" ]; then rm -rf "$DEV"; echo "removed $DEV"; exit 0; fi
 mkdir -p "$DEV"
 export UNSEENET_INSECURE_FAST_KDF=1 UNSEENET_NODE_PASSPHRASE=dev
-[ -f "$DEV/node.toml" ] || echo "min_pow = 8" > "$DEV/node.toml"
+# no key ripening on the playground (UN-RFC 0025): new keys would work minutes each first
+# (in [node]: settings outside it are not read, so min_pow used to stay at 18)
+[ -f "$DEV/node.toml" ] || printf '[node]\nmin_pow = 8\nmin_ripe = "-"\n' > "$DEV/node.toml"
 
 unseenet-node --data "$DEV/node-data" --config "$DEV/node.toml" --no-tor --listen 127.0.0.1:1119 \
   > "$DEV/node.log" 2>&1 &

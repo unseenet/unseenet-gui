@@ -1066,6 +1066,21 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
 function pendingState(p) {
   if (p.state === "failed") return h("span", { class: "state bad", text: "Not sent: " + (p.error || "") });
   if (p.state === "sent") return h("span", { class: "state" }, svg(ICON.check, 14, 2.5), "sent");
+  // a brand-new key ripens first, once (UN-RFC 0025): sequential, so t/next_at is exact
+  if (typeof p.fraction !== "number" && S.ripening && S.ripening.level === null && S.ripening.next_at) {
+    const pct = Math.min(99, Math.round(100 * S.ripening.t / S.ripening.next_at));
+    return h("span", { class: "sending", title: "A new key works a few minutes, once, before it can post. " +
+                       "That is what keeps throwaway keys from spamming." },
+      `Your new key is getting ready · ${pct}%`,
+      h("span", { class: "bar determinate" }, h("span", { style: `width:${pct}%` })));
+  }
+  // postage progress from the core (#29): the chance it is done by now, never 100% early
+  if (typeof p.fraction === "number") {
+    const pct = Math.round(p.fraction * 100);
+    return h("span", { class: "sending", title: "Postage (proof-of-work) for this message" },
+      `Sending · postage ${pct}%`,
+      h("span", { class: "bar determinate" }, h("span", { style: `width:${pct}%` })));
+  }
   return h("span", { class: "sending" }, "Sending · proof-of-work", h("span", { class: "bar" }, h("span", {})));
 }
 
@@ -1978,6 +1993,25 @@ function connectEvents() {
     } else if (e.type === "group" && (e.id === S.gid || S.gid === "for-you" ||
                (S.gid && S.gid.startsWith("contact:") && S.sidebar && e.id === S.sidebar.inbox.id))) {
       await loadGroup(); render();
+    } else if (e.type === "pow") {
+      const p = S.pending[e.job];
+      if (!p) return;
+      const before = Math.round((p.fraction || 0) * 100);
+      p.fraction = e.fraction;
+      if (Math.round(e.fraction * 100) !== before) render();    // at most a hundred redraws
+    } else if (e.type === "node") {
+      S.nodes = S.nodes || {};
+      S.nodes[e.address] = { up: e.up, error: e.error };
+    } else if (e.type === "tor") {
+      S.tor = { progress: e.progress, summary: e.summary };
+      if (e.progress < 100 && !S.dialog) {
+        S.state.status = `Tor: ${e.progress}% ${e.summary || ""}`.trim();
+        const st = document.querySelector(".statusbar");
+        if (st) st.replaceWith(statusbar());
+      }
+    } else if (e.type === "ripening") {
+      S.ripening = { level: e.level, next_at: e.next_at, t: e.t };
+      if (Object.keys(S.pending).length) render();             // a waiting message shows it
     } else if (e.type === "post") {
       const p = S.pending[e.job];
       if (!p) return;

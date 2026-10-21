@@ -18,6 +18,7 @@ from pathlib import Path
 from datetime import timedelta
 
 from unseenet import names as nm
+from unseenet.client import events as ev
 from unseenet.client import naming
 from unseenet.client.session import MAX_MENTION_NOTICES, Message, Session, SessionError
 from unseenet.core import crypto
@@ -45,10 +46,31 @@ class Runtime:
         self._watching: set[str] = set()
         self._inbox_ready = False
         self._jobs = 0
+        self._sending: str | None = None              # the job whose postage is computed now
 
     # --- events -----------------------------------------------------------
-    # CORE: Session only has one ``status`` callback. Clients need typed events
-    # (new post, post state, node down, proof-of-work progress).
+    # The core's typed events (Session.on, unseenet.client.events, #29) are passed
+    # to the page in this client's event names, next to its own ("post" job states).
+    def _on_core_event(self, e) -> None:
+        if isinstance(e, ev.GroupUpdated):
+            self.emit("group", id=e.group_id)
+            if e.new:
+                self.emit("groups")                    # counts in the sidebar
+        elif isinstance(e, (ev.GroupsChanged, ev.Ripening)):
+            if isinstance(e, ev.Ripening):
+                self.emit("ripening", level=e.level, next_at=e.next_at, t=e.t)
+            self.emit("groups")
+        elif isinstance(e, ev.PowProgress):
+            # postage for the job being sent: one at a time per client
+            if self._sending is not None:
+                self.emit("pow", job=self._sending, fraction=round(e.fraction, 3), done=e.done)
+        elif isinstance(e, ev.NodeState):
+            self.emit("node", address=e.address, up=e.up, error=e.error)
+        elif isinstance(e, ev.TorState):
+            self.emit("tor", progress=e.progress, summary=e.summary)
+        # Status comes through the status callback; the runtime's own events
+        # (InboxReady, Refreshed, ReleaseOffer) are for #30.
+
     def listen(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=200)
         self._listeners.add(q)
@@ -86,6 +108,7 @@ class Runtime:
             self.set_status("Locked")
             raise SessionError(str(exc) or "wrong passphrase") from exc
         self.session = Session(vault, status=self.set_status)
+        self.session.on(self._on_core_event)           # typed events (#29)
         if self.needs_setup():
             self.set_status("Choose a name and a node")
             return
@@ -321,8 +344,8 @@ class Runtime:
     async def _post(self, job: str, gid: str, subject: str, body: str, references: list[str],
                     kind: str = KIND_POST, notify: list[str] | None = None) -> None:
         s = self.session
-        # CORE: no progress callback for proof-of-work yet; the client shows "working".
         self.emit("post", job=job, group=gid, state="pow")
+        self._sending = job                            # PowProgress events are this job's
         try:
             if kind == KIND_CHAT and not references:      # a chat line, as in the TUI (#27)
                 msgid = await s.send_chat(gid, body)
@@ -331,6 +354,8 @@ class Runtime:
         except NETWORK_ERRORS as exc:
             self.emit("post", job=job, group=gid, state="failed", error=str(exc))
             return
+        finally:
+            self._sending = None
         self.emit("post", job=job, group=gid, state="sent", message_id=msgid)
         if notify:          # for a post sent to the moderators, the core waits for approval
             self.spawn(s.send_mention_notices(gid, msgid, subject, kind, notify))
@@ -366,6 +391,7 @@ class Runtime:
     async def _private(self, job, ui_group, inbox, owner, subject, body, refs, kind) -> None:
         s = self.session
         self.emit("post", job=job, group=ui_group, state="pow")
+        self._sending = job
         try:
             if kind == KIND_CHAT and not refs and inbox == personal_inbox_id(owner):
                 msgid = await s.send_chat(ui_group, body)    # the core's chat line (#27)
@@ -375,6 +401,8 @@ class Runtime:
         except (*NETWORK_ERRORS, ValueError) as exc:
             self.emit("post", job=job, group=ui_group, state="failed", error=str(exc))
             return
+        finally:
+            self._sending = None
         self.emit("post", job=job, group=ui_group, state="sent", message_id=msgid)
         self.emit("group", id=ui_group)
         self.emit("group", id=s.my_inbox)
