@@ -12,7 +12,7 @@ coming Android client the same foundation.
 
 ## 1. A client runtime: startup, refresh and push
 
-**Status:** in the core (`ClientRuntime`, unseenet#276); moving onto it is #30.
+**Status:** done. `ClientRuntime` (unseenet#276) runs startup, refresh, push, maintenance and ripening here (#30); its `Refreshed`, `InboxReady` and `ReleaseOffer` events drive the status bar and the update notice.
 
 **Today:** `UnseenetApp.start()`, `refresh_groups()`, `update_known_nodes()` and
 `watch_loop()` in `client/tui.py`. Copied as `Runtime.start()`, `refresh()`,

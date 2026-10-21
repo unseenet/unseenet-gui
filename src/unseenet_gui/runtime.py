@@ -1,10 +1,9 @@
 """The client runtime: one unlocked Session and what keeps it up to date.
 
-Most of this mirrors the TUI's startup and refresh flow (``client/tui.py``:
-``start``, ``refresh_groups``, ``watch_loop``). It is copied here because it
-is not in the core yet. Every block marked ``CORE:`` is a candidate for
-unseenet 0.4.0, so that all clients share one implementation - see
-CORE-NEEDS.md.
+Startup, refresh, push, background maintenance and key ripening are the
+core's ``ClientRuntime`` (unseenet #139, #30), in the same order as in the
+TUI. This module adds what is this client's: the page's events and the
+jobs that send posts.
 """
 
 from __future__ import annotations
@@ -19,6 +18,7 @@ from datetime import timedelta
 
 from unseenet import names as nm
 from unseenet.client import events as ev
+from unseenet.client.runtime import ClientRuntime
 from unseenet.client import naming
 from unseenet.client.session import MAX_MENTION_NOTICES, Message, Session, SessionError
 from unseenet.core import crypto
@@ -43,10 +43,10 @@ class Runtime:
         self.connected = False
         self._listeners: set[asyncio.Queue] = set()
         self._tasks: set[asyncio.Task] = set()
-        self._watching: set[str] = set()
         self._inbox_ready = False
         self._jobs = 0
         self._sending: str | None = None              # the job whose postage is computed now
+        self.core: ClientRuntime | None = None        # startup, refresh, push (#30)
 
     # --- events -----------------------------------------------------------
     # The core's typed events (Session.on, unseenet.client.events, #29) are passed
@@ -68,8 +68,19 @@ class Runtime:
             self.emit("node", address=e.address, up=e.up, error=e.error)
         elif isinstance(e, ev.TorState):
             self.emit("tor", progress=e.progress, summary=e.summary)
-        # Status comes through the status callback; the runtime's own events
-        # (InboxReady, Refreshed, ReleaseOffer) are for #30.
+        elif isinstance(e, ev.InboxReady):
+            self._inbox_ready = True
+            self.emit("groups")
+        elif isinstance(e, ev.Refreshed):
+            self.connected = e.error is None
+            if e.error:
+                self.set_status(f"Offline ({e.error}) - showing saved posts")
+            elif self.session is not None:
+                self.set_status(f"Connected to {self.session.node}")
+            self.emit("groups")
+        elif isinstance(e, ev.ReleaseOffer):              # unseenet#264
+            self.emit("update")
+        # Status itself comes through the status callback.
 
     def listen(self) -> asyncio.Queue:
         q: asyncio.Queue = asyncio.Queue(maxsize=200)
@@ -128,79 +139,19 @@ class Runtime:
         self.spawn(self.start())
 
     # --- startup and refresh ---------------------------------------------
-    # CORE: this is the TUI's start() + refresh_groups(), step for step.
     async def start(self) -> None:
-        s = self.session
-        s.subscribe_starter_groups()
-        loaded = s.load_offline()
+        """The core's ClientRuntime does it all, in the TUI's order: starter groups,
+        the offline cache, the inbox once, push per node, the node list, releases,
+        names and renewals, every group each minute, and ripening the key on."""
+        self.core = ClientRuntime(self.session, refresh_seconds=REFRESH_SECONDS)
+        loaded = await self.core.start()
         self.set_status(f"{loaded} saved posts available offline - connecting ...")
         self.emit("groups")
-        await self.refresh()
-        self.spawn(self._known_nodes())
-        self.spawn(self._refresh_loop())
-
-    async def _refresh_loop(self) -> None:
-        while self.session is not None:
-            await asyncio.sleep(REFRESH_SECONDS)
-            await self.refresh()
 
     async def refresh(self) -> None:
-        s = self.session
-        try:
-            await s.list_groups()
-        except NETWORK_ERRORS as exc:
-            self.connected = False
-            self.set_status(f"Offline ({exc}) - showing saved posts")
-            self.emit("groups")
-            return
-        self.connected = True
-        if not self._inbox_ready:
-            try:
-                await s.ensure_inbox()
-                self._inbox_ready = True
-                self._start_watches()
-            except NETWORK_ERRORS as exc:
-                self.set_status(f"Could not set up your inbox: {exc}")
-        for gid in list(s.data["subscribed"]) + ([s.my_inbox] if self._inbox_ready else []):
-            try:
-                await s.fetch_group(gid)
-            except NETWORK_ERRORS:
-                pass
-            self.emit("group", id=gid)
-        self.set_status(f"Connected to {s.node}")
-        self.emit("groups")
-
-    async def _known_nodes(self) -> None:
-        with contextlib.suppress(*NETWORK_ERRORS, ValueError):
-            await self.session.refresh_known_nodes()
-        with contextlib.suppress(*NETWORK_ERRORS, ValueError, AttributeError):   # unseenet#264
-            if await self.session.refresh_releases():
-                self.emit("update")
-        with contextlib.suppress(*NETWORK_ERRORS, ValueError):
-            if await self.session.refresh_naming():
-                self.emit("groups")
-
-    # CORE: the TUI's watch_loop (push, UN-RFC 0008 section 2).
-    def _start_watches(self) -> None:
-        for address in self.session.nodes:
-            if address not in self._watching:
-                self._watching.add(address)
-                self.spawn(self._watch(address))
-
-    async def _watch(self, node: str) -> None:
-        s = self.session
-
-        async def on_new(gid: str, message_id: str) -> None:
-            if s.node_for(gid) == node and (gid in s.data["subscribed"] or gid == s.my_inbox):
-                self.spawn(self._fetch(gid))
-
-        while s is self.session and node in s.nodes:
-            try:
-                if await s.watch(on_new, node=node) is False:
-                    return
-            except NETWORK_ERRORS:
-                pass
-            await asyncio.sleep(15)
+        """Fetch every group now (after Wi-Fi came back, or when the page asks)."""
+        if self.core is not None:
+            await self.core.refresh()
 
     async def _fetch(self, gid: str) -> None:
         with contextlib.suppress(*NETWORK_ERRORS):
@@ -209,6 +160,9 @@ class Runtime:
         self.emit("groups")
 
     async def close(self) -> None:
+        if self.core is not None:
+            await self.core.stop()                       # push, refresh, a ripening segment
+            self.core = None
         for task in list(self._tasks):
             task.cancel()
         if self.session is not None:
