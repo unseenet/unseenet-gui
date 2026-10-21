@@ -220,7 +220,11 @@ function unlockScreen() {
         S.busy ? "Unlocking …" : isNew ? "Create vault" : "Unlock")),
     isNew ? h("p", { class: "hint", text: "Your keys, groups and saved posts are kept in this one file, " +
       "encrypted with the passphrase. Lose both, and they are gone - nobody can reset it." }) : null,
-    h("div", { class: "statuscard" },
+    S.state.web ? h("div", { class: "statuscard" },
+      h("div", { text: "Your keys stay in this browser: it signs, encrypts and checks signatures here." }),
+      h("div", { class: "muted", text: "A web entrance carries the connection to a node over Tor. The entrance sees your IP address " +
+        "(unless this is Tor Browser); the nodes do not. The vault is only kept here if you choose so in the bar at the top." }))
+    : h("div", { class: "statuscard" },
       h("div", { text: "Tor starts when the vault is open." }),
       h("div", { class: "muted", text: "Nothing leaves this computer except through Tor. The window loads nothing from the internet." })),
     h("p", { class: "note" }, h("strong", { text: "Pre-alpha. " }),
@@ -500,7 +504,7 @@ function sidebar() {
       h("span", { class: "av s c4", "aria-hidden": "true", text: initials(me.display) }),
       h("div", { class: "who" }, h("div", { text: me.label || me.display || "" }),
         h("div", { class: "hint" }, h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
-          S.state.connected ? "Tor · " + shortNode(S.state.node) : "Not connected")),
+          S.state.connected ? (S.state.web ? "Entrance and Tor · " : "Tor · ") + shortNode(S.state.node) : "Not connected")),
       h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
 }
 

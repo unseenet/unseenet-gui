@@ -198,7 +198,10 @@ class Runtime:
         s = self.session
         out = {"unlocked": s is not None, "vault": str(self.vault_path),
                "vault_exists": self.vault_exists(), "status": self.status,
-               "connected": self.connected, "setup": self.needs_setup()}
+               "connected": self.connected, "setup": self.needs_setup(),
+               # in a browser through a web entrance (unseenet-entrance): the page says
+               # what is true there - the entrance, not Tor on this computer, carries it
+               "web": sys.platform == "emscripten"}
         if s is not None and s.has_identity():
             ident = s.identity()
             out["me"] = {"display": s.display_name(), "key": ident.key_text,
