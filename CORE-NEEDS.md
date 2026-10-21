@@ -29,7 +29,7 @@ fallback.
 
 ## 2. Typed events instead of one status callback
 
-**Status:** in the core (`Session.on`, `client.events`, unseenet#275); moving onto it is #29.
+**Status:** done. `Session.on()` (unseenet#275) is passed to the page (#29): group and list updates, a real postage bar per job, node and Tor state, and ripening of a new key.
 
 **Today:** `Session(vault, status=print)` - one string callback.
 
