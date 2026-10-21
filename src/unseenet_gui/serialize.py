@@ -4,8 +4,11 @@ Threads, views and the order of a group's rows come from the core
 (``Session.threads``, ``Session.view_of``, unseenet #139, #27), so this
 client shows them as the TUI does.
 
-CORE: ``Message`` and ``GroupInfo`` have a stable dict form in the core now
-(``to_dict``); moving onto it is #28.
+What a message and a group *are* comes from the core too: ``Message.to_dict()``
+and ``Session.group_info()`` / ``GroupInfo.to_dict()`` (#28). This module adds
+only what is this client's: labels, colours, icons, the Markdown tree, the
+owner's tools. The browser API keeps its names (``key``, ``fast``, ``for_you``),
+mapped here from the core's, so the page does not change.
 """
 
 from __future__ import annotations
@@ -14,9 +17,9 @@ import hashlib
 
 from unseenet.client import threads as core_threads
 from unseenet.client.grouptree import group_tree
-from unseenet.client.session import GroupInfo, Message, Session, split_signature
+from unseenet.client.session import DICT_VERSION, GroupInfo, Message, Session, split_signature
 from unseenet.core import markup
-from unseenet.core.groups import KIND_CHAT, group_refs, short_group_id
+from unseenet.core.groups import KIND_CHAT, group_refs, short_group_id  # noqa: F401 (runtime uses it)
 
 CONTACT = core_threads.CONTACT  # a conversation with one key, shown as a chat (as in the TUI)
 FOR_YOU = "for-you"            # the browser's name for the core's "for-you:" (threads.FOR_YOU)
@@ -39,17 +42,26 @@ def view_of(s: Session, gid: str) -> str:
     return s.view_of(core_id(gid))
 
 
-def group_kind(s: Session, gid: str) -> dict:
-    data = s.manifest_data(gid)
-    gtype = s.group_entry(gid).get("type") or data.get("type")
-    access = ACCESS_ICONS.get(gtype, "⌂" if data.get("local") else "")
+def core_dict(obj) -> dict:
+    """A message's or a group's dict from the core, in the one shape this client
+    knows: a newer core with another shape should fail loudly, not draw wrong."""
+    d = obj.to_dict()
+    if d.get("v") != DICT_VERSION:
+        raise RuntimeError(f"the unseenet core gives version {d.get('v')} dicts; "
+                           f"this client knows version {DICT_VERSION}")
+    return d
+
+
+def group_kind(s: Session, gid: str, info: GroupInfo | None = None) -> dict:
+    """The core's view of a group, with this client's icons."""
+    g = core_dict(info or s.group_info(gid, counts=False))
+    gtype = g["type"]
+    access = ACCESS_ICONS.get(gtype, "⌂" if g["local"] else "")
     if gtype == "inbox":
         access = "@"
-    view = view_of(s, gid)
-    return {"type": gtype, "access": access, "icon": VIEW_ICONS.get(view, "≡") if gtype else "·",
-            "view": view, "owner_view": data.get("view", "threads"),
-            "fast": bool(data.get("low_latency")), "local": bool(data.get("local")),
-            "encrypted": gtype == "closed"}
+    return {"type": gtype, "access": access, "icon": VIEW_ICONS.get(g["view"], "≡") if gtype else "·",
+            "view": g["view"], "owner_view": g["owner_view"],
+            "fast": g["low_latency"], "local": g["local"], "encrypted": gtype == "closed"}
 
 
 def seen_name(s: Session, key_text: str) -> str:
@@ -61,25 +73,30 @@ def seen_name(s: Session, key_text: str) -> str:
     return ""
 
 
-def group_summary(s: Session, gid: str) -> dict:
-    label = s.group_label(gid)
+def group_summary(s: Session, gid: str, info: GroupInfo | None = None) -> dict:
+    """A group for the page: the core's group_info(), with labels, the rules as a
+    tree and the owner's tools added. ``info`` saves asking the core again."""
+    info = info if info is not None and info.unread is not None else s.group_info(gid)
+    g = core_dict(info)
+    label = s.group_label(gid)                 # names (UN-RFC 0018, 0019), not just the name
     data = s.manifest_data(gid)
-    entry = s.group_entry(gid)
     members = []
-    if entry.get("owner") and (entry.get("type") or data.get("type")) == "closed":
+    if g["owner"] and g["type"] == "closed":
         members = [{"key": k, "label": s.identity_label(k, seen_name(s, k)), "colour": colour(k)}
                    for k in s.members(gid)]
     return {"members": members, "id": gid, "label": label, "hierarchy": label.split("@")[0].split(".")[0],
-            "short": short_group_id(gid), "title": data.get("title") or entry.get("title", ""),
-            "description": data.get("description", ""), "rules": data.get("rules", ""),
+            "short": g["short"], "title": g["title"],
+            "description": g["description"] if g["subscribed"] else data.get("description", ""),
+            "rules": data.get("rules", ""),
             # the rules as the TUI shows them: Markdown without images, or plain (UN-RFC 0014 2.1)
             "rules_markdown": markup.is_markdown(data.get("rules_type")),
             "rules_tree": (markup.manifest_text(data.get("rules", ""), data.get("rules_type"))
                            if data.get("rules") else []),
-            "owner": entry.get("owner", False), "may_post": s.may_post(gid),
-            "unread": s.unread_count(gid), **for_you(s, gid),
-            "kinds": list(s.group_kinds(gid)), **roles(s, gid),            # owner and moderator tools
-            **group_kind(s, gid)}     # what it takes (UN-RFC 0028)
+            "owner": g["owner"], "may_post": s.may_post(gid), "listed": g["listed"],
+            "unread": g["unread"], "for_you": g["replies"] + g["mentions"],
+            "replies": g["replies"], "mentions": g["mentions"],
+            "kinds": g["kinds"], **roles(s, gid),            # owner and moderator tools
+            **group_kind(s, gid, info)}     # what it takes (UN-RFC 0028)
 
 
 def for_you(s: Session, gid: str | None = None) -> dict:
@@ -89,8 +106,8 @@ def for_you(s: Session, gid: str | None = None) -> dict:
 
 
 def sidebar(s: Session, inbox_ready: bool) -> dict:
-    groups = [group_summary(s, gid) for gid in s.data["subscribed"]
-              if gid != s.my_inbox and not s.is_data_group(gid)]
+    groups = [group_summary(s, g.group_id, g) for g in s.subscribed_groups(counts=True)
+              if g.group_id != s.my_inbox and not s.is_data_group(g.group_id)]
     hierarchies: dict[str, list[dict]] = {}
     for g in sorted(groups, key=lambda g: g["label"]):
         hierarchies.setdefault(g["hierarchy"], []).append(g)
@@ -123,7 +140,10 @@ def group_tree_dict(top: str, groups: list[dict]) -> dict:
 
 
 def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns: list) -> dict:
-    text, sig = split_signature(m.body) if m.readable else ("", None)
+    """A message for the page: the core's to_dict(), with who wrote it as this
+    client shows it, a colour, the Markdown tree and what the reader may do."""
+    d = core_dict(m)
+    text, sig = d["text"], d["signature"]
     if m.to_key:
         who, who_key = "You → " + s.identity_label(m.to_key, seen_name(s, m.to_key)), m.to_key
     elif m.private and m.sender_key:
@@ -131,17 +151,16 @@ def message(s: Session, m: Message, my_keys: set[str], mine: set[str], patterns:
     else:
         who, who_key = s.identity_label(m.author_key, m.from_name), m.author_key
     me = m.author_key in my_keys or bool(m.to_key)
-    return {"id": m.message_id, "number": m.number, "group": m.group, "subject": m.subject,
+    return {"id": d["id"], "number": d["number"], "group": d["group"], "subject": d["subject"],
             "who": who, "key": who_key, "colour": colour(who_key), "mine": me,
             "contact": bool(s.contact_name(who_key)) if who_key else False,
-            "date": m.date.isoformat() if m.date else None, "text": text.rstrip("\n"),
-            "signature": (sig or "").rstrip("\n") or None, "references": m.references,
-            "encrypted": m.encrypted, "private": m.private, "verified": bool(m.sender_key),
-            "kind": m.kind,                      # a chat line or a post (UN-RFC 0028)
+            "date": d["date"], "text": text, "signature": sig, "references": d["references"],
+            "encrypted": d["encrypted"], "private": d["private"], "verified": bool(d["sender_key"]),
+            "kind": d["kind"],                   # a chat line or a post (UN-RFC 0028)
             # the text as a safe tree, Markdown or plain, rendered as the TUI does (UN-RFC 0031)
-            "tree": markup.body(text.rstrip("\n"), m.content_type, m.kind) if m.readable else [],
-            "markdown": markup.is_markdown(m.content_type),
-            "readable": m.readable, "error": m.error, "read": s.is_read(m),
+            "tree": markup.body(text, d["content_type"], d["kind"]) if d["readable"] else [],
+            "markdown": markup.is_markdown(d["content_type"]),
+            "readable": d["readable"], "error": d["error"], "read": s.is_read(m),
             "for_me": s.for_me(m, mine, patterns), "may_withdraw": s.may_cancel(m),
             # groups it names with # (unseenet #172): # on the post, or a click, goes there
             "groups": [r.text for r in group_refs(f"{m.subject}\n{text}")] if m.readable else [],
