@@ -259,6 +259,39 @@ async function power(action) {
     h("p", { class: "muted", text: action === "poweroff" ? "Shutting down …" : "Restarting …" })));
 }
 
+// A newer signed release (unseenet#264): the updater replaces this stick's or
+// folder's program files over Tor and keeps data/; then Unseenet is started again.
+function openUpdate() {
+  const u = S.state.update;
+  if (!u) return;
+  let msg = "", busy = false, done = false;
+  const go = async () => {
+    busy = true; msg = "Fetching and checking the release over Tor - this takes a few minutes …"; render();
+    try {
+      const r = await api("POST", "/api/update");
+      done = r.ok;
+      msg = r.ok ? "Done. Close Unseenet and start it again to use the new version. Your data is as it was."
+        : "The update did not finish:\n" + (r.output || "");
+    } catch (e) { msg = e.message; }
+    busy = false; render();
+  };
+  updateProgress = (text) => { if (busy) { msg = text; render(); } };
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Update Unseenet" },
+    h("div", { class: "dh" }, h("h2", { text: `Unseenet ${u.version}` }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      h("p", { style: "margin:0" }, u.here
+        ? `A newer ${u.channel === "dev" ? "development build" : "release"} is ready, signed by the Unseenet project. ` +
+          "Updating replaces the program on this stick or folder and keeps your data/. Every file is checked against the signature."
+        : "A newer release is ready. This Unseenet was not installed from a stick or a portable folder: update it the way you installed it (see unseenet.org)."),
+      msg ? h("p", { class: "hint", style: "margin:0;white-space:pre-wrap", role: "status", text: msg }) : null),
+    h("div", { class: "df" },
+      u.here && !done ? h("button", { class: "btn primary", onclick: go, disabled: busy }, busy ? "Updating …" : "Update now") : null,
+      h("button", { class: "btn", onclick: closeDialog }, done ? "Close" : "Later"))) };
+  render();
+}
+let updateProgress = () => {};
+
 function openNetwork() {
   const nets = {}, busy = {};
   let msg = "", pick = null;
@@ -562,6 +595,7 @@ function statusbar() {
         [k("N", "new"), k("R", "reply"), k("↑↓", "posts"), k("Space", "next unread"), k("Enter", "full screen")],
       k("V", "chat/threads"), k("?", "about group"), k("Ctrl P", "commands")),
     h("span", { class: "grow" }),
+    S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     h("span", { class: "st", title: S.state.status },
       h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), S.state.status || "", " · pre-alpha"));
@@ -1805,6 +1839,7 @@ function commands() {
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
+    { name: "Update Unseenet", key: "", when: !!S.state.update, run: openUpdate },
     { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },
     { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
     { name: "Shut down the computer", key: "", when: S.state.bootable, run: () => power("poweroff") },
@@ -1924,6 +1959,12 @@ function connectEvents() {
       S.state.connected = /^Connected/.test(e.text) ? true : /^Offline/.test(e.text) ? false : S.state.connected;
       const st = document.querySelector(".statusbar");
       if (st && !S.dialog) st.replaceWith(statusbar()); else render();
+    } else if (e.type === "update") {
+      try { S.state = await api("GET", "/api/state"); } catch (_) { }
+      const st = document.querySelector(".statusbar");
+      if (st && !S.dialog) st.replaceWith(statusbar());
+    } else if (e.type === "update-progress") {
+      updateProgress(e.text);
     } else if (e.type === "groups") {
       clearTimeout(sidebarTimer);
       sidebarTimer = setTimeout(async () => {
