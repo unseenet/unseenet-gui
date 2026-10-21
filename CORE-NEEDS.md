@@ -70,7 +70,7 @@ Setting it is done by writing `data["views"]` directly.
 
 ## 5. Icons and the group list
 
-**Status:** in the core (`Session.subscribed_groups`, unseenet#274); moving onto it is #28.
+**Status:** done. `Session.subscribed_groups()` and `group_info()` (unseenet#274, #299), used here (#28).
 
 **Today:** `group_icons()` and `_groups_from_vault()` in the TUI.
 
@@ -80,7 +80,7 @@ characters stay a client decision.
 
 ## 6. A stable dict form for Message and GroupInfo
 
-**Status:** in the core (`to_dict`, unseenet#274); moving onto it is #28.
+**Status:** done. `Message.to_dict()` / `GroupInfo.to_dict()` (unseenet#274), used here with a version check (#28).
 
 **Today:** dataclasses with `bytes` and `datetime`. Each client has to decide
 how to turn them into JSON (`serialize.message()`).
