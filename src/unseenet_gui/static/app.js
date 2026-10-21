@@ -1844,12 +1844,13 @@ function openPalette() {
             else if (e.key === "ArrowUp") { e.preventDefault(); sel--; render(); }
             else if (e.key === "Enter") { e.preventDefault(); const c = shown()[sel]; if (c) run(c); }
           } }),
-        h("kbd", { text: "Esc" })),
+        h("kbd", { text: "Esc" }),
+        h("button", { class: "btn icon pal-close", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),   // phones: no Esc key
       h("div", { class: "db list", "data-scroll": "palette" },
         acts.length ? [h("div", { class: "sect", text: "Commands" }), acts.map(row)] : null,
         grps.length ? [h("div", { class: "sect", text: "Your groups" }), grps.map(row)] : null,
         !list.length ? h("p", { class: "muted", style: "padding:12px", text: "Nothing matches." }) : null),
-      h("div", { class: "df" }, h("span", { text: "↑↓ move" }), h("span", { text: "Enter run" }), h("span", { text: "Esc close" })));
+      h("div", { class: "df keys-only" }, h("span", { text: "↑↓ move" }), h("span", { text: "Enter run" }), h("span", { text: "Esc close" })));
   } };
   render();
 }

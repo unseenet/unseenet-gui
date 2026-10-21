@@ -451,8 +451,17 @@ blockquote.quote-block.md { margin: 8px 0; padding: 2px 0 2px 12px; border-left:
 /* ---- phones: one pane at a time (unseenet-gui #22) ----------------------------------
    Groups → posts → the post, each full screen, back arrows at the top; only what you
    need now, the rest behind ⋯; writing full screen with Post/Send at the top, so the
-   on-screen keyboard never hides it. Same width as PHONE in app.js. */
-.ghead .back-groups, .dh-send, .more-btn, .pal-btn { display: none; }
+   on-screen keyboard never hides it. Same width as PHONE in app.js.
+
+   Rules for every view, also the ones to come (feeds, pages, ...):
+   - it fills the group pane (.content); a second column becomes its own pane with a
+     back arrow, never a squeezed column;
+   - one primary action stays visible (New post, Reply, Send); others go behind ⋯
+     (the palette, or a .sec-tools group that ⋯ opens);
+   - an input that people type in sits at the bottom of the screen (chat) or its send
+     button sits at the top (a full-screen dialog), so the keyboard never hides it;
+   - no hover-only controls, no keyboard hints; targets at least 44 px. */
+.ghead .back-groups, .dh-send, .more-btn, .pal-btn, .pal-close { display: none; }
 .sec-tools { display: contents; }
 @media (max-width: 760px) {
   .app { height: 100dvh; }
@@ -515,7 +524,8 @@ blockquote.quote-block.md { margin: 8px 0; padding: 2px 0 2px 12px; border-left:
   .dialog .db { flex: 1 1 auto; min-height: 0; }
   .dialog .df { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
   .dialog .in, .dialog textarea.in { font-size: 16px; }
-  .dh-send { display: inline-flex; }
+  .dh-send, .pal-close { display: inline-flex; }
+  .dialog .df.keys-only { display: none; }
   .compose-body, .dialog textarea.in { min-height: 0; flex: 1 1 auto; height: 40dvh; }
 
   /* the status bar: one quiet line */
