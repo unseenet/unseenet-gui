@@ -27,6 +27,9 @@ from unseenet.nntp import NNTPError
 
 from . import serialize
 
+# Offering newer releases, with an Update button: off for now (see Runtime.update_info)
+UPDATES = False
+
 NETWORK_ERRORS = (SessionError, OSError, ConnectionError, NNTPError, asyncio.IncompleteReadError)
 REFRESH_SECONDS = 60            # a fallback; new posts normally arrive by push (UN-RFC 0008)
 
@@ -206,11 +209,16 @@ class Runtime:
         return out
 
     # --- a newer release (unseenet#264) ---
+    # Off until this client's own builds are signed and announced: the releases the
+    # core announces are unseenet's, without this client, and its updater refuses
+    # this client's folders (unseenet#264, #266).
     _stick: "Path | None | bool" = False             # not looked for yet
 
     def update_info(self) -> dict | None:
         """{"version", "channel", "here"} when a signed release is newer than this
         program; "here": this is a stick or portable folder that can update itself."""
+        if not UPDATES:
+            return None
         s = self.session
         if s is None or sys.platform == "emscripten" or not hasattr(s, "update_offer"):
             return None                              # the web client updates by itself

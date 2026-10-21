@@ -6,7 +6,7 @@
 </p>
 
 <p align="center"><b>Usenet, unseen - now in a window.</b><br>
-Discussions you read and answer, chats you chat in, over Tor. Portable on Windows, macOS and Linux, or booted from a USB stick.</p>
+Discussions you read and answer, chats you chat in, over Tor. Portable on Windows, macOS and Linux, booted from a USB stick - or in any browser, on a phone too, through a web entrance.</p>
 
 <p align="center">
   <img src="docs/img/demo.gif" alt="Unlocking the vault, reading down a thread post by post, replying with a quote, chatting, the command palette and the light theme" width="880">
@@ -45,6 +45,23 @@ screen - network, Wi-Fi, keyboard and power at the top. The splash is the
 image's own; the picture of the client is taken by the image's self-test, which
 boots it in QEMU on every build.
 
+### In a browser, on a phone or a computer
+
+The same client runs in an ordinary browser, with nothing to install, through
+a **web entrance** ([unseenet-entrance](https://github.com/unseenet/unseenet-entrance),
+UN-RFC 0043) - for example the project's own, **https://129.151.209.26/**.
+There the client's Python backend - this repository's server code and the
+unseenet core - runs in the browser itself (WebAssembly), so the keys stay in
+the browser; the entrance only carries the connections to the nodes over Tor.
+It can be added to the home screen like an app, keeps the vault on the
+device if you want, and updates itself to signed versions. The entrance sees
+your IP address (not in Tor Browser), and the page says so at all times: for
+the hidden way in, use the portable client or the stick.
+
+On a narrow screen - a phone - the client shows one thing at a time: your
+groups, then a group, then a post or the chat. **⋯** holds what does not fit,
+and the compose window has its Send button at the top, above the keyboard.
+
 ## How it works
 
 ```
@@ -53,7 +70,8 @@ boots it in QEMU on every build.
 ```
 
 `unseenet-gui` is a small local server around the core's `Session` - the same
-one the TUI uses. It opens the same encrypted vault, starts the same bundled
+one the TUI uses. (On the web the same server code runs inside the browser
+instead, see above; nothing in this repository is different for it.) It opens the same encrypted vault, starts the same bundled
 Tor and talks to the same nodes. The browser only draws what you would see on
 screen: **keys, signing, encryption and postage never leave Python**, and the
 passphrase is only sent once, to unlock.
@@ -171,12 +189,18 @@ groups, read threads and chats (closed groups decrypted), post, reply, chat,
 "For you", private messages (write to anyone by key, conversations as chats,
 private replies), contacts, create groups (open, moderated, channel, closed;
 threads or chat; fast delivery), invite to your closed groups, your signature,
-a light and a dark theme, the command palette, and narrow screens. On the
-bootable image also: network and Wi-Fi, keyboard layout, restart and shut down.
+a light and a dark theme, the command palette, and phones and other narrow
+screens. On the bootable image also: network and Wi-Fi, keyboard layout,
+restart and shut down. In a browser: everything above, through a web entrance.
 
 Not yet - use the TUI: names (@you), moderation and member removal,
-reporting, ignoring people, Tor bridges, several identities, and updates of
-the stick.
+reporting, ignoring people, Tor bridges and several identities. **Updating**
+a stick or portable folder of this client is not there yet either: its builds
+are not signed yet, and unseenet's own updater does not touch them (it would
+remove the graphical client). Download the new build from the
+[releases](https://github.com/unseenet/unseenet-gui/releases) for now; signed
+builds, a notice and an Update button (already in the code, switched off)
+are coming (unseenet#264).
 
 ## Built on the core
 

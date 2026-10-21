@@ -102,6 +102,8 @@ def test_update_offer_only_where_it_can_update(tmp_path, monkeypatch):
     from unseenet.client.session import Session
     from unseenet.core.vault import Vault
     import unseenet.update
+    import unseenet_gui.runtime
+    monkeypatch.setattr(unseenet_gui.runtime, "UPDATES", True)       # off for now (unseenet#264)
     rt = Runtime(tmp_path / "v.vault")
     rt.session = Session(Vault.open(tmp_path / "v.vault", "pw", ops=1, mem=8192 * 1024),
                          status=lambda *_: None)
