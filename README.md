@@ -160,7 +160,8 @@ Passphrase `test`. Everything is in `./dev`; `tools/dev.sh clean` deletes it.
 
 ## Security
 
-The local server is reachable from your own computer, so it guards itself:
+The local server is reachable from your own computer, so it guards itself.
+These are the rules of UN-RFC 0046, kept by the core's local API:
 
 - It listens on **127.0.0.1 only**, on a random port.
 - Every start makes a **random token**. It is in the address the client opens
@@ -189,12 +190,12 @@ groups, read threads and chats (closed groups decrypted), post, reply, chat,
 "For you", private messages (write to anyone by key, conversations as chats,
 private replies), contacts, create groups (open, moderated, channel, closed;
 threads or chat; fast delivery), invite to your closed groups, your signature,
+edit your own posts, names (@you), moderation, roles, bans and member removal, reporting, ignoring people,
 a light and a dark theme, the command palette, and phones and other narrow
 screens. On the bootable image also: network and Wi-Fi, keyboard layout,
 restart and shut down. In a browser: everything above, through a web entrance.
 
-Not yet - use the TUI: names (@you), moderation and member removal,
-reporting, ignoring people, Tor bridges and several identities. **Updating**
+Not yet - use the TUI: Tor bridges and several identities. **Updating**
 a stick or portable folder of this client is not there yet either: its builds
 are not signed yet, and unseenet's own updater does not touch them (it would
 remove the graphical client). Download the new build from the
@@ -204,9 +205,12 @@ are coming (unseenet#264).
 
 ## Built on the core
 
-The client needs no changes to unseenet. It does copy a few things that live
-in the TUI today - startup, threads, the view of a group, events - and those
-are listed in [CORE-NEEDS.md](CORE-NEEDS.md) as candidates for unseenet 0.4.0.
+Everything but the page is the core's: this client is unseenet's local
+client API (UN-RFC 0046, `unseenet.client.localapi`) with its page and a few
+routes of its own under `/x/gui/` - the bootable image's network, keyboard and
+power, updating, and what the page shows about this machine. The same runtime,
+threads, names and safe Markdown tree serve every front end, so this client
+shows what the TUI shows. [CORE-NEEDS.md](CORE-NEEDS.md) records how it got there.
 
 ## Layout
 
@@ -214,15 +218,14 @@ are listed in [CORE-NEEDS.md](CORE-NEEDS.md) as candidates for unseenet 0.4.0.
 src/unseenet_gui/
   __main__.py     command line: how to open it, --self-test
   opening.py      app window, browser in app mode, or the browser
-  server.py       the local HTTP/WebSocket server and its guards
-  runtime.py      one Session, its startup, refresh and push
-  serialize.py    Session objects as JSON
+  server.py       the core's local API with this page, and /x/gui/
+  update.py       updating a stick or portable folder (off for now)
   system.py       the bootable image's network, keyboard and power
   boot.py         the bootable image's session (cage) and its self-test
   splash.py       the boot splash, drawn on the framebuffer
   selftest.py     does this build work?
   static/         the page: index.html, app.css, app.js (no build step)
-tests/            the server's guards
+tests/            the server: the core's guards, the page, /x/gui/
 tools/
   dev.sh          a playground without Tor (seed_dev.py fills it)
   record_demo.py  the demo and screenshots in this README, from the playground
