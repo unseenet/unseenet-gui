@@ -78,6 +78,7 @@ function fromRow(r) {
   const m = r.message;
   return { id: m.id, number: m.number, group: m.group, subject: m.subject, kind: m.kind,
     who: r.who, key: r.who_key, colour: colour(r.who_key), mine: r.mine, contact: r.contact,
+    bot: !!r.bot,                                     // its profile says it posts automatically
     date: m.date, text: m.text, signature: m.signature, references: m.references,
     encrypted: m.encrypted, private: m.private, verified: !!m.sender_key,
     readable: m.readable, error: m.error, edited: m.edited,
@@ -93,7 +94,8 @@ function fromSidebar(d, st) {
   return { for_you: (fy.replies || 0) + (fy.mentions || 0), replies: fy.replies || 0, mentions: fy.mentions || 0,
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
-    show_blocked: !!st.show_blocked, markdown: st.markdown !== false, notices: st.notices || {},
+    show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots,
+    markdown: st.markdown !== false, notices: st.notices || {},
     hierarchies: d.hierarchies.map(h => ({ name: h.name, tree: h.tree, groups: by[h.name] || [] })) };
 }
 
@@ -767,7 +769,7 @@ function threadsView(d) {
         // a reply with the thread's own subject: quieter, so new subjects stand out
         h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
         g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
-      h("span", { class: "from mono", text: m.who }),
+      h("span", { class: "from mono" }, m.who, m.bot ? h("span", { class: "muted", text: " · bot" }) : null),
       h("span", { class: "date", text: when(m.date) }))),
     pend.map(([job, p]) => h("div", { class: "prow pending" }, h("span", {}),
       h("span", { class: "sj", text: p.body.subject || "" }),
@@ -977,6 +979,7 @@ function openLink(href) {
 function readerPane(g, m, msgs) {
   const marks = [];
   if (m.mine) marks.push(h("span", { class: "sm", text: "you" }));
+  if (m.bot) marks.push(h("span", { class: "sm", title: "Its profile says it posts automatically (UN-RFC 0030)", text: "bot" }));
   else if (m.contact) marks.push(h("span", { class: "sm", text: "contact" }));
   marks.push(h("span", { class: "sm", text: when(m.date) }));
   if (m.for_me === "reply") marks.push(h("span", { class: "sm you", text: "◄ reply to you" }));
@@ -1192,7 +1195,8 @@ function chatView(d) {
     if (!close) {
       flush();
       const col = h("div", { class: "col" });
-      if (!m.mine) col.append(h("div", { class: "hd" }, nameEl(m.who), h("span", { class: "hint", text: when(m.date, false) })));
+      if (!m.mine) col.append(h("div", { class: "hd" }, nameEl(m.who),
+        m.bot ? h("span", { class: "hint", text: "bot" }) : null, h("span", { class: "hint", text: when(m.date, false) })));
       else col.append(h("div", { class: "hint", text: when(m.date, false) }));
       grp = { key: m.key, at: d0, col, el: h("div", { class: "mg" + (m.mine ? " mine" : "") }, m.mine ? null : avatar(m, true), col) };
     }
@@ -1643,6 +1647,13 @@ function openBlock(m) {
     } });
 }
 
+async function toggleBots() {
+  const on = !(S.sidebar && S.sidebar.hide_bots);
+  await api("POST", "/api/settings", { hide_bots: on });
+  await loadSidebar(); await loadGroup(); render();
+  toast(on ? "Posts by bots are hidden." : "You see bots again, marked bot.");
+}
+
 async function toggleShowBlocked() {
   const on = !(S.sidebar && S.sidebar.show_blocked);
   await api("POST", "/api/settings", { show_blocked: on });
@@ -1946,6 +1957,7 @@ function commands() {
       run: async () => { const on = !(S.sidebar && S.sidebar.markdown !== false); await api("POST", "/api/settings", { markdown: on }); await loadSidebar();
         toast(on ? "You write Markdown: *emphasis*, **strong**, `code`, lists, :tada:" : "You write plain text: sent and shown exactly as typed."); } },
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
+    { name: S.sidebar && S.sidebar.hide_bots ? "Show bots" : "Hide bots: posts by keys that say they post automatically", key: "", run: toggleBots },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
     { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
     { name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },
