@@ -70,6 +70,13 @@ jobs:
         if: "!startsWith(github.ref, 'refs/tags/v')"
         shell: bash
         run: sed -i.bak "s/^__version__ = \"\(.*\)\.dev0\"/__version__ = \"\1.dev${{ github.run_number }}\"/" src/unseenet_gui/__init__.py
+      - name: Key ripening on Intel Macs (chiavdf has no wheel there)
+        if: matrix.platform == 'macos-x86_64'
+        shell: bash
+        # from source, as in unseenet's builds; the self-test proves it works (UN-RFC 0025)
+        run: |
+          brew install gmp cmake
+          BUILD_VDF_CLIENT=N pip install --no-binary chiavdf "chiavdf>=1.1"
       - name: Install
         shell: bash
         run: |

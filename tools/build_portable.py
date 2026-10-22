@@ -94,13 +94,19 @@ def pyinstaller(plat: str, work: Path, core: Path) -> Path:
            "--collect-submodules", "unseenet", "--collect-data", "unseenet",
            "--collect-submodules", "unseenet_gui", "--collect-data", "unseenet_gui",
            "--collect-submodules", "aiohttp",
-           "--collect-all", "nacl", "--hidden-import", "_cffi_backend",
+           "--collect-all", "nacl", "--hidden-import", "_cffi_backend", "--hidden-import", "chiavdf",
            "--collect-data", "certifi",
            # not used by the graphical client; unseenet.boot and the TUI import them
            "--exclude-module", "textual", "--exclude-module", "rich",
            "--exclude-module", "tkinter", "--exclude-module", "unittest", "--exclude-module", "PIL"]
     if not plat.startswith("linux"):
         cmd += ["--collect-all", "webview"]          # the app window (WebView2 / WKWebView)
+    # chiavdf on Windows (key ripening, UN-RFC 0025): mpir.dll loads a variant for the CPU
+    # (mpir_broadwell.dll, ...) at run time, which PyInstaller cannot see (as unseenet#306)
+    if windows:
+        import sysconfig
+        for dll in sorted(Path(sysconfig.get_paths()["platlib"]).glob("mpir*.dll")):
+            cmd += ["--add-binary", f"{dll}{os.pathsep}."]
     if not plat.startswith("windows"):
         cmd.append("--strip")
     ico = work / "unseenet.ico"
