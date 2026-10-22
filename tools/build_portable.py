@@ -94,7 +94,7 @@ def pyinstaller(plat: str, work: Path, core: Path) -> Path:
            "--collect-submodules", "unseenet", "--collect-data", "unseenet",
            "--collect-submodules", "unseenet_gui", "--collect-data", "unseenet_gui",
            "--collect-submodules", "aiohttp",
-           "--collect-all", "nacl", "--hidden-import", "_cffi_backend",
+           "--collect-all", "nacl", "--hidden-import", "_cffi_backend", "--hidden-import", "chiavdf",
            "--collect-data", "certifi",
            # not used by the graphical client; unseenet.boot and the TUI import them
            "--exclude-module", "textual", "--exclude-module", "rich",

@@ -67,6 +67,12 @@ def self_test(network: bool = True, node: str | None = None) -> int:
         print(f"Parts:     BROKEN ({type(exc).__name__}: {exc})")
         return 1
     print("Parts:     server, client core and cryptography load")
+    from unseenet.core import ripening
+    problem = ripening.self_check()
+    if problem:
+        print(f"Ripening:  BROKEN ({problem}) - this build could read, but not post on 0.4 nodes")
+        return 1
+    print("Ripening:  a short proof made and checked (UN-RFC 0025)")
     from .opening import find_app_browser, has_webview
     print(f"Window:    {'app window (pywebview)' if has_webview() else 'no app window here'}; "
           f"app-mode browser: {find_app_browser() or 'none found'}")
