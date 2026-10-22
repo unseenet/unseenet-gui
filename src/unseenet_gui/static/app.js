@@ -201,6 +201,11 @@ function nameEl(label) {
   }
   return h("span", { class: "name", text: label });
 }
+// the author's name opens their profile (#20), as Profile of this author does in the TUI
+function whoEl(m) {
+  if (!m.key || m.mine) return nameEl(m.who);
+  return h("button", { class: "name-btn", title: "Their profile", onclick: (e) => { e.stopPropagation(); openProfile(m.key, m.who); } }, nameEl(m.who));
+}
 const typing = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
 // ---- rendering with focus and scroll kept --------------------------------
@@ -498,9 +503,45 @@ async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
   try {
-    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid));
-    if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow) };
+    const [data, write] = await Promise.all([
+      api("GET", "/api/groups/" + encodeURIComponent(gid)),
+      api("GET", "/x/gui/write/" + encodeURIComponent(gid)).catch(() => ({}))]);
+    if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: write || {} };
   } catch (err) { S.status = err.message; }
+}
+
+// ---- may you write here? (#13) -------------------------------------------------
+// Said before you write, as the terminal client does: the core's write_permission
+// (the kinds a group takes, bans, blocks, posters, closed-group members, comments in
+// channels and when they close), from /x/gui/write. Buttons you may not use are
+// shown greyed out with the reason, rather than hidden, so people learn why.
+const NOT_HERE = "Only chosen people can write here.";
+function mayWrite(d, what) {                      // what: "post" or "chat"
+  const p = d && d.write && d.write[what];
+  if (p) return p;
+  const ok = !!(d && d.group && d.group.may_post);
+  return { allowed: ok, reason: ok ? "" : NOT_HERE, code: ok ? "ok" : "other" };
+}
+function mayReply(d, m) {
+  const g = d.group;
+  if (g.id === FOR_YOU || !m.readable || !m.key) return { allowed: false, reason: "", code: "none" };
+  if (g.private_reply || g.type === "contact") return { allowed: true, reason: "", code: "ok" };
+  const p = d.write && d.write.replies && d.write.replies[m.id];
+  if (p) return p;
+  const post = mayWrite(d, "post");        // not read by the core yet: what holds for the group
+  return post.code === "channel_thread" ? { allowed: true, reason: "", code: "ok" } : post;
+}
+// In a channel open for comments, a reader's reply is a comment (UN-RFC 0030).
+const commenting = (d) => d.group.type === "channel" && mayWrite(d, "post").code === "channel_thread";
+// a button that says why it does nothing, instead of not being there
+function offProps(p, props) {
+  return p.allowed ? props : { ...props, class: (props.class || "btn") + " off", "aria-disabled": "true",
+    title: p.reason, onclick: (e) => { e.preventDefault(); if (p.reason) toast(p.reason); } };
+}
+function tryReply(m, g) {
+  const p = mayReply(S.data, m);
+  if (p.allowed) openReply(m, g);
+  else if (p.reason) toast(p.reason);
 }
 
 let markTimer = null, toMark = new Set();
@@ -716,9 +757,9 @@ function mainArea() {
         g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
       h("button", { class: "btn icon pal-btn", "aria-label": "More: all commands", onclick: () => openPalette() }, "⋯"),
-      g.may_post && g.type !== "contact" && (g.kinds || ["post"]).includes("post") ?
-        h("button", { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
-          title: "A post with a subject (UN-RFC 0028)" },
+      g.type && !["contact", "inbox"].includes(g.type) && (g.kinds || ["post"]).includes("post") ?
+        h("button", offProps(mayWrite(d, "post"), { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
+          title: "A post with a subject (UN-RFC 0028)" }),
           svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
   return [head, g.view === "chat" ? chatView(d) : threadsView(d)];
 }
@@ -750,7 +791,7 @@ function threadsView(d) {
     return h("div", { class: "content" }, h("div", { class: "empty" },
       h("h2", { text: g.id === FOR_YOU ? "Nothing for you yet" : "No posts yet" }),
       h("p", { text: g.id === FOR_YOU ? "Replies to your posts, and posts that name you, show up here." :
-        g.may_post ? "Be the first: press N to write a post." : "" })));
+        mayWrite(d, "post").allowed ? "Be the first: press N to write a post." : mayWrite(d, "post").reason })));
   }
   const cur = currentPost(msgs);
   S.post = cur.id;
@@ -991,7 +1032,7 @@ function readerPane(g, m, msgs) {
   else if (m.private && m.verified) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " verified sender"));
   else if (!m.private) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " signed"));
   const parent = m.references.length ? msgs.find(x => x.id === m.references[m.references.length - 1]) : null;
-  const canReply = (g.may_post || g.private_reply) && g.id !== FOR_YOU && m.readable && m.key;
+  const rp = mayReply(S.data, m), canReply = rp.code !== "none";
   const pos = msgs.indexOf(m);
   return h("article", { class: "reader", "aria-label": "Post" },
     S.full ? h("div", { class: "fullbar" },
@@ -1000,14 +1041,15 @@ function readerPane(g, m, msgs) {
     h("div", { class: "scroll", "data-scroll": "post:" + m.id },
       h("h2", { text: subjectOf(m) }),
       h("div", { class: "post" }, avatar(m),
-        h("div", { class: "pb" }, h("div", { class: "ph" }, nameEl(m.who), marks),
+        h("div", { class: "pb" }, h("div", { class: "ph" }, whoEl(m), marks),
           parent ? h("button", { class: "inreply", onclick: () => { S.post = parent.id; render(); } },
             "In reply to ", h("span", { class: "mono", text: parent.who })) : null)),
       h("div", { class: "pbody" },
         messageBody(m),
         m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null)),
     h("div", { class: "pbar" },
-      canReply ? h("button", { class: "btn primary", onclick: () => openReply(m, g) }, "Reply", h("kbd", { text: "R" })) : null,
+      canReply ? h("button", offProps(rp, { class: "btn primary", onclick: () => openReply(m, g) }),
+        commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,
       g.id === FOR_YOU && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === FOR_YOU ? h("button", { class: "btn", onclick: async () => {
@@ -1198,7 +1240,7 @@ function chatView(d) {
     if (!close) {
       flush();
       const col = h("div", { class: "col" });
-      if (!m.mine) col.append(h("div", { class: "hd" }, nameEl(m.who),
+      if (!m.mine) col.append(h("div", { class: "hd" }, whoEl(m),
         m.bot ? h("span", { class: "hint", text: "bot" }) : null, h("span", { class: "hint", text: when(m.date, false) })));
       else col.append(h("div", { class: "hint", text: when(m.date, false) }));
       grp = { key: m.key, at: d0, col, el: h("div", { class: "mg" + (m.mine ? " mine" : "") }, m.mine ? null : avatar(m, true), col) };
@@ -1210,8 +1252,9 @@ function chatView(d) {
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
       m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
-      isPost && g.type !== "contact" && g.may_post && (g.kinds || []).includes("post") ?
-        h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) }, "Reply with a quote")) : null));
+      isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
+        h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },
+          commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null));
     if (m.mine) grp.lastMine = m;
   }
   flush();
@@ -1227,8 +1270,9 @@ function chatView(d) {
         h("button", { class: "link", onclick: () => { retry(job); } }, "Try again")) : pendingState(p))));
   }
   if (msgs.length === 0 && !Object.keys(S.pending).length) {
-    out.push(h("div", { class: "empty" }, h("h2", { text: "Quiet here" }), h("p", { text: g.may_post ? "Say hello below." : "" })));
+    out.push(h("div", { class: "empty" }, h("h2", { text: "Quiet here" }), h("p", { text: g.type === "contact" || mayWrite(d, "chat").allowed ? "Say hello below." : "" })));
   }
+  const cp = g.type === "contact" ? { allowed: true } : mayWrite(d, "chat");
   const send = () => {
     const input = document.querySelector('[data-k="chat"]');
     const text = input.value.trim();
@@ -1239,9 +1283,10 @@ function chatView(d) {
   };
   return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
     h("div", { class: "msgs", "data-scroll": "chat:" + g.id, "data-stick": "bottom" }, out),
-    g.may_post && g.type !== "contact" && g.kinds && !g.kinds.includes("chat") ?
-      h("div", { class: "chatbar hint", text: "A discussion group: it takes posts with a subject only. N writes one." }) :
-    g.may_post ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); } },
+    g.type !== "contact" && g.kinds && !g.kinds.includes("chat") ?
+      h("div", { class: "chatbar hint", text: mayWrite(d, "post").allowed ?
+        "A discussion group: it takes posts with a subject only. N writes one." : mayWrite(d, "post").reason }) :
+    cp.allowed ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); } },
       h("div", { class: "row" },
         h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
         h("input", { id: "chat", type: "text", "data-k": "chat", autocomplete: "off",
@@ -1250,7 +1295,11 @@ function chatView(d) {
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
       h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Esc" }), " for shortcuts",
         g.type === "contact" ? " · sealed to them" : g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
-      h("div", { class: "chatbar hint", text: "Only chosen people can write here." })));
+      h("div", { class: "chatbar off" }, h("div", { class: "row" },
+        h("label", { for: "chat", class: "sr", text: "You cannot write here" }),
+        h("input", { id: "chat", type: "text", disabled: true, "aria-describedby": "chat-why", placeholder: cp.reason || NOT_HERE }),
+        h("button", { class: "send", type: "button", disabled: true, "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
+        h("div", { class: "hint", id: "chat-why", text: cp.reason || NOT_HERE }))));
 }
 
 // ---- posting ------------------------------------------------------------
@@ -1713,8 +1762,10 @@ function openReport(m) {
 async function openCompose() {
   const g = S.data && S.data.group;
   if (g && g.type === "contact") { openPost(g.key, g.label.replace(/ √$/, "")); return; }   // N in a chat: a post
-  if (!g || !g.may_post) return;
+  if (!g || !g.type || g.type === "inbox") return;
   if (g.kinds && !g.kinds.includes("post")) { toast("A chat group: it takes chat lines only."); return; }
+  const may = mayWrite(S.data, "post");
+  if (!may.allowed) { if (may.reason) toast(may.reason); return; }    // N says why, as the button does
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
@@ -1932,6 +1983,141 @@ async function openSignature() {
     submit: async (v) => { await api("POST", "/api/settings", { signature: v.template }); closeDialog(); toast("Signature saved."); } });
 }
 
+// ---- your vault's passphrase (#32, as the TUI's Change passphrase) ------------
+const COPIES_NOTE = "Only this vault file changes. Copies of it on other devices, sticks or backups still open with the old passphrase: replace or delete them.";
+function openPassphrase() {
+  formDialog({ label: "Change passphrase", title: "Change passphrase", focus: "#pold", button: "Change", note: COPIES_NOTE,
+    fields: (vals) => [
+      GUI && GUI.vault ? h("p", { class: "hint mono", style: "margin:0", text: GUI.vault }) : null,
+      h("label", { for: "pold", text: "Current passphrase" }),
+      h("input", { id: "pold", name: "old", type: "password", class: "in", "data-k": "pold", autocomplete: "current-password", value: vals.old || "" }),
+      h("label", { for: "pnew", text: "New passphrase" }),
+      h("input", { id: "pnew", name: "pw", type: "password", class: "in", "data-k": "pnew", autocomplete: "new-password", value: vals.pw || "" }),
+      h("label", { for: "pnew2", text: "The new passphrase again" }),
+      h("input", { id: "pnew2", name: "pw2", type: "password", class: "in", "data-k": "pnew2", autocomplete: "new-password", value: vals.pw2 || "" })],
+    submit: async (v) => {
+      if ((v.pw || "") !== (v.pw2 || "")) throw new Error("The new passphrases do not match.");
+      if ((v.pw || "").length < 4) throw new Error("The new passphrase is too short.");
+      if (v.pw === v.old) throw new Error("The new passphrase is the same as the current one.");
+      toast("Encrypting the vault with the new passphrase …");
+      await api("POST", "/x/gui/passphrase", { old: v.old || "", new: v.pw });
+      closeDialog();
+      toast("Passphrase changed. Copies of the vault elsewhere still open with the old one - replace or delete them.");
+    } });
+}
+
+// ---- profiles (#20, UN-RFC 0022): anyone's, and your own ----------------------
+// Links are shown as written and never opened by themselves (section 9.2).
+function profileBody(p) {
+  const obj = p.profile;
+  if (p.hidden) return h("p", { style: "margin:0", text: "You have hidden this profile." });
+  if (!obj || (!obj.about && !(obj.lang || []).length && !(obj.links || []).length))
+    return h("p", { class: "muted", style: "margin:0", text: p.mine ? "You have no public profile yet." : "No public profile." });
+  return [
+    obj.about ? (p.about_tree && p.about_tree.length ? h("div", { class: "md profile-about" }, renderTree(p.about_tree)) :
+      renderBody(obj.about)) : null,
+    (obj.lang || []).length ? h("p", { style: "margin:0", text: "Writes: " + obj.lang.join(", ") }) : null,
+    (obj.links || []).length ? [h("p", { class: "hint", style: "margin:0", text: "Links, as stated by this identity (not checked):" }),
+      h("ul", { class: "profile-links" }, obj.links.map(l => h("li", { class: "mono", text: `${l.kind}: ${l.value}${l.label ? "  (" + l.label + ")" : ""}` })))] : null];
+}
+
+async function openProfile(key, who = "") {
+  let p = null, err = "";
+  const draw = () => dialogShell({ label: "Profile" },
+    h("div", { class: "dh" }, h("h2", { text: (p && p.label) || who || "Profile" }),
+      p && p.profile && p.profile.bot ? h("span", { class: "chip", text: "bot" }) : null,
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      h("div", { class: "keybox", text: key }),
+      err ? h("p", { class: "error", text: err }) :
+      !p ? h("p", { class: "muted", style: "margin:0", text: "Reading the profile over Tor …" }) : profileBody(p)),
+    h("div", { class: "df btns" },
+      p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
+      p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
+        try { await api("POST", "/x/gui/profile/hide", { key, hidden: !p.hidden }); }
+        catch (x) { toast(x.message); return; }
+        toast(p.hidden ? "Profile shown." : "Profile hidden."); openProfile(key, who); } }, p.hidden ? "Show" : "Hide") : null,
+      h("button", { class: "btn primary", onclick: closeDialog }, "Close")));
+  S.dialog = { focus: ".dialog .btn.primary", render: draw };
+  render();
+  try { p = await api("GET", "/x/gui/profile?key=" + encodeURIComponent(key)); }
+  catch (x) { err = x.message; }
+  if (S.dialog && S.dialog.render === draw) render();
+}
+
+function confirmDialog({ title, text, button, danger, ok }) {
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: title },
+    h("div", { class: "dh" }, h("h2", { text: title }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" }, text.split("\n\n").map(t => h("p", { style: "margin:0;white-space:pre-line", text: t }))),
+    h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary" + (danger ? " danger" : ""), onclick: ok }, button))) };
+  render();
+}
+
+function linksText(links) {
+  return (links || []).map(l => `${l.kind} ${l.value}` + (l.label ? `  # ${l.label}` : "")).join("\n");
+}
+function parseLinks(text) {
+  const out = [];
+  text.split("\n").forEach((line, i) => {
+    const [main, ...rest] = line.split("#");
+    const parts = main.trim().split(/\s+/);
+    if (!parts[0]) return;
+    if (parts.length < 2) throw new Error(`Line ${i + 1}: the kind, a space, then the address.`);
+    const link = { kind: parts[0].toLowerCase(), value: parts.slice(1).join(" ") };
+    if (rest.join("#").trim()) link.label = rest.join("#").trim();
+    out.push(link);
+  });
+  return out;
+}
+
+async function openMyProfile() {
+  let p;
+  try { p = await api("GET", "/x/gui/profile"); } catch (x) { toast(x.message); return; }
+  if (!p.published) {               // the warning before the first, as in the TUI
+    confirmDialog({ title: "Before you publish a profile", text: p.warning, button: "I understand", ok: () => editProfile(p) });
+    return;
+  }
+  editProfile(p);
+}
+
+function editProfile(p) {
+  const cur = p.profile || {};
+  const md = cur.about ? /markdown/i.test(cur.about_type || "") : !(S.sidebar && S.sidebar.markdown === false);
+  const publish = async (body) => {
+    await api("POST", "/x/gui/profile", body);
+    closeDialog(); toast(body.remove ? "Your profile is removed." : "Your profile is published.");
+  };
+  formDialog({ label: "Your profile", title: "Your public profile - anybody can read it", focus: "#pabout", button: "Publish",
+    values: { about: cur.about || "", markdown: md, lang: (cur.lang || []).join(", "), links: linksText(cur.links) },
+    note: "Kinds of links: " + (p.link_kinds || []).join(", ") + ", or x-something. Links are shown as written; nobody checks them.",
+    fields: (vals) => [
+      h("label", { for: "pabout", text: "About you - a few lines, or a small home page" }),
+      h("textarea", { id: "pabout", name: "about", class: "in", "data-k": "pabout", value: vals.about, style: "min-height:120px" }),
+      h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
+        " Markdown - # headings, - lists, **strong**, [links](https://...), :tada: (no pictures)"),
+      h("label", { for: "plang", text: "Languages you write, e.g. da, en" }),
+      h("input", { id: "plang", name: "lang", class: "in", "data-k": "plang", value: vals.lang }),
+      h("label", { for: "plinks", text: "Links, one per line: kind address  (# a label)" }),
+      h("textarea", { id: "plinks", name: "links", class: "in mono", "data-k": "plinks", value: vals.links, style: "min-height:80px" }),
+      p.published ? h("button", { type: "button", class: "link", onclick: () => confirmDialog({ title: "Remove your profile?",
+        text: "Nodes stop showing it. Copies others already kept cannot be taken back.", button: "Remove", danger: true,
+        ok: () => publish({ remove: true }).catch(x => toast(x.message)) }) }, "Remove your profile") : null],
+    submit: async (v) => {
+      const links = parseLinks(v.links || "");
+      const body = { about: v.about || "", markdown: !!v.markdown, lang: v.lang || "", links };
+      const old = new Set((cur.links || []).map(l => l.kind + " " + l.value));
+      const added = links.filter(l => !old.has(l.kind + " " + l.value) && l.kind !== "onion");
+      if (added.length && p.published) {     // each new link ties this identity to that account
+        confirmDialog({ title: "New links", button: "Publish",
+          text: "Each link ties this identity, and everything it posts, to that account:\n\n" + added.map(l => `${l.kind}: ${l.value}`).join("\n"),
+          ok: () => publish(body).catch(x => toast(x.message)) });
+        return;
+      }
+      await publish(body);
+    } });
+}
+
 function selectedPost() {
   return (S.data && S.data.group && S.data.group.view !== "chat" && S.data.messages.find(x => x.id === S.post)) || null;
 }
@@ -1939,7 +2125,7 @@ function selectedPost() {
 function commands() {
   const g = S.data && S.data.group;
   const cmds = [
-    { name: "New post", key: "N", when: g && g.may_post && g.view !== "chat", run: openCompose },
+    { name: "New post", key: "N", when: g && g.type && mayWrite(S.data, "post").allowed && g.view !== "chat", run: openCompose },
     { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
     { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
     { name: "Find groups on your nodes", key: "G", run: openBrowse },
@@ -1974,6 +2160,10 @@ function commands() {
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
+    { name: "Profile of this author: about, languages, links (UN-RFC 0022)", key: "", when: selectedPost() && selectedPost().key,
+      run: () => openProfile(selectedPost().key, selectedPost().who) },
+    { name: "Your profile: write, change or remove it", key: "", run: openMyProfile },
+    { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
     { name: "Update Unseenet", key: "", when: !!S.state.update, run: openUpdate },
     { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },
     { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
@@ -2049,7 +2239,7 @@ document.addEventListener("keydown", (e) => {
       n: () => step(1), p: () => step(-1), j: () => step(1), ArrowDown: () => step(1), ArrowUp: () => step(-1),
       q: back, f: back, Enter: back,
       " ": () => { if (sc && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4) sc.scrollBy({ top: sc.clientHeight * 0.9 }); else nextUnread(); },
-      r: () => { if (cur && (g.may_post || g.private_reply) && g.id !== FOR_YOU) openReply(cur, g); },
+      r: () => { if (cur) tryReply(cur, g); },
       m: () => { if (cur && !cur.mine && cur.key) { S.full = false; openGroup("contact:" + cur.key); } },
       "#": () => groupsInPost(cur),
     }[key];
@@ -2071,7 +2261,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === " ") { e.preventDefault(); nextUnread(); }
   else if ((key === "Enter" || key === "f") && cur && cur.notice) { e.preventDefault(); openMentioned(cur); }
   else if (key === "Enter" || key === "f") { e.preventDefault(); S.full = true; render(); }
-  else if (key === "r" && cur && (g.may_post || g.private_reply) && g.id !== FOR_YOU) { e.preventDefault(); openReply(cur, g); }
+  else if (key === "r" && cur) { e.preventDefault(); tryReply(cur, g); }
   else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
   else if (e.key === "#" && cur) { e.preventDefault(); groupsInPost(cur); }
 });

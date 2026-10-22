@@ -28,6 +28,17 @@ the background first. Pre-alpha: not security reviewed.
 - Replies and mentions shown apart in the sidebar, mention notices
   (UN-RFC 0032), `#group` references that open or offer the group.
 - Bots marked next to their posts, and *Hide bots*.
+- **Said before you write** (#13): *New post*, *Reply* and the chat bar are
+  greyed out with the reason when you may not write there (a channel's
+  readers, a ban, a block, a closed group, comments that have closed), and
+  N and R say it; in a channel open for comments, *Reply* reads *Comment*.
+  From the core's `write_permission`, as in the terminal client.
+- **Profiles** (#20, UN-RFC 0022): an author's name opens their profile
+  (about in Markdown, languages, links shown as written and never opened),
+  which you can hide; *Your profile* writes, changes or removes yours, with
+  the warning before the first and before new links.
+- **Change passphrase** (#32): for this vault file; copies elsewhere keep
+  the old one, and the dialog says so.
 - *About Unseenet*, also before unlocking.
 - A phone layout, one pane at a time on narrow screens.
 - An update notice with an *Update* button on a stick or in a folder.
@@ -40,6 +51,9 @@ the background first. Pre-alpha: not security reviewed.
   (#31).
 
 ### Changed
+
+- The playground (`tools/dev.sh`) seeds a channel open for comments, and
+  uses 12-bit postage, the floor of 0.4 nodes.
 
 - Built entirely on the core: threads, views, messages, events, startup,
   refresh, push and ripening come from `unseenet.client`, and the window
