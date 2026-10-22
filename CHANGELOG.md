@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+### Fixed
+
+- The playground (`tools/dev.sh`) seeds chat lines as chat lines, not as
+  posts with the subject "chat".
+
 ## [0.1.0] - 2026-10-22
 
 The first release of the graphical client. Works with unseenet 0.4
