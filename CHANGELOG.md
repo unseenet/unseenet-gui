@@ -9,13 +9,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Fixed
 
+- Compose windows keep their text, selection and ongoing typing when status or
+  group updates arrive. Mention lookups stay with the draft that requested them. (#47)
 - The playground (`tools/dev.sh`) seeds chat lines as chat lines, not as
   posts with the subject "chat".
 - The portable build for Windows takes chiavdf 1.2's DLLs from
   `chiavdf.libs` as well, or it could not ripen keys (#51).
-- Text you typed disappeared when the screen was redrawn: the compose
-  window lost it when a new post or a status line came in, and the name on
-  first start went blank when you chose a node. It now stays (#53).
+- Text you typed in other fields survives a redraw too: the name on first
+  start no longer goes blank when you choose a node (#53).
 
 ## [0.1.0] - 2026-10-22
 
