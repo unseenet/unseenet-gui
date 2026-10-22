@@ -109,7 +109,7 @@ build, so the terminal client and this one can share a stick and a vault.
 You need Python 3.11+.
 
 ```sh
-pip install "unseenet-gui @ git+https://github.com/unseenet/unseenet-gui"
+pip install unseenet-gui
 unseenet-gui                        # opens your browser
 unseenet-gui --vault /path/to/unseenet.vault
 ```
@@ -121,7 +121,7 @@ same in both. Do not run both on the same vault at the same time.
 ### In its own window
 
 ```sh
-pip install "unseenet-gui[window] @ git+https://github.com/unseenet/unseenet-gui"
+pip install "unseenet-gui[window]"
 unseenet-gui --window
 ```
 
@@ -202,6 +202,24 @@ remove the graphical client). Download the new build from the
 [releases](https://github.com/unseenet/unseenet-gui/releases) for now; signed
 builds, a notice and an Update button (already in the code, switched off)
 are coming (unseenet#264).
+
+## Versions and releases
+
+Versions follow [semantic versioning](https://semver.org/) on the same
+principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/development.md#versioning):
+tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and
+releases on [PyPI](https://pypi.org/p/unseenet-gui) and here with the
+portable builds and the image. Each release names the minor version of
+unseenet it works with (`unseenet[api]>=0.4.1,<0.5`).
+
+To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
+new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
+`src/unseenet_gui/__init__.py`, and the core release the builds use
+(`CORE_REF` in `.github/workflows/build.yml`); commit, then
+`git tag -a vX.Y.Z -m "unseenet-gui X.Y.Z" && git push origin vX.Y.Z`.
+`release.yml` publishes to PyPI and makes the release with the changelog
+notes, `build.yml` adds the builds. Afterwards set `__version__` on main to
+the next `.dev0`, so development builds are named after it.
 
 ## Built on the core
 

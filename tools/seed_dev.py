@@ -14,7 +14,7 @@ FAST = {"ops": 1, "mem": 8192 * 1024}
 # The playground node does not ask for key ripening (min_ripe "-", UN-RFC 0025), so a
 # new key pays the unripe surcharge, +6 bits: at the network default of 20 every post
 # here would cost 26 bits. The groups ask for little, as the node does.
-MIN_POW = 8
+MIN_POW = 12              # the node's floor (core.ripening.FLOOR_POW)
 sess.DEFAULT_POW = MIN_POW        # also for inboxes and anything without a manifest yet
 
 
@@ -45,8 +45,11 @@ async def main() -> None:
                                  min_pow=MIN_POW)
     ops = await me.create_group("operators", "closed", title="People who run nodes", view="chat",
                                 min_pow=MIN_POW)
+    # a channel open for comments (UN-RFC 0030): the others may comment, not start threads
+    news = await me.create_group("dev.news", "channel", title="News from the project",
+                                 min_pow=MIN_POW, kinds=["post"], comments="open", comment_days=14)
     for p in (mikkel, tove):
-        for g in (talk, snak, chat):
+        for g in (talk, snak, chat, news):
             p.subscribe(g)
         await p.list_groups()
     for p in (mikkel, tove):
@@ -76,6 +79,7 @@ async def main() -> None:
     await tove.post(talk, "Proof-of-work feels slow on old laptops",
                     "On my 2012 ThinkPad a post takes a while. Could the client show progress?")
     await me.post(snak, "Hej fra Kvistgård", "Første indlæg i dk.snak. Velkommen!")
+    await me.post(news, "Version 0.4.0", "Key ripening is in: new keys work a few minutes before they post.")
     bh = await mikkel.post(snak, "Bornhack - hvem tager med?",
                            "Jeg tænker at køre en node fra teltet. Nogen der vil peere?")
     await tove.fetch_group(snak)
