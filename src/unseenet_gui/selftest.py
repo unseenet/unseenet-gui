@@ -61,7 +61,7 @@ def self_test(network: bool = True, node: str | None = None) -> int:
         import nacl.bindings  # noqa: F401
         from unseenet.client.session import Session  # noqa: F401
         from unseenet.core import crypto
-        from . import runtime, serialize, server  # noqa: F401
+        from . import server, update  # noqa: F401
         crypto.Identity.generate()
     except Exception as exc:  # noqa: BLE001
         print(f"Parts:     BROKEN ({type(exc).__name__}: {exc})")

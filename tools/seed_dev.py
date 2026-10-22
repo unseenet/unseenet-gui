@@ -4,12 +4,18 @@ import os
 import sys
 from pathlib import Path
 
+import unseenet.client.session as sess
 from unseenet.client.session import Session
 from unseenet.core.vault import Vault
 
 NODE = "127.0.0.1:1119"
 BASE = Path(sys.argv[1])
 FAST = {"ops": 1, "mem": 8192 * 1024}
+# The playground node does not ask for key ripening (min_ripe "-", UN-RFC 0025), so a
+# new key pays the unripe surcharge, +6 bits: at the network default of 20 every post
+# here would cost 26 bits. The groups ask for little, as the node does.
+MIN_POW = 8
+sess.DEFAULT_POW = MIN_POW        # also for inboxes and anything without a manifest yet
 
 
 def session(name: str, display: str) -> Session:
@@ -32,10 +38,13 @@ async def main() -> None:
     for p in people:
         await p.ensure_inbox()
 
-    talk = await me.create_group("unseenet", "open", title="The project: protocol, software, ideas, questions")
-    snak = await me.create_group("dk.snak", "open", title="Snak om alt og intet")
-    chat = await me.create_group("dk.snak.chat", "open", title="Hurtig snak", view="chat", low_latency=True)
-    ops = await me.create_group("operators", "closed", title="People who run nodes", view="chat")
+    talk = await me.create_group("unseenet", "open", title="The project: protocol, software, ideas, questions",
+                                 min_pow=MIN_POW)
+    snak = await me.create_group("dk.snak", "open", title="Snak om alt og intet", min_pow=MIN_POW)
+    chat = await me.create_group("dk.snak.chat", "open", title="Hurtig snak", view="chat", low_latency=True,
+                                 min_pow=MIN_POW)
+    ops = await me.create_group("operators", "closed", title="People who run nodes", view="chat",
+                                min_pow=MIN_POW)
     for p in (mikkel, tove):
         for g in (talk, snak, chat):
             p.subscribe(g)

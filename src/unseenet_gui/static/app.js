@@ -37,6 +37,77 @@ const S = {
   moreTools: false,        // on a phone: the post's less used tools shown
 };
 
+
+// ---- the core's local API (UN-RFC 0046) into what the page draws ------------------
+// The answers are the core's (unseenet.client.localapi). These few functions turn
+// them into the objects the rest of this file draws, so the drawing stays as it was.
+const FOR_YOU = "for-you:";                          // the core's pseudo group (threads.FOR_YOU)
+const ACCESS_ICONS = { moderated: "√", channel: "►", closed: "∩" };
+const VIEW_ICONS = { chat: "»", data: "¤", threads: "≡" };
+const MARKDOWN = "text/markdown; charset=utf-8; variant=unseenet";   // core.markup.MARKDOWN_TYPE
+const isMd = (t) => (t || "").split(";")[0].trim().toLowerCase() === "text/markdown";
+
+// A stable avatar colour (0-5) for a key, the same each time.
+function colour(key) {
+  let x = 2166136261;
+  for (const ch of key || "") { x ^= ch.charCodeAt(0); x = Math.imul(x, 16777619) >>> 0; }
+  return x % 6;
+}
+const person = (p) => ({ ...p, colour: colour(p.key) });
+
+function fromGroup(g) {
+  const roles = g.roles || {}, pseudo = ["inbox", "contact"].includes(g.type) || g.id === FOR_YOU;
+  return { ...g,
+    label: g.shown || g.label,                       // the name as UN-RFC 0018 says to show it
+    title: g.title || (pseudo ? g.description : ""),
+    // without a description of its own, a group's description is its title: shown once
+    description: pseudo || g.description === g.title ? "" : (g.description || ""),
+    access: ["inbox", "contact"].includes(g.type) ? "@" : ACCESS_ICONS[g.type] || (g.local ? "⌂" : ""),
+    icon: g.id === FOR_YOU ? "◄" : g.type ? (VIEW_ICONS[g.view] || "≡") : "·",
+    fast: !!g.low_latency, encrypted: ["closed", "inbox", "contact"].includes(g.type),
+    unread: g.unread || 0, replies: g.replies || 0, mentions: g.mentions || 0,
+    for_you: (g.replies || 0) + (g.mentions || 0),
+    rules_markdown: isMd(g.rules_type), private_reply: g.type === "inbox",
+    colour: g.key ? colour(g.key) : undefined,
+    members: (roles.members || []).map(person), moderators: (roles.moderators || []).map(person),
+    posters: (roles.posters || []).map(person), banned: (roles.banned || []).map(person),
+    moderates: !!roles.moderates, maintainer: !!roles.maintainer };
+}
+
+function fromRow(r) {
+  const m = r.message;
+  return { id: m.id, number: m.number, group: m.group, subject: m.subject, kind: m.kind,
+    who: r.who, key: r.who_key, colour: colour(r.who_key), mine: r.mine, contact: r.contact,
+    date: m.date, text: m.text, signature: m.signature, references: m.references,
+    encrypted: m.encrypted, private: m.private, verified: !!m.sender_key,
+    readable: m.readable, error: m.error, edited: m.edited,
+    tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
+    may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
+    depth: r.depth };
+}
+
+function fromSidebar(d, st) {
+  const groups = d.groups.map(fromGroup), by = {};
+  groups.forEach(g => (by[g.hierarchy] = by[g.hierarchy] || []).push(g));
+  const fy = d.for_you || {};
+  return { for_you: (fy.replies || 0) + (fy.mentions || 0), replies: fy.replies || 0, mentions: fy.mentions || 0,
+    people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
+    moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
+    show_blocked: !!st.show_blocked, markdown: st.markdown !== false, notices: st.notices || {},
+    hierarchies: d.hierarchies.map(h => ({ name: h.name, tree: h.tree, groups: by[h.name] || [] })) };
+}
+
+// The core's state, with this client's own from /x/gui/state (UN-RFC 0046 section 6).
+let GUI = {};
+async function loadState(st) {
+  st = st || await api("GET", "/api/state");
+  try { GUI = await api("GET", "/x/gui/state"); } catch (_) { /* the core's state is enough */ }
+  const id = st.identity;
+  S.state = { ...st, ...GUI, me: id ? { display: id.display, key: id.key, label: id.label, fp: GUI.fp || "" } : null };
+  if (st.ripening) S.ripening = { level: st.ripening.level, next_at: st.ripening.next_at, t: st.ripening.t };
+  return S.state;
+}
+
 // ---- helpers ------------------------------------------------------------
 function h(tag, props, ...kids) {
   const el = document.createElement(tag);
@@ -201,7 +272,7 @@ function unlockScreen() {
     if (isNew && pass !== f.again.value) { S.error = "The two passphrases are not the same."; render(); return; }
     if (isNew && pass.length < 8) { S.error = "Use at least 8 characters - a few words is best."; render(); return; }
     S.busy = true; S.error = ""; render();
-    try { S.state = await api("POST", "/api/unlock", { passphrase: pass }); await afterUnlock(); }
+    try { await loadState(await api("POST", "/api/unlock", { passphrase: pass })); await afterUnlock(); }
     catch (err) { S.error = /wrong|decrypt|passphrase|invalid/i.test(err.message) ? "Wrong passphrase." : err.message; }
     S.busy = false; render();
   };
@@ -235,7 +306,7 @@ function unlockScreen() {
 // ---- the bootable image: network, keyboard, power ------------------------------
 let SYS = null;
 async function loadSystem() {
-  try { SYS = await api("GET", "/api/system"); } catch (_) { SYS = null; }
+  try { SYS = await api("GET", "/x/gui/system"); } catch (_) { SYS = null; }
   render();
 }
 
@@ -249,7 +320,7 @@ function systemBar() {
       online ? s.addresses.map(a => a.interface).join(", ") + " connected" : "No network - set it up"),
     h("label", { class: "sr", for: "kbd", text: "Keyboard" }),
     h("select", { id: "kbd", class: "btn", onchange: async (e) => {
-        const r = await api("POST", "/api/system/keyboard", { layout: e.target.value });
+        const r = await api("POST", "/x/gui/system/keyboard", { layout: e.target.value });
         toast(r.restart ? "Changing the keyboard …" : "The keyboard changes at the next start.");
       } }, (s.keyboards || []).map(k => h("option", { value: k.id, selected: k.id === s.keyboard ? "" : null, text: "⌨ " + k.name }))),
     h("button", { class: "btn", onclick: () => power("reboot") }, "Restart"),
@@ -258,7 +329,7 @@ function systemBar() {
 
 async function power(action) {
   if (!confirm(action === "poweroff" ? "Shut down the computer?" : "Restart the computer?")) return;
-  try { await api("POST", "/api/system/power", { action }); } catch (_) { }
+  try { await api("POST", "/x/gui/system/power", { action }); } catch (_) { }
   document.getElementById("root").replaceChildren(h("div", { class: "unlock" },
     h("p", { class: "muted", text: action === "poweroff" ? "Shutting down …" : "Restarting …" })));
 }
@@ -272,7 +343,7 @@ function openUpdate() {
   const go = async () => {
     busy = true; msg = "Fetching and checking the release over Tor - this takes a few minutes …"; render();
     try {
-      const r = await api("POST", "/api/update");
+      const r = await api("POST", "/x/gui/update");
       done = r.ok;
       msg = r.ok ? "Done. Close Unseenet and start it again to use the new version. Your data is as it was."
         : "The update did not finish:\n" + (r.output || "");
@@ -302,14 +373,14 @@ function openNetwork() {
   loadSystem();
   const scan = async (dev) => {
     busy[dev] = true; render();
-    try { nets[dev] = await api("POST", "/api/system/wifi", { action: "scan", device: dev }); }
+    try { nets[dev] = await api("POST", "/x/gui/system/wifi", { action: "scan", device: dev }); }
     catch (e) { msg = e.message; }
     busy[dev] = false; render();
   };
   const connect = async (dev, name, pass) => {
     msg = "Connecting to " + name + " …"; render();
     try {
-      const r = await api("POST", "/api/system/wifi", { action: "connect", device: dev, name, passphrase: pass });
+      const r = await api("POST", "/x/gui/system/wifi", { action: "connect", device: dev, name, passphrase: pass });
       msg = r.ok ? "Connected to " + name + "." : r.message; pick = null;
       await loadSystem(); scan(dev);
     } catch (e) { msg = e.message; render(); }
@@ -345,7 +416,7 @@ function setupScreen() {
   const st = S.state, needName = !st.me, needNode = !st.node;
   if (needNode && S.knownNodes === null) {
     S.knownNodes = [];
-    api("GET", "/api/known-nodes").then(n => { S.knownNodes = n; if (!S.setupNode && n[0]) S.setupNode = n[0].address; render(); })
+    api("GET", "/api/known-nodes").then(r => { const n = r.nodes; S.knownNodes = n; if (!S.setupNode && n[0]) S.setupNode = n[0].address; render(); })
       .catch(() => {});
   }
   const submit = async (e) => {
@@ -353,8 +424,8 @@ function setupScreen() {
     const f = e.target;
     S.busy = true; S.error = ""; render();
     try {
-      S.state = await api("POST", "/api/setup", {
-        display: needName ? f.display.value : "", node: needNode ? (f.custom.value.trim() || S.setupNode || "") : "" });
+      await loadState(await api("POST", "/api/setup", {
+        display: needName ? f.display.value : "", node: needNode ? (f.custom.value.trim() || S.setupNode || "") : "" }));
       await afterUnlock();
     } catch (err) { S.error = err.message; }
     S.busy = false; render();
@@ -391,7 +462,10 @@ function allGroups() {
 }
 
 async function loadSidebar() {
-  try { S.sidebar = await api("GET", "/api/groups"); }
+  try {
+    const [d, st] = await Promise.all([api("GET", "/api/groups"), api("GET", "/api/settings")]);
+    S.sidebar = fromSidebar(d, st);
+  }
   catch (err) { S.status = err.message; }
   if (!S.gid) {
     const first = allGroups()[0];
@@ -420,7 +494,7 @@ async function loadGroup() {
   const gid = S.gid;
   try {
     const data = await api("GET", "/api/groups/" + encodeURIComponent(gid));
-    if (S.gid === gid) S.data = data;
+    if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow) };
   } catch (err) { S.status = err.message; }
 }
 
@@ -474,7 +548,7 @@ function sidebar() {
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl P" })),
     sb ? h("div", { class: "nav" },
-      item("for-you", "◄", "For you", forYouMarks(sb)),
+      item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
@@ -669,8 +743,8 @@ function threadsView(d) {
   const g = d.group, msgs = d.messages;
   if (!msgs.length) {
     return h("div", { class: "content" }, h("div", { class: "empty" },
-      h("h2", { text: g.id === "for-you" ? "Nothing for you yet" : "No posts yet" }),
-      h("p", { text: g.id === "for-you" ? "Replies to your posts, and posts that name you, show up here." :
+      h("h2", { text: g.id === FOR_YOU ? "Nothing for you yet" : "No posts yet" }),
+      h("p", { text: g.id === FOR_YOU ? "Replies to your posts, and posts that name you, show up here." :
         g.may_post ? "Be the first: press N to write a post." : "" })));
   }
   const cur = currentPost(msgs);
@@ -692,7 +766,7 @@ function threadsView(d) {
         m.private && !m.notice ? h("span", { class: "muted", text: "@ " }) : m.encrypted && !m.notice ? h("span", { class: "muted", text: "∩ " }) : null,
         // a reply with the thread's own subject: quieter, so new subjects stand out
         h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
-        g.id === "for-you" ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
+        g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
       h("span", { class: "from mono", text: m.who }),
       h("span", { class: "date", text: when(m.date) }))),
     pend.map(([job, p]) => h("div", { class: "prow pending" }, h("span", {}),
@@ -829,7 +903,7 @@ function linkGroups(text) {
 // and you choose to follow it - never without asking (as the TUI's #).
 async function goToGroup(ref) {
   let found;
-  try { found = await api("GET", "/api/group-ref?ref=" + encodeURIComponent(ref)); }
+  try { found = (await api("GET", "/api/group-ref?ref=" + encodeURIComponent(ref))).groups.map(fromGroup); }
   catch (x) { toast(x.message); return; }
   if (!found.length) { toast(`No group called ${ref.slice(1).split("@")[0]} on your nodes.`); return; }
   if (found[0].subscribed) { S.full = false; openGroup(found[0].id); return; }
@@ -911,7 +985,7 @@ function readerPane(g, m, msgs) {
   else if (m.private && m.verified) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " verified sender"));
   else if (!m.private) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " signed"));
   const parent = m.references.length ? msgs.find(x => x.id === m.references[m.references.length - 1]) : null;
-  const canReply = (g.may_post || g.private_reply) && g.id !== "for-you" && m.readable && m.key;
+  const canReply = (g.may_post || g.private_reply) && g.id !== FOR_YOU && m.readable && m.key;
   const pos = msgs.indexOf(m);
   return h("article", { class: "reader", "aria-label": "Post" },
     S.full ? h("div", { class: "fullbar" },
@@ -928,9 +1002,9 @@ function readerPane(g, m, msgs) {
         m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null)),
     h("div", { class: "pbar" },
       canReply ? h("button", { class: "btn primary", onclick: () => openReply(m, g) }, "Reply", h("kbd", { text: "R" })) : null,
-      g.id === "for-you" && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
+      g.id === FOR_YOU && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
-      g.id === "for-you" ? h("button", { class: "btn", onclick: async () => {
+      g.id === FOR_YOU ? h("button", { class: "btn", onclick: async () => {
         await openGroup(m.group); S.post = m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
       h("button", { class: "btn icon more-btn", "aria-label": "More", "aria-expanded": S.moreTools ? "true" : "false",
         onclick: () => { S.moreTools = !S.moreTools; render(); } }, "⋯"),
@@ -941,8 +1015,10 @@ function readerPane(g, m, msgs) {
         onclick: () => openPost(m.key, m.who.replace(/ √$/, "")) }, "Write a post") : null,
       !m.mine && m.key && !m.contact ? h("button", { class: "btn", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
       // the post's tools, as in the TUI: withdraw (D), report, ban its author (owner)
+      m.may_edit && m.kind !== "chat" ? h("button", { class: "btn", title: "Post a new version: everyone sees the newest (UN-RFC 0042)",
+        onclick: () => openEdit(m, g) }, "Edit") : null,
       m.may_withdraw ? h("button", { class: "btn", title: "Withdraw the post from the network (D)", onclick: () => openWithdraw(m) }, "Withdraw", h("kbd", { text: "D" })) : null,
-      !m.mine && !m.private && g.id !== "for-you" ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
+      !m.mine && !m.private && g.id !== FOR_YOU ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
       !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null),
@@ -978,7 +1054,7 @@ async function nextUnread() {
 }
 
 async function signatureText() {
-  try { const s = await api("GET", "/api/signature"); return s.preview || ""; } catch (_) { return ""; }
+  try { const s = await api("GET", "/api/settings"); return s.signature_preview || ""; } catch (_) { return ""; }
 }
 
 // A post's title in the list; a chat line among posts shows its first line (UN-RFC 0028).
@@ -1005,9 +1081,17 @@ async function openReply(m, g) {
       doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify }, { text }) });
 }
 
-function openComposeWindow({ g, title, subject, body, cursor, send, private: priv }) {
+// Edit your own post (UN-RFC 0042): a new version, in the same place in its thread.
+function openEdit(m, g) {
+  openComposeWindow({ g, title: "Edit your post in " + g.label, subject: m.subject, edit: true, cursor: 0,
+    body: (m.text || "").trimEnd() + "\n" + (m.signature ? "\n-- \n" + m.signature + "\n" : ""),
+    send: (subject, text) => doSend(`/api/groups/${encodeURIComponent(g.id)}/edit`, g.id,
+      { id: m.id, subject, body: text }, { text }) });
+}
+
+function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
   // mention notices (UN-RFC 0032): who would be told, and a box to say no
-  const N = { may: !priv && g && g.type !== "closed", names: [], max: 5,
+  const N = { may: !priv && !edit && g && g.type !== "closed", names: [], max: 5,
     on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
   const askWho = () => {
     clearTimeout(N.timer);
@@ -1034,7 +1118,8 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     if (!s || !own) { toast("Write something of your own above the signature."); return; }
     closeDialog();
     await send(s, b, N.may ? N.on : undefined);
-    toast(priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
+    toast(edit ? "Saving the new version - postage takes a few seconds." :
+      priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
   };
   S.dialog = { focus: "#body", render: () => dialogShell({ label: title, wide: true },
@@ -1067,6 +1152,13 @@ function pendingState(p) {
   if (p.state === "failed") return h("span", { class: "state bad", text: "Not sent: " + (p.error || "") });
   if (p.state === "sent") return h("span", { class: "state" }, svg(ICON.check, 14, 2.5), "sent");
   // a brand-new key ripens first, once (UN-RFC 0025): sequential, so t/next_at is exact
+  if (p.state === "ripening" && typeof p.fraction === "number") {
+    const pct = Math.min(99, Math.round(100 * p.fraction));
+    return h("span", { class: "sending", title: "A new key works a few minutes, once, before it can post. " +
+                       "That is what keeps throwaway keys from spamming." },
+      `Your new key is getting ready · ${pct}%`,
+      h("span", { class: "bar determinate" }, h("span", { style: `width:${pct}%` })));
+  }
   if (typeof p.fraction !== "number" && S.ripening && S.ripening.level === null && S.ripening.next_at) {
     const pct = Math.min(99, Math.round(100 * S.ripening.t / S.ripening.next_at));
     return h("span", { class: "sending", title: "A new key works a few minutes, once, before it can post. " +
@@ -1160,9 +1252,16 @@ function doPost(gid, body, local) {
 }
 
 async function doSend(path, gid, body, local) {
+  const sent = { ...body, kind: body.chat ? "chat" : "post" };     // UN-RFC 0028
+  delete sent.chat;
   try {
-    const { job } = await api("POST", path, body);
-    S.pending[job] = { group: gid, state: "pow", body, path, ...local };
+    let r;
+    try { r = await api("POST", path, sent); }
+    catch (err) {           // a group whose posts are also published outside Tor: ask first
+      if (!/portal|outside Tor/i.test(err.message) || !window.confirm(err.message + "\n\nPost anyway?")) throw err;
+      r = await api("POST", path, { ...sent, publish_outside_tor: true });
+    }
+    S.pending[r.job] = { group: gid, state: "pow", body, path, ...local };
   } catch (err) {
     S.pending["local" + Date.now()] = { group: gid, state: "failed", error: err.message, body, path, ...local };
   }
@@ -1277,7 +1376,7 @@ function openInfo() {
       g.owner ? h("button", { class: "btn", onclick: () => openBanned() }, `Banned (${(g.banned || []).length})`) : null,
       g.owner ? h("button", { class: "btn danger", onclick: openRemoveGroup }, "Remove group") : null,
       h("span", { class: "grow" }),
-      g.id !== "for-you" ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Unsubscribe") : null)) };
+      g.id !== FOR_YOU ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Unsubscribe") : null)) };
   render();
 }
 
@@ -1317,8 +1416,10 @@ function openEditGroup() {
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
         " Markdown: # headings, - lists, **strong**, [links](https://…), :tada: (no pictures)")],
     submit: async (v) => {
-      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/edit`,
-        { title: v.title.trim(), description: v.description.trim(), rules: v.rules.trim(), markdown: !!v.markdown, view, kinds });
+      const rules = v.rules.trim();
+      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/settings`,
+        { title: v.title.trim(), description: v.description.trim(), rules,
+          rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
 }
@@ -1399,7 +1500,7 @@ function openBanned(prefill = "") {
 // The moderation queue: posts sent to groups you moderate, waiting for you.
 function openModeration() {
   let list = null, err = "", at = 0, reason = "";
-  const load = () => api("GET", "/api/moderation").then(l => { list = l; at = Math.min(at, Math.max(0, l.length - 1)); if (S.dialog) render(); })
+  const load = () => api("GET", "/api/moderation").then(r => { const l = r.waiting.map(s => ({ ...s, text: s.body, markdown: isMd(s.content_type) })); list = l; at = Math.min(at, Math.max(0, l.length - 1)); if (S.dialog) render(); })
     .catch(e => { err = e.message; if (S.dialog) render(); });
   load();
   const act = async (approve) => {
@@ -1485,8 +1586,8 @@ function openNames() {
           sect("Names under yours (" + data.parents.map(p => "@" + p).join(", ") + ")"),
           data.requests.map(r => h("div", { class: "cmd" },
             h("span", { class: "nm" }, h("span", { class: "mono", text: r.name }), h("small", { text: " asked for by " + r.who })),
-            h("button", { class: "btn primary", onclick: () => act({ action: "answer", id: r.id, approve: true }) }, "Give"),
-            h("button", { class: "btn", onclick: () => act({ action: "answer", id: r.id, approve: false }) }, "Say no"))),
+            h("button", { class: "btn primary", onclick: () => act({ action: "approve", id: r.id }) }, "Give"),
+            h("button", { class: "btn", onclick: () => act({ action: "refuse", id: r.id }) }, "Say no"))),
           data.given.map(g => h("div", { class: "cmd" },
             h("span", { class: "nm" }, h("span", { class: "mono", text: g.name }), h("small", { text: ` ${g.who}, until ${when(g.expires)}` })),
             h("button", { class: "btn", onclick: () => act({ action: "revoke", name: g.name }, `Take ${g.name} back?`) }, "Take back"))),
@@ -1514,7 +1615,7 @@ async function ignorePerson(key, label, on = true) {
 
 function openIgnored() {
   let list = null;
-  const load = () => api("GET", "/api/ignore").then(l => { list = l; if (S.dialog) render(); });
+  const load = () => api("GET", "/api/ignore").then(r => { list = r.ignored; if (S.dialog) render(); });
   load();
   S.dialog = { render: () => dialogShell({ label: "People you ignore", wide: true },
     h("div", { class: "dh" }, h("h2", { text: "People you ignore" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
@@ -1544,7 +1645,7 @@ function openBlock(m) {
 
 async function toggleShowBlocked() {
   const on = !(S.sidebar && S.sidebar.show_blocked);
-  await api("POST", "/api/show-blocked", { on });
+  await api("POST", "/api/settings", { show_blocked: on });
   await loadSidebar(); await loadGroup(); render();
   toast(on ? "You see posts blocked by maintainers, marked." : "Posts blocked by maintainers are hidden.");
 }
@@ -1575,7 +1676,7 @@ function openReport(m) {
   let targets = null, err = "";
   const chosen = new Set();
   api("GET", `/api/groups/${encodeURIComponent(g.id)}/report?id=${encodeURIComponent(m.id)}`)
-    .then(t => { targets = t; t.forEach(x => chosen.add(x.i)); if (S.dialog) render(); })
+    .then(r => { const t = r.targets; targets = t; t.forEach(x => chosen.add(x.i)); if (S.dialog) render(); })
     .catch(e => { err = e.message; if (S.dialog) render(); });
   formDialog({ label: "Report post", title: "Report “" + subjectOf(m) + "”", focus: "#rnote", button: "Report",
     note: "For posts that break the group's rules or the law. In an emergency, contact the police: nobody on Unseenet can see who anyone is.",
@@ -1609,7 +1710,7 @@ async function openCompose() {
 
 function openBrowse() {
   let list = null, filter = "", err = "";
-  api("GET", "/api/browse").then(l => { list = l; if (S.dialog) render(); }).catch(e => { err = e.message; if (S.dialog) render(); });
+  api("GET", "/api/browse").then(r => { list = r.groups.map(fromGroup); if (S.dialog) render(); }).catch(e => { err = e.message; if (S.dialog) render(); });
   S.dialog = { focus: "#browse", render: () => {
     const shown = (list || []).filter(g => !filter || (g.label + " " + g.description).toLowerCase().includes(filter));
     return dialogShell({ label: "Groups on your node", wide: true },
@@ -1809,12 +1910,12 @@ function openInvite() {
 }
 
 async function openSignature() {
-  const cur = await api("GET", "/api/signature");
-  formDialog({ values: { template: cur.template }, label: "Signature", title: "Your signature", focus: "#sig", button: "Save",
+  const cur = await api("GET", "/api/settings");
+  formDialog({ values: { template: cur.signature }, label: "Signature", title: "Your signature", focus: "#sig", button: "Save",
     note: "Added below your posts (not chat). {name}, {key} and {fp} are filled in. Empty: no signature. At most 4 lines.",
     fields: (vals) => [h("label", { for: "sig", class: "sr", text: "Signature" }),
       h("textarea", { id: "sig", name: "template", class: "in mono", value: vals.template, "data-k": "sig", style: "min-height:100px" })],
-    submit: async (v) => { await api("POST", "/api/signature", { template: v.template }); closeDialog(); toast("Signature saved."); } });
+    submit: async (v) => { await api("POST", "/api/settings", { signature: v.template }); closeDialog(); toast("Signature saved."); } });
 }
 
 function selectedPost() {
@@ -1835,14 +1936,14 @@ function commands() {
     { name: "People you ignore", key: "", run: openIgnored },
     { name: S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false ? "Tell people you mention" : "Stop telling people you mention", key: "",
       run: async () => { const on = !!(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false);
-        await api("POST", "/api/notices", { send: on }); await loadSidebar();
+        await api("POST", "/api/settings", { notices: { send: on } }); await loadSidebar();
         toast(on ? "People you mention by name are told in their inbox (you can say no per post)." : "People you mention are no longer told; they see it if they follow the group."); } },
     { name: S.sidebar && S.sidebar.notices && S.sidebar.notices.receive === false ? "Show mention notices" : "Stop showing mention notices", key: "",
       run: async () => { const on = !!(S.sidebar && S.sidebar.notices && S.sidebar.notices.receive === false);
-        await api("POST", "/api/notices", { receive: on }); await loadSidebar();
+        await api("POST", "/api/settings", { notices: { receive: on } }); await loadSidebar();
         toast(on ? "Mentions of you in groups you do not follow show in For you." : "Mention notices from others are no longer shown."); } },
     { name: S.sidebar && S.sidebar.markdown === false ? "Write Markdown (*emphasis*, `code`, :tada:)" : "Write plain text instead of Markdown", key: "",
-      run: async () => { const on = !(S.sidebar && S.sidebar.markdown !== false); await api("POST", "/api/markdown", { on }); await loadSidebar();
+      run: async () => { const on = !(S.sidebar && S.sidebar.markdown !== false); await api("POST", "/api/settings", { markdown: on }); await loadSidebar();
         toast(on ? "You write Markdown: *emphasis*, **strong**, `code`, lists, :tada:" : "You write plain text: sent and shown exactly as typed."); } },
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
@@ -1868,7 +1969,7 @@ function commands() {
     { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
     { name: "Private posts", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
     { name: "Chat with someone", key: "", run: () => openWrite("", "chat") },
-    { name: "For you: replies and mentions", key: "", run: () => openGroup("for-you") },
+    { name: "For you: replies and mentions", key: "", run: () => openGroup(FOR_YOU) },
   ].filter(c => c.when === undefined || c.when);
   return cmds.concat(allGroups().map(x => ({ name: x.label, group: x, key: "", run: () => openGroup(x.id) })));
 }
@@ -1933,7 +2034,7 @@ document.addEventListener("keydown", (e) => {
       n: () => step(1), p: () => step(-1), j: () => step(1), ArrowDown: () => step(1), ArrowUp: () => step(-1),
       q: back, f: back, Enter: back,
       " ": () => { if (sc && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4) sc.scrollBy({ top: sc.clientHeight * 0.9 }); else nextUnread(); },
-      r: () => { if (cur && (g.may_post || g.private_reply) && g.id !== "for-you") openReply(cur, g); },
+      r: () => { if (cur && (g.may_post || g.private_reply) && g.id !== FOR_YOU) openReply(cur, g); },
       m: () => { if (cur && !cur.mine && cur.key) { S.full = false; openGroup("contact:" + cur.key); } },
       "#": () => groupsInPost(cur),
     }[key];
@@ -1955,7 +2056,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === " ") { e.preventDefault(); nextUnread(); }
   else if ((key === "Enter" || key === "f") && cur && cur.notice) { e.preventDefault(); openMentioned(cur); }
   else if (key === "Enter" || key === "f") { e.preventDefault(); S.full = true; render(); }
-  else if (key === "r" && cur && (g.may_post || g.private_reply) && g.id !== "for-you") { e.preventDefault(); openReply(cur, g); }
+  else if (key === "r" && cur && (g.may_post || g.private_reply) && g.id !== FOR_YOU) { e.preventDefault(); openReply(cur, g); }
   else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
   else if (e.key === "#" && cur) { e.preventDefault(); groupsInPost(cur); }
 });
@@ -1967,54 +2068,62 @@ function connectEvents() {
   const ws = new WebSocket(`ws://${location.host}/api/events`, ["unseenet", "unseenet-token." + TOKEN]);
   S.ws = ws;
   ws.onopen = async () => {          // catch up on what happened before we were listening
-    try { S.state = await api("GET", "/api/state"); } catch (_) { }
+    try { await loadState(); } catch (_) { }
     await loadGroup(); await loadSidebar();
   };
   ws.onmessage = async (ev) => {
     let e;
     try { e = JSON.parse(ev.data); } catch (_) { return; }
-    if (e.type === "status") {
+    const type = e.event;
+    const sidebarSoon = () => {
+      clearTimeout(sidebarTimer);
+      sidebarTimer = setTimeout(async () => {
+        try { await loadState(); } catch (_) { }
+        await loadSidebar();
+      }, 250);
+    };
+    if (type === "status") {
       S.state.status = e.text;
       S.state.connected = /^Connected/.test(e.text) ? true : /^Offline/.test(e.text) ? false : S.state.connected;
       const st = document.querySelector(".statusbar");
       if (st && !S.dialog) st.replaceWith(statusbar()); else render();
-    } else if (e.type === "update") {
-      try { S.state = await api("GET", "/api/state"); } catch (_) { }
+    } else if (type === "release-offer") {
+      try { await loadState(); } catch (_) { }
       const st = document.querySelector(".statusbar");
       if (st && !S.dialog) st.replaceWith(statusbar());
-    } else if (e.type === "update-progress") {
+    } else if (type === "x-gui-update") {
       updateProgress(e.text);
-    } else if (e.type === "groups") {
-      clearTimeout(sidebarTimer);
-      sidebarTimer = setTimeout(async () => {
-        try { S.state = await api("GET", "/api/state"); } catch (_) { }
-        await loadSidebar();
-      }, 250);
-    } else if (e.type === "group" && (e.id === S.gid || S.gid === "for-you" ||
-               (S.gid && S.gid.startsWith("contact:") && S.sidebar && e.id === S.sidebar.inbox.id))) {
-      await loadGroup(); render();
-    } else if (e.type === "pow") {
-      const p = S.pending[e.job];
-      if (!p) return;
-      const before = Math.round((p.fraction || 0) * 100);
-      p.fraction = e.fraction;
-      if (Math.round(e.fraction * 100) !== before) render();    // at most a hundred redraws
-    } else if (e.type === "node") {
+    } else if (type === "groups-changed" || type === "refreshed" || type === "inbox-ready") {
+      sidebarSoon();
+    } else if (type === "group-updated") {
+      if (e.new) sidebarSoon();                                // counts in the sidebar
+      if (e.group_id === S.gid || S.gid === FOR_YOU ||
+          (S.gid && S.gid.startsWith("contact:") && S.sidebar && e.group_id === S.sidebar.inbox.id)) {
+        await loadGroup(); render();
+      }
+    } else if (type === "node-state") {
       S.nodes = S.nodes || {};
       S.nodes[e.address] = { up: e.up, error: e.error };
-    } else if (e.type === "tor") {
+    } else if (type === "tor-state") {
       S.tor = { progress: e.progress, summary: e.summary };
       if (e.progress < 100 && !S.dialog) {
         S.state.status = `Tor: ${e.progress}% ${e.summary || ""}`.trim();
         const st = document.querySelector(".statusbar");
         if (st) st.replaceWith(statusbar());
       }
-    } else if (e.type === "ripening") {
+    } else if (type === "ripening") {
       S.ripening = { level: e.level, next_at: e.next_at, t: e.t };
+      sidebarSoon();
       if (Object.keys(S.pending).length) render();             // a waiting message shows it
-    } else if (e.type === "post") {
+    } else if (type === "job") {                                // a post on its way (section 5)
       const p = S.pending[e.job];
       if (!p) return;
+      if (e.state === "pow" || e.state === "ripening") {
+        const before = p.state + Math.round((p.fraction || 0) * 100);
+        p.state = e.state; p.fraction = e.fraction;
+        if (p.state + Math.round((e.fraction || 0) * 100) !== before) render();   // at most a hundred redraws
+        return;
+      }
       p.state = e.state; p.error = e.error;
       if (e.state === "reached") {
         delete S.pending[e.job];
@@ -2032,7 +2141,7 @@ function connectEvents() {
   render();
   if (!TOKEN) return;
   try {
-    S.state = await api("GET", "/api/state");
+    await loadState();
     if (S.state.unlocked) await afterUnlock();
   } catch (err) {
     S.state = { unlocked: false, vault: "", vault_exists: true };

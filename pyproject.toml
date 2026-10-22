@@ -12,7 +12,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Andreas Lorensen" }]
 requires-python = ">=3.11"
 dependencies = [
-    "unseenet @ git+https://github.com/unseenet/unseenet@main",
+    "unseenet[api] @ git+https://github.com/unseenet/unseenet@main",
     "aiohttp>=3.9",
 ]
 classifiers = [

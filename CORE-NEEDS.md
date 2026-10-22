@@ -100,6 +100,8 @@ in `Runtime.post(chat=True)`.
 
 ## 8. The local client API as a UN-RFC
 
+**Status:** done. UN-RFC 0046 (unseenet#301), implemented in the core as `unseenet.client.localapi` (unseenet#302-#305). This client is now the core's API with its page and an extension under `/x/gui/` (#38): `runtime.py` and `serialize.py` are gone.
+
 The HTTP and WebSocket API in `server.py` (`/api/state`, `/api/groups`,
 `/api/groups/{id}`, `/post`, `/read`, `/view`, `/api/events`) plus its security
 rules (127.0.0.1 only, per-start token, Host and Origin checks, no keys in the
