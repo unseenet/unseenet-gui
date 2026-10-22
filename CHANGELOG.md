@@ -9,6 +9,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Fixed
 
+- Compose windows keep their text, selection and ongoing typing when status or
+  group updates arrive. Mention lookups stay with the draft that requested them. (#47)
 - The playground (`tools/dev.sh`) seeds chat lines as chat lines, not as
   posts with the subject "chat".
 
