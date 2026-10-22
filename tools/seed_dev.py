@@ -94,13 +94,13 @@ async def main() -> None:
     for text, who in [("Er der nogen her?", mikkel), ("Ja da! Webklienten virker.", tove),
                       ("Fedt - jeg tester chat nu.", mikkel), ("Den ser godt ud i mørkt tema.", tove),
                       ("Og den kører fra en USB-stick.", mikkel)]:
-        await who.post(chat, "chat", text)
+        await who.post(chat, "", text, kind="chat")
 
     for p in (mikkel, tove):           # pick up the invitation
         p.subscribe(ops)
         await p.fetch_group(ops)
-    await tove.post(ops, "chat", "node4 is back after the reboot.")
-    await mikkel.post(ops, "chat", "Catch-up by pull took about 40 s for all groups.")
+    await tove.post(ops, "", "node4 is back after the reboot.", kind="chat")
+    await mikkel.post(ops, "", "Catch-up by pull took about 40 s for all groups.", kind="chat")
     for p in people:
         await p.close()
     print("seeded", talk, chat, ops)
