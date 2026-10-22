@@ -21,7 +21,10 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CORE_REF: main          # the unseenet core these builds are made with
+  # The unseenet core these builds are made with: a release (vX.Y.Z) is built with
+  # the core release named here (keep it within the range pyproject.toml asks for);
+  # main, pull requests and dev builds with the core's main, to find breakage early.
+  CORE_REF: ${{ startsWith(github.ref, 'refs/tags/v') && 'v0.4.1' || 'main' }}
 
 jobs:
   tor:
@@ -233,8 +236,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           if [ "${GITHUB_REF#refs/tags/}" != "$GITHUB_REF" ]; then
-            gh release create "$GITHUB_REF_NAME" files/* --title "Unseenet graphical $GITHUB_REF_NAME" \
-              --notes "Portable builds with Tor inside, and the bootable graphical image. Pre-alpha."
+            # release.yml makes the release with the CHANGELOG notes (and PyPI); add the builds
+            for i in $(seq 1 40); do
+              gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break
+              sleep 30
+            done
+            gh release upload "$GITHUB_REF_NAME" files/* --clobber
           else
             gh release delete dev --yes --cleanup-tag 2>/dev/null || true
             gh release create dev files/* --prerelease --latest=false --target "$GITHUB_SHA" \
