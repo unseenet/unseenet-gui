@@ -66,9 +66,19 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .btn.primary kbd { background: rgba(16, 48, 42, 0.18); color: var(--ink); }
 .btn.icon { width: 40px; padding: 0; justify-content: center; font-weight: 700; }
 .btn:disabled { opacity: 0.5; cursor: default; }
+/* you may not use it here: greyed out, and its title (and a click) says why (#13) */
+.btn.off, .btn.off:hover { opacity: 0.45; cursor: not-allowed; border-color: var(--line-2); }
+.btn.primary.off, .btn.primary.off:hover { background: transparent; color: var(--muted); }
+.chatbar.off input { opacity: 0.6; cursor: not-allowed; }
+.chatbar.off .send { opacity: 0.4; }
 .link { border: none; background: none; color: var(--muted); padding: 4px 8px; border-radius: 6px;
   min-height: 32px; font-size: 13px; }
 .link:hover { color: var(--paper); background: var(--ink-2); }
+/* an author's name: opens their profile (#20) */
+.name-btn { background: none; border: none; padding: 0; margin: 0; color: inherit; font: inherit; cursor: pointer; }
+.name-btn:hover .name, .name-btn:focus-visible .name { text-decoration: underline; }
+.profile-links { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; word-break: break-all; }
+.profile-about { max-height: 320px; overflow: auto; }
 
 /* ---- unlock ------------------------------------------------------------- */
 .unlock { min-height: 100%; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
