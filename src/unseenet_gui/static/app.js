@@ -418,7 +418,10 @@ function setupScreen() {
   const st = S.state, needName = !st.me, needNode = !st.node;
   if (needNode && S.knownNodes === null) {
     S.knownNodes = [];
-    api("GET", "/api/known-nodes").then(r => { const n = r.nodes; S.knownNodes = n; if (!S.setupNode && n[0]) S.setupNode = n[0].address; render(); })
+    api("GET", "/api/known-nodes").then(r => { const n = r.nodes; S.knownNodes = n;
+      // a known node at random, so new users do not all start on the first (UN-RFC 0043 5.1)
+      if (!S.setupNode && n.length) S.setupNode = n[Math.floor(Math.random() * n.length)].address;
+      render(); })
       .catch(() => {});
   }
   const submit = async (e) => {
