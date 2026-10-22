@@ -229,8 +229,15 @@ function render() {
     const start = el._v0 ?? "";
     if (el.value !== start) typed.push([el.dataset.k, start, el.value]);
   });
-  root.replaceChildren(view());
-  if (S.dialog) document.getElementById("root").append(S.dialog.render());
+  const dialogNode = S.dialog && S.dialog.node;
+  const keepDialog = dialogNode && dialogNode.parentNode === root;
+  // Keep a compose window attached: replacing its fields loses drafts and undo,
+  // and even moving the same fields out and back interrupts text composition (#47).
+  if (keepDialog) root.firstChild.replaceWith(view());
+  else {
+    root.replaceChildren(view());
+    if (S.dialog) root.append(dialogNode || S.dialog.render());
+  }
   for (const [k, start, value] of typed) {
     const el = root.querySelector(`[data-k="${CSS.escape(k)}"]`);
     if (el && (el._v0 ?? "") === start && el.value === start) el.value = value;
@@ -242,6 +249,7 @@ function render() {
   });
   const now = root.querySelector(".ptable .prow.on");
   if (anchor && now && now.dataset.id === anchor.id) now.parentElement.scrollTop = now.offsetTop - anchor.off;
+  if (keepDialog && dialogNode.contains(active)) return;
   // A dialog takes the focus from the page behind it; inside a dialog, keep the field you were in.
   const inDialog = active && active.closest && active.closest(".dialog");
   const again = key && (!S.dialog || inDialog) && root.querySelector(`[data-k="${CSS.escape(key)}"]`);
@@ -1150,20 +1158,28 @@ function openEdit(m, g) {
 }
 
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
+  const dialog = { focus: "#body", node: null };
   // mention notices (UN-RFC 0032): who would be told, and a box to say no
   const N = { may: !priv && !edit && g && g.type !== "closed", names: [], max: 5,
     on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
+  let lookup = 0;
   const askWho = () => {
     clearTimeout(N.timer);
+    const version = ++lookup;
+    if (!N.may) return;
     N.timer = setTimeout(async () => {
-      const f = document.querySelector(".dialog form");
-      if (!f || !N.may) return;
+      if (S.dialog !== dialog || version !== lookup) return;
+      const f = dialog.node.querySelector("form");
       try {
         const r = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/mentioned`, { subject: f.subject.value, body: f.body.value });
+        if (S.dialog !== dialog || version !== lookup) return;
         N.may = r.may; N.names = r.names; N.max = r.max || 5;
       } catch (_) { return; }
-      const el = document.getElementById("notify-who");
-      if (el) el.textContent = whoText();
+      const el = dialog.node.querySelector("#notify-who");
+      if (el) {
+        if (N.may) el.textContent = whoText();
+        else { dialog.node.querySelector(".check").remove(); el.remove(); }
+      }
     }, 400);
   };
   const whoText = () => !N.names.length ? "" : !N.on ?
@@ -1172,7 +1188,8 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       (N.names.length > N.max ? `  (at most ${N.max}; not told: ${N.names.slice(N.max).join(", ")})` : "");
   const go = async (e) => {
     e && e.preventDefault();
-    const f = document.querySelector(".dialog form");
+    if (S.dialog !== dialog) return;
+    const f = dialog.node.querySelector("form");
     const s = f.subject.value.trim(), b = f.body.value.replace(/\s+$/, "");
     const own = b.split(/\n-- \n/)[0].split("\n").filter(ln => !/^>/.test(ln) && !/ wrote:$/.test(ln)).join("").trim();
     if (!s || !own) { toast("Write something of your own above the signature."); return; }
@@ -1182,29 +1199,28 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
   };
-  S.dialog = { focus: "#body", render: () => dialogShell({ label: title, wide: true },
+  dialog.node = dialogShell({ label: title, wide: true },
     h("div", { class: "dh" }, h("h2", { text: title }),
       h("button", { class: "btn primary dh-send", onclick: go }, priv ? "Send" : "Post"),   // phones: above the keyboard
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
       h("label", { for: "subject", text: "Subject" }),
-      h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject }),
+      h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
       h("label", { for: "body", text: "Text" }),
       h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true", oninput: askWho }),
       N.may ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: N.on,
-        onchange: (e) => { N.on = e.target.checked; const el = document.getElementById("notify-who"); if (el) el.textContent = whoText(); } }),
+        onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
       h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
         "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
         (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),
     h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
-      h("button", { class: "btn primary", onclick: go }, priv ? "Send" : "Post", h("kbd", { text: "Ctrl S" })))) };
+      h("button", { class: "btn primary", onclick: go }, priv ? "Send" : "Post", h("kbd", { text: "Ctrl S" }))));
+  S.dialog = dialog;
   render();
-  const ta = document.getElementById("body");
+  const ta = dialog.node.querySelector("#body");
   if (ta && cursor != null) { ta.focus(); ta.setSelectionRange(cursor, cursor); ta.scrollTop = 0; }
-  const sj = document.getElementById("subject");
-  if (sj) sj.addEventListener("input", askWho);
   askWho();
 }
 
