@@ -20,6 +20,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 - Your own chat line or post shows up at once, clearly greyed out with its
   progress, instead of vanishing until it is back from the node. It turns
   normal when the node has it, without a gap or a duplicate (#48).
+- The first start offers the known nodes to choose from again: the core
+  refused the list until setup was done (unseenet#372, fixed in the core).
+  If the list cannot be loaded, the screen now says so, with "Try again",
+  instead of showing only the address field.
 
 ## [0.1.1] - 2026-10-23
 
