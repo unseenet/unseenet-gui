@@ -102,11 +102,18 @@ def pyinstaller(plat: str, work: Path, core: Path) -> Path:
     if not plat.startswith("linux"):
         cmd += ["--collect-all", "webview"]          # the app window (WebView2 / WKWebView)
     # chiavdf on Windows (key ripening, UN-RFC 0025): mpir.dll loads a variant for the CPU
-    # (mpir_broadwell.dll, ...) at run time, which PyInstaller cannot see (as unseenet#306)
+    # (mpir_broadwell.dll, ...) at run time, which PyInstaller cannot see (as unseenet#306).
+    # Up to 1.1 they lie in site-packages; from 1.2 in site-packages/chiavdf.libs, which
+    # chiavdf adds to the DLL search itself (as unseenet#332).
     if windows:
         import sysconfig
-        for dll in sorted(Path(sysconfig.get_paths()["platlib"]).glob("mpir*.dll")):
+        site = Path(sysconfig.get_paths()["platlib"])
+        for dll in sorted(site.glob("mpir*.dll")):
             cmd += ["--add-binary", f"{dll}{os.pathsep}."]
+        for dll in sorted((site / "chiavdf.libs").glob("*.dll")):
+            cmd += ["--add-binary", f"{dll}{os.pathsep}chiavdf.libs",
+                    "--add-binary", f"{dll}{os.pathsep}."]
+        cmd += ["--hidden-import", "chiavdf._chiavdf"]
     if not plat.startswith("windows"):
         cmd.append("--strip")
     ico = work / "unseenet.ico"
