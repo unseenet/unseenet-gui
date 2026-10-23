@@ -11,6 +11,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 - The playground (`tools/dev.sh`) seeds chat lines as chat lines, not as
   posts with the subject "chat".
+- The portable build for Windows takes chiavdf 1.2's DLLs from
+  `chiavdf.libs` as well, or it could not ripen keys (#51).
 
 ## [0.1.0] - 2026-10-22
 
