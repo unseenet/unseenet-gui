@@ -247,7 +247,9 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .mg.mine { align-self: flex-end; flex-direction: row-reverse; }
 .mg.mine .col { align-items: flex-end; }
 .mg.mine .bubble { background: var(--own); color: var(--on-green); border-radius: 14px 4px 14px 14px; }
-.mg.mine .bubble.pending { opacity: 0.72; }
+/* on its way (#48): clearly grey, not just a little faded, until the node has it */
+.mg.mine .bubble.pending { background: var(--ink-2); color: var(--muted);
+  border: 1px dashed var(--muted); }
 .mg.mine .bubble.failed { background: var(--red); color: #fff; }
 .quote { display: block; font-size: 12px; color: var(--muted); padding: 4px 8px; margin-bottom: 6px;
   border-radius: 6px; background: var(--ink); }
@@ -381,7 +383,8 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .prow .you { color: var(--amber); }
 .prow .from, .prow .date { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   font-size: 12px; color: var(--muted); }
-.prow.pending { opacity: 0.8; cursor: default; }
+.prow.pending { cursor: default; color: var(--muted); font-style: italic; }
+.prow.pending .date { overflow: visible; }
 .news .reader { flex: 1 1 auto; min-height: 0; }
 .news.full .ptable { display: none; }
 .reader .pbody { max-width: 46em; margin-left: 46px; }
