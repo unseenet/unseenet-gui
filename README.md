@@ -210,7 +210,7 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and
 releases on [PyPI](https://pypi.org/p/unseenet-gui) and here with the
 portable builds and the image. Each release names the minor version of
-unseenet it works with (`unseenet[api]>=0.4.1,<0.5`).
+unseenet it works with (`unseenet[api]>=0.4.4,<0.5`).
 
 To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
 new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
