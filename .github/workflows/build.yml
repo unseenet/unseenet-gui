@@ -24,7 +24,7 @@ env:
   # The unseenet core these builds are made with: a release (vX.Y.Z) is built with
   # the core release named here (keep it within the range pyproject.toml asks for);
   # main, pull requests and dev builds with the core's main, to find breakage early.
-  CORE_REF: ${{ startsWith(github.ref, 'refs/tags/v') && 'v0.4.1' || 'main' }}
+  CORE_REF: ${{ startsWith(github.ref, 'refs/tags/v') && 'v0.4.3' || 'main' }}
 
 jobs:
   tor:
