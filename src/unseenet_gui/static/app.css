@@ -116,6 +116,15 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 /* ---- app shell ------------------------------------------------------------ */
 .app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 .body { flex: 1 1 auto; min-height: 0; display: flex; }
+/* a new key getting ready in the browser: keep the page open (#50) */
+.ripebar { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 8px 16px;
+  background: var(--ink-deep); border-bottom: 1px solid var(--line-2); font-size: 13px; }
+.ripebar > span:first-child { flex: 1 1 260px; }
+.ripebar b { color: var(--amber); }
+.ripebar .bar { width: 120px; }
+.me .ripe { display: block; padding: 0; font-size: 12px; text-align: left; max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me .ripe:hover { background: none; color: var(--paper); text-decoration: underline; }
 .side { flex: 0 0 272px; min-height: 0; overflow-y: auto; background: var(--ink-deep);
   border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 12px; gap: 16px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 4px; font-family: var(--mono);
