@@ -444,13 +444,19 @@ function openNetwork() {
 function setupScreen() {
   const st = S.state, needName = !st.me, needNode = !st.node;
   if (needNode && S.knownNodes === null) {
-    S.knownNodes = [];
-    api("GET", "/api/known-nodes").then(r => { const n = r.nodes; S.knownNodes = n;
+    S.knownNodes = []; S.nodesState = "loading";
+    api("GET", "/api/known-nodes").then(r => { const n = r.nodes; S.knownNodes = n; S.nodesState = "";
       // a known node at random, so new users do not all start on the first (UN-RFC 0043 5.1)
       if (!S.setupNode && n.length) S.setupNode = n[Math.floor(Math.random() * n.length)].address;
       render(); })
-      .catch(() => {});
+      // say so: without the list a new user only sees an address field they cannot fill in
+      .catch(err => { S.nodesState = err.message || "unknown error"; render(); });
   }
+  const nodesNote = S.nodesState === "loading" ? h("p", { class: "hint", text: "Getting the list of nodes …" }) :
+    S.nodesState ? h("div", { class: "hint", role: "alert" },
+      "The list of nodes could not be loaded (" + S.nodesState + "). ",
+      h("button", { type: "button", class: "link", onclick: () => { S.knownNodes = null; S.nodesState = ""; render(); } }, "Try again"),
+      " - or type a node's address below.") : null;
   const submit = async (e) => {
     e.preventDefault();
     const f = e.target;
@@ -476,6 +482,7 @@ function setupScreen() {
           onclick: () => { S.setupNode = n.address; render(); } },
           h("span", {}, h("span", { class: "mono", text: n.name || n.address }),
             h("small", { text: n.description || n.operator || n.address }))))),
+        nodesNote,
         h("input", { name: "custom", class: "field mono", "data-k": "custom", placeholder: "or an address: xyz.onion or host:port",
           style: "font-size:14px" })] : null,
       h("div", { class: "error", role: "alert", text: S.error }),
