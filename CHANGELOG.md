@@ -7,6 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+### Added
+
+- Key ripening is explained where it shows: your key's level under your name,
+  and a dialog with the progress, the time left, and what the levels do. With
+  a core that can (unseenet#337), it pauses and resumes. On the web, a new key
+  getting ready asks you to keep the page open and keeps the screen on where
+  the browser allows (#50).
+
 ## [0.1.1] - 2026-10-23
 
 Fixes; the builds are made with unseenet 0.4.3.
