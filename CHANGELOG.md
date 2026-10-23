@@ -7,10 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-10-23
+
+Fixes; the builds are made with unseenet 0.4.3.
+
 ### Fixed
 
 - Compose windows keep their text, selection and ongoing typing when status or
-  group updates arrive. Mention lookups stay with the draft that requested them. (#47)
+  group updates arrive. Mention lookups stay with the draft that requested them (#47, by @KingEmma7).
 - The playground (`tools/dev.sh`) seeds chat lines as chat lines, not as
   posts with the subject "chat".
 - The portable build for Windows takes chiavdf 1.2's DLLs from
@@ -73,5 +77,6 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/unseenet/unseenet-gui/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/unseenet/unseenet-gui/releases/tag/v0.1.0
