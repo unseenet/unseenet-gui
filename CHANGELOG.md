@@ -20,15 +20,20 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   the order of suggestions are the core's (`GET /api/emoji`, unseenet#362), so
   this needs unseenet 0.5; with an older core the button stays away (#21).
 
+## [0.1.2] - 2026-10-23
+
+Fixes, from the new `release/0.1` branch; the builds are made with unseenet
+0.4.4, which this version needs.
+
 ### Fixed
 
+- The first start offers the known nodes to choose from again: the core
+  refused the list until setup was done (unseenet#372, fixed in unseenet
+  0.4.4). If the list cannot be loaded, the screen now says so, with "Try
+  again", instead of showing only the address field.
 - Your own chat line or post shows up at once, clearly greyed out with its
   progress, instead of vanishing until it is back from the node. It turns
   normal when the node has it, without a gap or a duplicate (#48).
-- The first start offers the known nodes to choose from again: the core
-  refused the list until setup was done (unseenet#372, fixed in the core).
-  If the list cannot be loaded, the screen now says so, with "Try again",
-  instead of showing only the address field.
 
 ## [0.1.1] - 2026-10-23
 
@@ -100,6 +105,7 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/unseenet/unseenet-gui/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/unseenet/unseenet-gui/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/unseenet/unseenet-gui/releases/tag/v0.1.0
