@@ -15,6 +15,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   getting ready asks you to keep the page open and keeps the screen on where
   the browser allows (#50).
 
+### Fixed
+
+- Your own chat line or post shows up at once, clearly greyed out with its
+  progress, instead of vanishing until it is back from the node. It turns
+  normal when the node has it, without a gap or a duplicate (#48).
+
 ## [0.1.1] - 2026-10-23
 
 Fixes; the builds are made with unseenet 0.4.3.

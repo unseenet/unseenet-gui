@@ -31,7 +31,7 @@ theme();
 
 const S = {
   state: null, sidebar: null, gid: null, data: null, thread: null, replyTo: null,
-  pending: {}, drafts: {}, dialog: null, status: "", error: "", busy: false,
+  pending: {}, early: {}, drafts: {}, dialog: null, status: "", error: "", busy: false,
   knownNodes: null, setupNode: null, ws: null, mobileReading: false,
   pane: "groups",          // on a phone: one pane at a time - "groups", or the group
   moreTools: false,        // on a phone: the post's less used tools shown
@@ -810,15 +810,18 @@ function currentPost(msgs) {
 function threadsView(d) {
   const g = d.group, msgs = d.messages;
   if (!msgs.length) {
-    return h("div", { class: "content" }, h("div", { class: "empty" },
-      h("h2", { text: g.id === FOR_YOU ? "Nothing for you yet" : "No posts yet" }),
-      h("p", { text: g.id === FOR_YOU ? "Replies to your posts, and posts that name you, show up here." :
-        mayWrite(d, "post").allowed ? "Be the first: press N to write a post." : mayWrite(d, "post").reason })));
+    const pend = pendingIn(g, msgs, false);              // your first post on its way (#48)
+    return h("div", { class: "content" }, pend.length ?
+      h("section", { class: "ptable", "aria-label": "Posts" }, pend.map(([job, p]) => pendingRow(job, p))) :
+      h("div", { class: "empty" },
+        h("h2", { text: g.id === FOR_YOU ? "Nothing for you yet" : "No posts yet" }),
+        h("p", { text: g.id === FOR_YOU ? "Replies to your posts, and posts that name you, show up here." :
+          mayWrite(d, "post").allowed ? "Be the first: press N to write a post." : mayWrite(d, "post").reason })));
   }
   const cur = currentPost(msgs);
   S.post = cur.id;
   markRead([cur]);
-  const pend = Object.entries(S.pending).filter(([, p]) => p.group === g.id && !p.chat);
+  const pend = pendingIn(g, msgs, false);
   const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
       h("span", { text: "From" }), h("span", { text: "Date" })),
@@ -837,13 +840,17 @@ function threadsView(d) {
         g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
       h("span", { class: "from mono" }, m.who, m.bot ? h("span", { class: "muted", text: " · bot" }) : null),
       h("span", { class: "date", text: when(m.date) }))),
-    pend.map(([job, p]) => h("div", { class: "prow pending" }, h("span", {}),
-      h("span", { class: "sj", text: p.body.subject || "" }),
-      h("span", { class: "from mono", text: S.state.me.label }),
-      h("span", { class: "date" }, p.state === "failed" ?
-        h("button", { class: "link", onclick: () => retry(job), title: p.error || "" }, "Not sent - again") : pendingState(p)))));
+    pend.map(([job, p]) => pendingRow(job, p)));
   return h("div", { class: "content news" + (S.full ? " full" : "") + (S.mobileReading ? " reading" : "") },
     table, readerPane(g, cur, msgs));
+}
+
+function pendingRow(job, p) {
+  return h("div", { class: "prow pending" + (p.state === "failed" ? " failed" : ""), "data-job": job }, h("span", {}),
+    h("span", { class: "sj", text: p.body.subject || "" }),
+    h("span", { class: "from mono", text: S.state.me.label }),
+    h("span", { class: "date" }, p.state === "failed" ?
+      h("button", { class: "link", onclick: () => retry(job), title: p.error || "" }, "Not sent - again") : pendingState(p)));
 }
 
 function sameSubject(m, msgs) {
@@ -1229,6 +1236,8 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
 function pendingState(p) {
   if (p.state === "failed") return h("span", { class: "state bad", text: "Not sent: " + (p.error || "") });
   if (p.state === "sent") return h("span", { class: "state" }, svg(ICON.check, 14, 2.5), "sent");
+  if (p.state === "reached") return h("span", { class: "state ok" }, svg(ICON.checks, 14, 2.5), "reached the node");
+  if (p.state === "queued") return h("span", { class: "sending" }, "Sending …");
   // a brand-new key ripens first, once (UN-RFC 0025): sequential, so t/next_at is exact
   if (p.state === "ripening" && typeof p.fraction === "number") {
     const pct = Math.min(99, Math.round(100 * p.fraction));
@@ -1423,14 +1432,14 @@ function chatView(d) {
   if (msgs.length && msgs[msgs.length - 1].mine && last.classList && last.classList.contains("mg")) {
     last.querySelector(".col").append(h("div", { class: "state ok" }, svg(ICON.checks, 14, 2.5), "reached the node"));
   }
-  for (const [job, p] of Object.entries(S.pending)) {
-    if (p.group !== g.id || !p.chat || p.state === "reached") continue;
-    out.push(h("div", { class: "mg mine" }, h("div", { class: "col" },
+  const pend = pendingIn(g, msgs, true);
+  for (const [job, p] of pend) {
+    out.push(h("div", { class: "mg mine", "data-job": job }, h("div", { class: "col" },
       h("div", { class: "bubble " + (p.state === "failed" ? "failed" : "pending"), text: p.text }),
       p.state === "failed" ? h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ",
         h("button", { class: "link", onclick: () => { retry(job); } }, "Try again")) : pendingState(p))));
   }
-  if (msgs.length === 0 && !Object.keys(S.pending).length) {
+  if (msgs.length === 0 && !pend.length) {
     out.push(h("div", { class: "empty" }, h("h2", { text: "Quiet here" }), h("p", { text: g.type === "contact" || mayWrite(d, "chat").allowed ? "Say hello below." : "" })));
   }
   const cp = g.type === "contact" ? { allowed: true } : mayWrite(d, "chat");
@@ -1438,9 +1447,9 @@ function chatView(d) {
     const input = document.querySelector('[data-k="chat"]');
     const text = input.value.trim();
     if (!text) return;
+    input.value = ""; S.drafts["chat:" + g.id] = "";        // before doSend draws the grey line (#48)
     if (g.type === "contact") doSend("/api/private", g.id, { key: g.key, body: text, chat: true }, { text, chat: true });
     else doPost(g.id, { body: text, chat: true }, { text, chat: true });
-    input.value = ""; S.drafts["chat:" + g.id] = "";
   };
   return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
     h("div", { class: "msgs", "data-scroll": "chat:" + g.id, "data-stick": "bottom" }, out),
@@ -1468,9 +1477,16 @@ function doPost(gid, body, local) {
   return doSend(`/api/groups/${encodeURIComponent(gid)}/post`, gid, body, local);
 }
 
+// Your own message shows up greyed out at once (#48): it goes into S.pending under a
+// local id *before* the request, and moves to the core's job id when the answer comes.
+// Job events that beat the HTTP answer over the WebSocket wait in S.early meanwhile.
+let localSeq = 0;
 async function doSend(path, gid, body, local) {
   const sent = { ...body, kind: body.chat ? "chat" : "post" };     // UN-RFC 0028
   delete sent.chat;
+  const id = "local" + (++localSeq);
+  const p = S.pending[id] = { group: gid, state: "queued", body, path, ...local };
+  render();
   try {
     let r;
     try { r = await api("POST", path, sent); }
@@ -1478,9 +1494,14 @@ async function doSend(path, gid, body, local) {
       if (!/portal|outside Tor/i.test(err.message) || !window.confirm(err.message + "\n\nPost anyway?")) throw err;
       r = await api("POST", path, { ...sent, publish_outside_tor: true });
     }
-    S.pending[r.job] = { group: gid, state: "pow", body, path, ...local };
+    delete S.pending[id];
+    if (p.state === "queued") p.state = "pow";
+    S.pending[r.job] = p;
+    const early = S.early[r.job] || [];
+    delete S.early[r.job];
+    for (const e of early) await jobEvent(e, false);
   } catch (err) {
-    S.pending["local" + Date.now()] = { group: gid, state: "failed", error: err.message, body, path, ...local };
+    p.state = "failed"; p.error = err.message;
   }
   render();
 }
@@ -1489,6 +1510,39 @@ function retry(job) {
   const p = S.pending[job];
   delete S.pending[job];
   doSend(p.path || `/api/groups/${encodeURIComponent(p.group)}/post`, p.group, p.body, { text: p.text, chat: p.chat, thread: p.thread });
+}
+
+// Pending messages to draw in group g: not yet among the group's messages. Once the
+// core has said which message it became (`sent`), the real one replaces it - drawn
+// once, whichever of `group-updated` and `reached` comes first.
+function pendingIn(g, msgs, chat) {
+  const have = new Set(msgs.map(m => m.id));
+  return Object.entries(S.pending).filter(([, p]) =>
+    p.group === g.id && !!p.chat === !!chat && !(p.message_id && have.has(p.message_id)));
+}
+
+async function jobEvent(e, draw = true) {                   // a post on its way (section 5)
+  const p = S.pending[e.job];
+  if (!p) {
+    // the answer to our POST may not be here yet: keep it for doSend (only while one is out)
+    if (Object.values(S.pending).some(q => q.state === "queued")) (S.early[e.job] = S.early[e.job] || []).push(e);
+    return;
+  }
+  if (e.state === "pow" || e.state === "ripening") {
+    const before = p.state + Math.round((p.fraction || 0) * 100);
+    p.state = e.state; p.fraction = e.fraction;
+    if (draw && p.state + Math.round((e.fraction || 0) * 100) !== before) render();   // at most a hundred redraws
+    return;
+  }
+  p.state = e.state; p.error = e.error;
+  if (e.message_id) p.message_id = e.message_id;
+  if (e.state === "reached") {
+    // keep the grey line until the group has the real one: no gap, no jump
+    if (S.gid === p.group) await loadGroup();
+    delete S.pending[e.job];
+  }
+  if (e.state === "failed") toast("Not sent: " + (e.error || "unknown error"));
+  if (draw) render();
 }
 
 async function toggleView() {
@@ -2486,22 +2540,8 @@ function connectEvents() {
       ripeSamples = [];
       setRipening({ paused: e.paused }, false);
       render();
-    } else if (type === "job") {                                // a post on its way (section 5)
-      const p = S.pending[e.job];
-      if (!p) return;
-      if (e.state === "pow" || e.state === "ripening") {
-        const before = p.state + Math.round((p.fraction || 0) * 100);
-        p.state = e.state; p.fraction = e.fraction;
-        if (p.state + Math.round((e.fraction || 0) * 100) !== before) render();   // at most a hundred redraws
-        return;
-      }
-      p.state = e.state; p.error = e.error;
-      if (e.state === "reached") {
-        delete S.pending[e.job];
-        if (S.gid === p.group) await loadGroup();   // your own post shows up; the selection stays put
-      }
-      if (e.state === "failed") toast("Not sent: " + (e.error || "unknown error"));
-      render();
+    } else if (type === "job") {
+      await jobEvent(e);
     }
   };
   ws.onclose = () => { S.ws = null; setTimeout(() => { if (S.state && S.state.unlocked) connectEvents(); }, 3000); };
