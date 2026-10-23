@@ -13,6 +13,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   posts with the subject "chat".
 - The portable build for Windows takes chiavdf 1.2's DLLs from
   `chiavdf.libs` as well, or it could not ripen keys (#51).
+- Text you typed disappeared when the screen was redrawn: the compose
+  window lost it when a new post or a status line came in, and the name on
+  first start went blank when you chose a node. It now stays (#53).
 
 ## [0.1.0] - 2026-10-22
 

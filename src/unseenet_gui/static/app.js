@@ -118,7 +118,7 @@ function h(tag, props, ...kids) {
     if (k === "class") el.className = v;
     else if (k === "text") el.textContent = v;
     else if (k.startsWith("on")) el.addEventListener(k.slice(2).toLowerCase(), v);
-    else if (k === "value") el.value = v;
+    else if (k === "value") el.value = el._v0 = v;     // _v0: what render() compares with
     else if (k === "style") el.style.cssText = v;     // via CSSOM: style attributes are blocked by the CSP
     else el.setAttribute(k, v === true ? "" : v);
   }
@@ -221,8 +221,20 @@ function render() {
   // the selected row stays where it was on screen when posts come in above it
   const row = root.querySelector(".ptable .prow.on");
   const anchor = row ? { id: row.dataset.id, off: row.offsetTop - row.parentElement.scrollTop } : null;
+  // what you typed survives a redraw (#53): a field you changed gets it back, if the
+  // same field (data-k) comes back with the same starting value - not a new window's
+  const typed = [];
+  root.querySelectorAll("input[data-k], textarea[data-k]").forEach(el => {
+    if (["checkbox", "radio", "file"].includes(el.type)) return;
+    const start = el._v0 ?? "";
+    if (el.value !== start) typed.push([el.dataset.k, start, el.value]);
+  });
   root.replaceChildren(view());
   if (S.dialog) document.getElementById("root").append(S.dialog.render());
+  for (const [k, start, value] of typed) {
+    const el = root.querySelector(`[data-k="${CSS.escape(k)}"]`);
+    if (el && (el._v0 ?? "") === start && el.value === start) el.value = value;
+  }
   root.querySelectorAll("[data-scroll]").forEach(el => {
     const was = scrolls[el.dataset.scroll];
     if (el.dataset.stick === "bottom" && (!was || was.bottom)) el.scrollTop = el.scrollHeight;
