@@ -149,6 +149,7 @@ const ICON = {
   back: "M15 18l-6-6 6-6",
   x: "M18 6L6 18M6 6l12 12",
   people: "M16 20v-2a4 4 0 0 0-8 0v2M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
+  smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 14s1.5 2 4 2 4-2 4-2M9 9.5h.01M15 9.5h.01",
 };
 
 async function api(method, path, body) {
@@ -250,6 +251,7 @@ function render() {
   const now = root.querySelector(".ptable .prow.on");
   if (anchor && now && now.dataset.id === anchor.id) now.parentElement.scrollTop = now.offsetTop - anchor.off;
   if (keepDialog && dialogNode.contains(active)) return;
+  if (active && active.closest && active.closest(".emoji-picker")) return;      // searching for an emoji (#21)
   // A dialog takes the focus from the page behind it; inside a dialog, keep the field you were in.
   const inDialog = active && active.closest && active.closest(".dialog");
   const again = key && (!S.dialog || inDialog) && root.querySelector(`[data-k="${CSS.escape(key)}"]`);
@@ -1215,7 +1217,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
-      h("label", { for: "body", text: "Text" }),
+      h("div", { class: "label-row" }, h("label", { for: "body", text: "Text" }), emojiButton("cbody")),
       h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true", oninput: askWho }),
       N.may ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: N.on,
         onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
@@ -1462,6 +1464,7 @@ function chatView(d) {
         h("input", { id: "chat", type: "text", "data-k": "chat", autocomplete: "off",
           placeholder: "Message " + (g.access || "") + (g.access ? " " : "") + g.label, value: S.drafts["chat:" + g.id] || "",
           oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; } }),
+        emojiButton("chat"),
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
       h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Esc" }), " for shortcuts",
         g.type === "contact" ? " · sealed to them" : g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
@@ -2111,7 +2114,7 @@ function openWrite(key = "", kind = "post") {
         placeholder: "a contact's name, or a key (ed25519:… - they find it with K)", autocomplete: "off" }),
       h("datalist", { id: "wcontacts" }, contactList().map(c => h("option", { value: c.label }))),
       kind === "chat" ? [
-        h("label", { for: "wtext", text: "Message" }),
+        h("div", { class: "label-row" }, h("label", { for: "wtext", text: "Message" }), emojiButton("wtext")),
         h("textarea", { id: "wtext", name: "body", class: "in", "data-k": "wtext", style: "min-height:120px", value: vals.body })] :
       [h("label", { for: "wsubject", text: "Subject" }),
         h("input", { id: "wsubject", name: "subject", class: "in", "data-k": "wsubject", value: vals.subject, autocomplete: "off" })]],
@@ -2431,6 +2434,220 @@ function openPalette() {
   } };
   render();
 }
+
+// ---- emoji: a picker, and :shortcode: completion while typing (#21) -----------
+// Both put the :shortcode: in the text (UN-RFC 0031 section 5.2), so it stays
+// readable everywhere and the core turns it into the glyph. The data comes once from
+// the core's GET /api/emoji (unseenet 0.5, UN-RFC 0046 section 4.4); the order of
+// suggestions is the core's find_emoji(), so all clients agree.
+// Both live outside #root, so a redraw does not close them; the field is found
+// again by its data-k each time.
+const EMOJI_FIELDS = new Set(["chat", "cbody", "wtext"]);
+const EMOJI_RECENT = "unseenet-emoji-recent";
+let emojiData = null, emojiLoading = null, picker = null, suggest = null, emojiMissing = false;
+// plain text: no glyphs, no picker; a core before 0.5 has no /api/emoji: none either
+const emojiOn = () => !emojiMissing && !(S.sidebar && S.sidebar.markdown === false);
+
+function loadEmoji() {
+  if (emojiData) return Promise.resolve(emojiData);
+  emojiLoading = emojiLoading || api("GET", "/api/emoji").then(d => {
+    d.codes = Object.keys(d.table);
+    return (emojiData = d);
+  }, err => {
+    emojiLoading = null;
+    if (/^404\b/.test(err.message)) { emojiMissing = true; closeEmojiPicker(); render(); }
+    throw err;
+  });
+  return emojiLoading;
+}
+
+function recentEmoji() {
+  try { const r = JSON.parse(localStorage.getItem(EMOJI_RECENT) || "[]"); return Array.isArray(r) ? r : []; }
+  catch (_) { return []; }
+}
+
+function rememberEmoji(code) {
+  const r = [code, ...recentEmoji().filter(c => c !== code)].slice(0, 24);
+  try { localStorage.setItem(EMOJI_RECENT, JSON.stringify(r)); } catch (_) { }
+}
+
+// Shortcodes that start with q first (shortest first), then ones that contain it,
+// then ones whose name or tags have a word starting with it. One per glyph.
+function findEmoji(d, q, max) {
+  q = q.toLowerCase().replace(/^:+|:+$/g, "");
+  if (!q) return [];
+  const starts = [], inside = [], named = [];
+  for (const c of d.codes) {
+    if (c.startsWith(q)) starts.push(c);
+    else if (c.includes(q)) inside.push(c);
+    else if ((d.names[c] || "").split(" ").some(w => w.startsWith(q))) named.push(c);
+  }
+  starts.sort((a, b) => a.length - b.length || (a < b ? -1 : 1));
+  const seen = new Set(), out = [];
+  for (const c of [...starts, ...inside, ...named]) {
+    if (seen.has(d.table[c])) continue;
+    seen.add(d.table[c]); out.push(c);
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+const emojiField = (k) => document.querySelector(`#root [data-k="${CSS.escape(k)}"]`);
+
+// Put :code: into field k: in place of [from, cursor) when completing, else at the cursor.
+// insertText keeps the browser's undo and fires `input`, so drafts follow.
+function insertEmoji(k, code, from) {
+  const el = emojiField(k);
+  if (!el) return;
+  const end = el.selectionEnd ?? el.value.length;
+  const start = from ?? el.selectionStart ?? end;
+  const before = el.value.slice(0, start), after = el.value.slice(end);
+  const text = (from == null && before && !/\s$/.test(before) ? " " : "") + ":" + code + ":" + (/^\s/.test(after) ? "" : " ");
+  el.focus();
+  el.setSelectionRange(start, end);
+  if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+    el.setRangeText(text, start, end, "end");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  rememberEmoji(code);
+}
+
+// A popover next to `anchor` (a DOMRect): above it when there is room, else below.
+function placePopover(node, r, width, left = false) {
+  const w = Math.min(width, innerWidth - 16);
+  node.style.width = w + "px";
+  node.style.left = Math.max(8, Math.min(left ? r.left : r.right - w, innerWidth - w - 8)) + "px";
+  const hgt = node.offsetHeight;
+  node.style.top = (r.top - hgt - 8 >= 8 ? r.top - hgt - 8 : Math.min(r.bottom + 8, innerHeight - hgt - 8)) + "px";
+}
+
+function emojiButton(k) {
+  if (!emojiOn()) return null;
+  return h("button", { type: "button", class: "btn icon emoji-btn", "aria-label": "Emoji", "aria-haspopup": "dialog",
+    title: "Emoji - or type : and a name", onclick: (e) => openEmojiPicker(k, e.currentTarget) }, svg(ICON.smile, 18));
+}
+
+function openEmojiPicker(k, button) {
+  if (picker && picker.k === k) { closeEmojiPicker(); return; }
+  closeEmojiPicker(); closeSuggest();
+  const node = h("div", { class: "emoji-picker", role: "dialog", "aria-label": "Choose an emoji" },
+    h("p", { class: "hint", text: "Loading emoji …" }));
+  picker = { k, node, rect: button.getBoundingClientRect(), tab: recentEmoji().length ? "recent" : 0, q: "" };
+  document.body.append(node);
+  placePopover(node, picker.rect, 344);
+  loadEmoji().then(() => { if (picker && picker.node === node) drawPicker(); },
+    err => { node.replaceChildren(h("p", { class: "hint", text: "Emoji could not be loaded: " + err.message })); });
+}
+
+function closeEmojiPicker(refocus) {
+  if (!picker) return;
+  const k = picker.k;
+  picker.node.remove(); picker = null;
+  if (refocus) { const el = emojiField(k); if (el) el.focus(); }
+}
+
+function drawPicker() {
+  const d = emojiData, P = picker;
+  const recent = recentEmoji().filter(c => d.table[c]);
+  const tabs = [...(recent.length ? [{ id: "recent", name: "Recently used", icon: "🕘", codes: recent }] : []),
+    ...d.categories.map((c, i) => ({ id: i, name: c.name, icon: d.table[c.codes[0]], codes: c.codes }))];
+  const pick = (code) => { closeEmojiPicker(); insertEmoji(P.k, code); };
+  const cell = (c) => h("button", { type: "button", class: "emo", title: ":" + c + ":", "aria-label": c,
+    "data-code": c, onclick: () => pick(c), text: d.table[c] });
+  const grid = h("div", { class: "emo-grid", role: "group" });
+  const tabRow = h("div", { class: "emo-tabs", role: "tablist", "aria-label": "Categories" });
+  const fill = () => {
+    const found = P.q ? findEmoji(d, P.q, 160) : null;
+    const tab = tabs.find(t => t.id === P.tab) || tabs[0];
+    grid.setAttribute("aria-label", found ? "Search results" : tab.name);
+    grid.replaceChildren(...(found ? (found.length ? found.map(cell) : [h("p", { class: "hint", text: "No emoji called that." })]) :
+      [h("div", { class: "emo-cat", text: tab.name }), ...tab.codes.map(cell)]));
+    grid.scrollTop = 0;
+    tabRow.replaceChildren(...tabs.map(t => h("button", { type: "button", role: "tab", class: "emo-tab", title: t.name,
+      "aria-label": t.name, "aria-selected": !found && t === tab ? "true" : "false", text: t.icon,
+      onclick: () => { P.q = ""; search.value = ""; P.tab = t.id; fill(); } })));
+  };
+  const search = h("input", { type: "search", class: "in emo-search", placeholder: "Search emoji", "aria-label": "Search emoji",
+    autocomplete: "off", oninput: (e) => { P.q = e.target.value.trim(); fill(); },
+    onkeydown: (e) => {
+      if (e.key === "Enter") { e.preventDefault(); const first = grid.querySelector(".emo"); if (first) pick(first.dataset.code); }
+    } });
+  P.node.replaceChildren(search, tabRow, grid);
+  fill();
+  placePopover(P.node, P.rect, 344);
+  search.focus();
+}
+
+// --- completion: ":ta" suggests :tada: and friends; Tab or Enter takes one
+function emojiQuery(el) {
+  if (!el || !el.dataset || !EMOJI_FIELDS.has(el.dataset.k) || el.selectionStart !== el.selectionEnd || !emojiOn()) return null;
+  const before = el.value.slice(0, el.selectionStart);
+  const m = /(^|[\s(])(:([a-z0-9_+-]{2,}))$/i.exec(before);
+  return m ? { from: before.length - m[2].length, q: m[3] } : null;
+}
+
+async function updateSuggest(el) {
+  const q = emojiQuery(el);
+  if (!q) { closeSuggest(); return; }
+  let d;
+  try { d = await loadEmoji(); } catch (_) { return; }
+  const now = emojiQuery(el);                       // typing went on while the data came
+  if (!now || now.q !== q.q || document.activeElement !== el) return;
+  const items = findEmoji(d, q.q, 8);
+  if (!items.length) { closeSuggest(); return; }
+  const node = suggest ? suggest.node : h("div", { class: "emoji-suggest", role: "listbox", "aria-label": "Emoji" });
+  suggest = { k: el.dataset.k, from: q.from, items, i: 0, node };
+  if (!node.isConnected) document.body.append(node);
+  drawSuggest();
+  placePopover(node, el.getBoundingClientRect(), 280, true);    // by the text, not the far edge
+}
+
+function drawSuggest() {
+  const s = suggest;
+  s.node.replaceChildren(...s.items.map((c, i) => h("div", { role: "option", class: "emo-opt" + (i === s.i ? " on" : ""),
+    "aria-selected": i === s.i ? "true" : "false", "data-code": c,
+    onmousedown: (e) => { e.preventDefault(); s.i = i; takeSuggest(); } },
+    h("span", { class: "emo-glyph", text: emojiData.table[c] }), h("span", { class: "mono", text: ":" + c + ":" }))));
+}
+
+function takeSuggest() {
+  const s = suggest;
+  closeSuggest();
+  insertEmoji(s.k, s.items[s.i], s.from);
+}
+
+function closeSuggest() {
+  if (!suggest) return;
+  suggest.node.remove(); suggest = null;
+}
+
+document.addEventListener("input", (e) => { if (EMOJI_FIELDS.has(e.target.dataset && e.target.dataset.k)) updateSuggest(e.target); }, true);
+document.addEventListener("focusout", (e) => { if (suggest && e.target.dataset && e.target.dataset.k === suggest.k) closeSuggest(); }, true);
+document.addEventListener("click", (e) => {
+  if (EMOJI_FIELDS.has(e.target.dataset && e.target.dataset.k)) updateSuggest(e.target);
+}, true);
+document.addEventListener("mousedown", (e) => {                       // a click outside closes the picker
+  if (picker && !picker.node.contains(e.target) && !(e.target.closest && e.target.closest(".emoji-btn"))) closeEmojiPicker();
+}, true);
+window.addEventListener("resize", () => { closeEmojiPicker(); closeSuggest(); });
+// before the page's own keys: Enter must not send while a suggestion is up, Esc
+// closes the picker before it closes a dialog
+window.addEventListener("keydown", (e) => {
+  const el = document.activeElement;
+  if (suggest && el && el.dataset && el.dataset.k === suggest.k && !e.isComposing) {
+    const move = { ArrowDown: 1, ArrowUp: -1 }[e.key];
+    if (move) { suggest.i = (suggest.i + move + suggest.items.length) % suggest.items.length; drawSuggest(); }
+    else if ((e.key === "Enter" || e.key === "Tab") && !e.shiftKey && !e.ctrlKey && !e.metaKey) takeSuggest();
+    else if (e.key === "Escape") closeSuggest();
+    else return;
+    e.preventDefault(); e.stopImmediatePropagation();
+  } else if (picker && e.key === "Escape") {
+    e.preventDefault(); e.stopImmediatePropagation();
+    closeEmojiPicker(true);
+  } else if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key) && EMOJI_FIELDS.has(el && el.dataset && el.dataset.k)) {
+    setTimeout(() => updateSuggest(el));
+  }
+}, true);
 
 // ---- keys -----------------------------------------------------------------
 document.addEventListener("keydown", (e) => {

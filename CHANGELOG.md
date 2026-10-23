@@ -14,6 +14,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   a core that can (unseenet#337), it pauses and resumes. On the web, a new key
   getting ready asks you to keep the page open and keeps the screen on where
   the browser allows (#50).
+- An emoji picker by the chat bar and the text of posts and chats: categories,
+  search by name, recently used. Typing `:ta` suggests matching shortcodes;
+  Tab or Enter takes one. Both put the `:shortcode:` in the text. The data and
+  the order of suggestions are the core's (`GET /api/emoji`, unseenet#362), so
+  this needs unseenet 0.5; with an older core the button stays away (#21).
 
 ### Fixed
 
