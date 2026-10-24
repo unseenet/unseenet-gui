@@ -958,7 +958,7 @@ function siteView(d) {
   const page = site.page, row = page ? fromRow(page.row) : null;
   if (row) markRead([row]);
   const list = h("nav", { class: "pagelist", "aria-label": "Pages" },
-    h("h3", { class: "row-h", text: `Pages (${site.pages.length})` }),
+    h("h3", { class: "list-h", text: `pages · ${site.pages.length}` }),     // a quiet label, as in the sidebar
     site.pages.map(p => h("button", { class: "item" + (p.path === site.path ? " on" : ""), "aria-current": p.path === site.path ? "page" : null,
       onclick: () => openPage(g.id, p.path) },
       h("span", { class: "ic", text: p.home ? "⌂" : "·" }),
