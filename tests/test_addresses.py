@@ -22,7 +22,7 @@ OTHER = "alt.andet@efgh"
 FP = "a" * 32
 KEY = "ed25519:bo"
 MD = "text/markdown; charset=utf-8; variant=unseenet"
-POSTS = [("<a@x>", "Velkommen", "Se unseenet:alt.adr@abcd/%3Cc@x%3E. Den er god."),
+POSTS = [("<a@x>", "Velkommen", "Se unseenet:alt.adr@abcd?m=c@x. Den er god."),
          ("<b@x>", "Andet sted", "Prøv unseenet:alt.andet@efgh?n=xyz.onion og <unseenet:" + FP + ">"),
          ("<c@x>", "Husk mødet", "torsdag kl. 19")]
 # the core's Markdown tree of the second post (UN-RFC 0046): an autolink to a person
@@ -35,7 +35,7 @@ def row(mid, subject, text, view):
     kind = "chat" if view == "chat" else "post"
     return {"who": "Someone", "who_key": "ed25519:other", "mine": False, "may_edit": False,
             "may_withdraw": False, "read": True, "depth": 0,
-            "address": f"unseenet:{GROUP}/{mid.strip('<>')}",
+            "address": f"unseenet:{GROUP}?m={mid.strip('<>')}",
             "tree": TREE if mid == "<b@x>" else None,
             "message": {"id": mid, "group": GROUP, "subject": "" if kind == "chat" else subject,
                         "text": text, "signature": "", "references": [], "kind": kind,
@@ -69,7 +69,7 @@ class AddressAPI:
                     "group_id": OTHER, "followed": OTHER in self.followed, "available": True,
                     "group": {"id": OTHER, "label": "alt.andet", "title": "Et andet sted",
                               "type": "open", "view": "threads"}, "message": None, "page": None}
-        if a.startswith("unseenet:" + GROUP + "/"):
+        if a.startswith("unseenet:" + GROUP + "?m="):
             return {"kind": "post", "address": a, "nodes": [], "group_id": GROUP,
                     "followed": True, "available": True,
                     "group": {"id": GROUP, "label": "alt.adr", "title": "", "type": "open",
@@ -158,10 +158,10 @@ async def test_an_address_in_plain_text_opens_the_post(addr_page):
     page, api = addr_page
     await page.locator(".prow", has_text="Velkommen").click()
     link = page.locator(".reader a.aref")
-    await expect(link).to_have_text("unseenet:alt.adr@abcd/%3Cc@x%3E")     # not the full stop
+    await expect(link).to_have_text("unseenet:alt.adr@abcd?m=c@x")     # not the full stop
     await link.click()
     await expect(page.locator(".prow.on")).to_contain_text("Husk mødet")
-    assert api.asked == ["unseenet:alt.adr@abcd/%3Cc@x%3E"]
+    assert api.asked == ["unseenet:alt.adr@abcd?m=c@x"]
 
 
 @pytest.mark.parametrize("addr_page", ["threads"], indirect=True)
@@ -205,7 +205,7 @@ async def test_copy_the_address_of_a_post_and_a_group(addr_page):
     await expect(page.locator(".dialog")).to_contain_text("unseenet:alt.adr@abcd")
     await page.locator(".dialog").get_by_role("button", name="Copy address").click()
     await expect(page.locator(".toast")).to_have_text("The group's address is copied.")
-    assert await page.evaluate("window.COPIED") == ["unseenet:alt.adr@abcd/c@x", "unseenet:alt.adr@abcd"]
+    assert await page.evaluate("window.COPIED") == ["unseenet:alt.adr@abcd?m=c@x", "unseenet:alt.adr@abcd"]
 
 
 @pytest.mark.parametrize("addr_page", ["chat"], indirect=True)
@@ -215,7 +215,7 @@ async def test_open_an_address_from_the_palette_and_copy_a_line(addr_page):
     await line.hover()
     await line.get_by_role("button", name="Copy address").click()
     await expect(page.locator(".toast")).to_have_text("The line's address is copied.")
-    assert await page.evaluate("window.COPIED") == ["unseenet:alt.adr@abcd/c@x"]
+    assert await page.evaluate("window.COPIED") == ["unseenet:alt.adr@abcd?m=c@x"]
 
     async def open_address(text):
         await page.keyboard.press("Control+k")
@@ -227,5 +227,5 @@ async def test_open_an_address_from_the_palette_and_copy_a_line(addr_page):
     await open_address("nonsense")
     await expect(page.locator(".toast")).to_contain_text("not an address")
     await expect(page.locator(".dialog")).to_have_count(0)
-    await open_address("unseenet:alt.adr@abcd/%3Cc@x%3E")
+    await open_address("unseenet:alt.adr@abcd?m=c@x")
     await expect(page.locator(".bubble.flash")).to_have_count(1)
