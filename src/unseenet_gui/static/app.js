@@ -42,8 +42,9 @@ const S = {
 // The answers are the core's (unseenet.client.localapi). These few functions turn
 // them into the objects the rest of this file draws, so the drawing stays as it was.
 const FOR_YOU = "for-you:";                          // the core's pseudo group (threads.FOR_YOU)
+const TIMELINE = "timeline:";                        // every feed you follow (threads.TIMELINE)
 const ACCESS_ICONS = { moderated: "√", channel: "►", closed: "∩" };
-const VIEW_ICONS = { chat: "»", data: "¤", threads: "≡" };
+const VIEW_ICONS = { chat: "»", data: "¤", threads: "≡", feed: "☰" };
 const MARKDOWN = "text/markdown; charset=utf-8; variant=unseenet";   // core.markup.MARKDOWN_TYPE
 const isMd = (t) => (t || "").split(";")[0].trim().toLowerCase() === "text/markdown";
 
@@ -85,7 +86,8 @@ function fromRow(r) {
     tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
     depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null,
-    pinned: !!r.pinned, address: r.address || "" };
+    pinned: !!r.pinned, address: r.address || "",
+    comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "" };
 }
 
 function fromSidebar(d, st) {
@@ -93,6 +95,7 @@ function fromSidebar(d, st) {
   groups.forEach(g => (by[g.hierarchy] = by[g.hierarchy] || []).push(g));
   const fy = d.for_you || {};
   return { for_you: (fy.replies || 0) + (fy.mentions || 0), replies: fy.replies || 0, mentions: fy.mentions || 0,
+    timeline: d.timeline || { id: TIMELINE, feeds: 0 },
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
@@ -681,6 +684,7 @@ function sidebar() {
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl P" })),
     sb ? h("div", { class: "nav" },
       item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
+      sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
@@ -820,7 +824,7 @@ function mainArea() {
   }
   const g = d.group;
   const chips = [
-    h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : "≡ threads" }),
+    h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : g.view === "feed" ? "☰ feed" : "≡ threads" }),
     g.encrypted ? h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5),
       g.type === "inbox" ? "sealed to you" : g.type === "contact" ? "private · sealed to each of you" : "closed · end-to-end encrypted") :
       g.type ? h("span", { class: "chip", text: g.type }) : null,
@@ -843,14 +847,154 @@ function mainArea() {
           onclick: () => openPost(g.key, g.label.replace(/ √$/, "")) }, "Write a post", h("kbd", { text: "N" }))] : null,
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
-        g.view === "chat" ? "Show as threads" : "Show as chat", h("kbd", { text: "V" })) : null,
+        "Show as " + nextView(g), h("kbd", { text: "V" })) : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
       h("button", { class: "btn icon pal-btn", "aria-label": "More: all commands", onclick: () => openPalette() }, "⋯"),
       g.type && !["contact", "inbox"].includes(g.type) && (g.kinds || ["post"]).includes("post") ?
         h("button", offProps(mayWrite(d, "post"), { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
           title: "A post with a subject (UN-RFC 0028)" }),
           svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
-  return [head, g.view === "chat" ? chatView(d) : threadsView(d)];
+  return [head, g.view === "chat" ? chatView(d) : g.view === "feed" ? feedView(d) : threadsView(d)];
+}
+
+// ---- feeds (UN-RFC 0034, UN-RFC 0046 section 4.14) ---------------------------
+// Entries newest first, each whole, comments under each, oldest first; the core lays
+// the group out (Session.feed: every note its own entry) and says who may comment.
+// The timeline is the pseudo-group timeline:, every followed feed's entries.
+const FEED_SHOWN = 2;                              // comments shown before "Show all"
+function feedEntries(d) {
+  const out = [];
+  for (const m of d.messages) {
+    if (m.depth === 0 || !out.length) out.push({ m, comments: [] });
+    else out[out.length - 1].comments.push(m);
+  }
+  const pinned = out.filter(e => e.m.pinned);       // pinned entries first (section 4.1)
+  return pinned.concat(out.filter(e => !e.m.pinned));
+}
+
+function feedView(d) {
+  const g = d.group, timeline = g.id === TIMELINE, entries = feedEntries(d);
+  S.feedOpen = S.feedOpen || {};
+  const shownMsgs = entries.flatMap(e => [e.m, ...visibleComments(e)]);
+  markRead(shownMsgs);
+  const note = !timeline && mayWrite(d, "chat").allowed && (g.kinds || ["chat"]).includes("chat");
+  const send = () => {
+    const input = document.querySelector('[data-k="note"]');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ""; S.drafts["note:" + g.id] = "";
+    doPost(g.id, { body: text, chat: true }, { text, chat: true, thread: "new:" + g.id });
+  };
+  const pendNew = Object.entries(S.pending).filter(([, p]) => p.thread === "new:" + g.id);
+  return h("div", { class: "content" }, h("section", { class: "feed", "aria-label": timeline ? "Timeline" : "Feed",
+    "data-scroll": "feed:" + g.id },
+    timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} feed${g.feeds === 1 ? "" : "s"} you follow, in the order they were written. Nobody is told whom you follow.` }) : null,
+    note ? h("form", { class: "chatbar notebar", onsubmit: (e) => { e.preventDefault(); send(); } },
+      h("div", { class: "row" },
+        h("label", { for: "note", class: "sr", text: "A note in " + g.label }),
+        h("input", { id: "note", type: "text", "data-k": "note", autocomplete: "off", placeholder: "Write a note in " + g.label,
+          value: S.drafts["note:" + g.id] || "", oninput: (e) => { S.drafts["note:" + g.id] = e.target.value; } }),
+        emojiButton("note"),
+        h("button", { class: "send", type: "submit", "aria-label": "Post the note" }, svg(ICON.send, 18, 2.5))),
+      h("div", { class: "hint" }, "A short note; New post gives one a headline.")) : null,
+    pendNew.map(([job, p]) => h("article", { class: "entry pending", "data-job": job },
+      h("div", { class: "etext", text: p.text }), p.state === "failed" ?
+        h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ", h("button", { class: "link", onclick: () => retry(job) }, "Try again")) :
+        pendingState(p))),
+    entries.length ? entries.map(e => entryCard(d, e)) :
+      h("div", { class: "empty" }, h("h2", { text: timeline ? "Nothing yet" : "No entries yet" }),
+        h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), and their entries come here." :
+          note ? "Write the first note above." : "" }))));
+}
+
+// what shows under an entry: all when opened; else the newest few, and always your own
+// (section 4.4 - never chosen by how many answers or reactions)
+function visibleComments(e) {
+  if (S.feedOpen && S.feedOpen[e.m.id]) return e.comments;
+  const newest = new Set(e.comments.slice(-FEED_SHOWN).map(c => c.id));
+  return e.comments.filter(c => newest.has(c.id) || c.mine || c.for_me);
+}
+
+function entryCard(d, e) {
+  const m = e.m, g = d.group, timeline = g.id === TIMELINE;
+  const shown = visibleComments(e), hidden = e.comments.length - shown.length;
+  const byId = Object.fromEntries(e.comments.map(c => [c.id, c]));
+  const cp = m.comment || { allowed: false, reason: NOT_HERE };
+  const target = (S.answering && S.answering[m.id] && byId[S.answering[m.id]]) || null;
+  const send = () => {
+    const input = document.querySelector(`[data-k="c:${m.id}"]`);
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ""; S.drafts["c:" + m.id] = "";
+    const to = target || m;
+    if (S.answering) delete S.answering[m.id];
+    doPost(m.group, { body: text, chat: true, references: [...to.references, to.id] }, { text, chat: true, thread: m.id });
+  };
+  const pend = Object.entries(S.pending).filter(([, p]) => p.thread === m.id);
+  const own = groupOf(m.group) || g;
+  return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread"), "data-id": m.id },
+    h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
+      m.bot ? h("span", { class: "sm", text: "bot" }) : null,
+      h("span", { class: "hint", text: when(m.date) }),
+      timeline ? h("button", { class: "link efeed", onclick: () => openGroup(m.group) }, "in " + (m.group_label || labelOf(m.group))) : null,
+      m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null)),
+    m.kind !== "chat" ? h("h3", { class: "etitle", text: subjectOf(m) }) : null,
+    h("div", { class: "ebody" }, m.kind === "chat" && m.readable ? [m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false)] : messageBody(m)),
+    h("div", { class: "eact" },
+      cp.allowed ? h("button", { class: "link", onclick: () => focusLater(`[data-k="c:${m.id}"]`) }, "Comment") : null,
+      m.replyPerm && m.replyPerm.allowed && (own.kinds || ["post"]).includes("post") ?
+        h("button", { class: "link", onclick: () => openReply(m, own) }, "Reply with a post") : null,
+      m.address ? h("button", { class: "link", onclick: () => copy(m.address, "The entry's address is copied.") }, "Copy address") : null,
+      g.may_pin && m.readable ? h("button", { class: "link", onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
+      h("span", { class: "grow" }),
+      e.comments.length ? h("span", { class: "hint", text: `${e.comments.length} comment${e.comments.length === 1 ? "" : "s"}` }) : null),
+    h("div", { class: "comments" },
+      hidden > 0 ? h("button", { class: "link more", onclick: () => { S.feedOpen[m.id] = true; render(); } },
+        `Show all ${e.comments.length} comments`) :
+      S.feedOpen[m.id] && e.comments.length > FEED_SHOWN ? h("button", { class: "link more", onclick: () => { delete S.feedOpen[m.id]; render(); } },
+        "Show fewer") : null,
+      shown.map(c => commentEl(c, m, byId)),
+      pend.map(([job, p]) => h("div", { class: "comment mine pending", "data-job": job },
+        h("div", { class: "ctext", text: p.text }), p.state === "failed" ?
+          h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ", h("button", { class: "link", onclick: () => retry(job) }, "Try again")) :
+          pendingState(p))),
+      cp.allowed ? h("form", { class: "cbar", onsubmit: (ev) => { ev.preventDefault(); send(); } },
+        target ? h("div", { class: "hint answering" }, "Answering " + target.who + " ",
+          h("button", { class: "link", type: "button", "aria-label": "Answer the entry instead", onclick: () => { delete S.answering[m.id]; render(); } }, "×")) : null,
+        h("label", { for: "c-" + m.id, class: "sr", text: "Comment" }),
+        h("input", { id: "c-" + m.id, type: "text", "data-k": "c:" + m.id, autocomplete: "off",
+          placeholder: target ? "Your answer" : "Write a comment", value: S.drafts["c:" + m.id] || "",
+          oninput: (ev) => { S.drafts["c:" + m.id] = ev.target.value; } }),
+        h("button", { class: "send", type: "submit", "aria-label": "Send the comment" }, svg(ICON.send, 16, 2.5))) :
+      cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
+}
+
+// two levels (section 4.2): a deeper answer sits under its comment and says whom it answers
+function commentEl(c, entry, byId) {
+  const parent = c.references.length ? byId[c.references[c.references.length - 1]] : null;
+  return h("div", { class: "comment" + (c.depth > 1 ? " answer" : "") + (c.mine ? " mine" : ""), "data-id": c.id },
+    avatar(c, true),
+    h("div", { class: "cb" },
+      h("div", { class: "chd" }, whoEl(c), h("span", { class: "hint", text: when(c.date) }),
+        c.depth > 2 && parent ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null),
+      h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
+        [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
+      entry.comment && entry.comment.allowed ? h("button", { class: "link", onclick: () => {
+        S.answering = S.answering || {}; S.answering[entry.id] = c.id; render(); focusLater(`[data-k="c:${entry.id}"]`); } }, "Answer") : null));
+}
+
+function focusLater(sel) {
+  setTimeout(() => { const el = document.querySelector(sel); if (el) el.focus(); });
+}
+
+function groupOf(gid) {
+  return allGroups().find(x => x.id === gid) || null;
+}
+
+// V: threads and chat; a feed also as a feed (UN-RFC 0034 section 3.1)
+function nextView(g) {
+  if (g.view === "feed" || g.owner_view === "feed") return { feed: "threads", threads: "chat" }[g.view] || "feed";
+  return g.view === "chat" ? "threads" : "chat";
 }
 
 // ---- discussion: the newsreader (as in the terminal client) ------------------
@@ -1344,6 +1488,94 @@ async function goToGroup(ref) {
           closeDialog(); S.full = false; await loadSidebar(); openGroup(g.id); } }, "Follow")))),
     h("div", { class: "df btns" }, h("span", { class: "mono muted", text: several ? "" : found[0].id }),
       h("button", { class: "btn", onclick: closeDialog }, "Cancel"))) };
+  render();
+}
+
+// ---- following (UN-RFC 0034 section 6, UN-RFC 0046 section 4.14) ----------------
+// Kept in your vault and sent nowhere: following someone does not tell them.
+async function setFollowing(body, who) {
+  let r;
+  try { r = await api("POST", "/api/following", body); } catch (x) { toast(x.message); return null; }
+  if (body.refresh) toast(r.new && r.new.length ? `Following ${r.new.length} new feed${r.new.length === 1 ? "" : "s"}.` : "Nothing new.");
+  else if (body.person && body.on !== false) toast(`Following ${who || r.name || "them"}` +
+    (r.feeds && r.feeds.length ? `: ${r.feeds.map(labelOf).join(", ")}.` : " - their feeds come into your timeline when they start one."));
+  else if (body.person) toast(`No longer following ${who || "them"}.`);
+  else toast(body.on === false ? "No longer following the feed." : "Following the feed.");
+  await loadSidebar();
+  return r;
+}
+
+function openFollow() {
+  const m = selectedPost();
+  formDialog({ label: "Follow", title: "Follow someone", focus: "#ftarget", button: "Follow",
+    values: { target: m && m.key && !m.mine && !m.private ? m.key : "" },
+    note: "Their key, their name (such as andreas@lorensen) or their unseenet: address. This follows their personal feed and the feeds their profile lists. Nobody is told, and the list stays in your vault.",
+    fields: (vals) => [h("input", { id: "ftarget", name: "target", class: "in mono", value: vals.target || "", "data-k": "ftarget",
+      placeholder: "ed25519:… or name@hierarchy", autocomplete: "off", spellcheck: "false" })],
+    submit: async (v) => {
+      if (!(v.target || "").trim()) throw new Error("Whom? Their key, name or address.");
+      await api("POST", "/api/following", { person: v.target.trim() }).then(async (r) => {
+        closeDialog();
+        toast(`Following ${r.name || "them"}` + (r.feeds.length ? `: ${r.feeds.map(labelOf).join(", ")}.` : " - no feeds yet."));
+        await loadSidebar(); render();
+      });
+    } });
+}
+
+async function openFollowing() {
+  let f;
+  try { f = await api("GET", "/api/following"); } catch (x) { toast(x.message); return; }
+  const own = f.feeds.filter(x => !f.people.some(p => p.feeds.some(y => y.id === x.id)));
+  const draw = () => dialogShell({ label: "Whom you follow", wide: true },
+    h("div", { class: "dh" }, h("h2", { text: "Whom you follow" }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db list" },
+      h("p", { class: "hint", style: "margin:0 0 8px", text: "Only you know: the list stays in your vault and is never sent to anyone." }),
+      f.people.length ? h("h3", { class: "row-h", text: "People" }) : null,
+      f.people.map(p => h("div", { class: "cmd" },
+        h("span", { class: "nm" }, h("span", { text: p.label }), " ",
+          h("small", { class: "mono", text: p.feeds.length ? p.feeds.map(x => x.label).join(", ") : "no feeds yet" })),
+        h("button", { class: "btn", onclick: async () => { await setFollowing({ person: p.fingerprint, on: false }, p.label); openFollowing(); } }, "Unfollow"))),
+      own.length ? h("h3", { class: "row-h", text: "Feeds" }) : null,
+      own.map(x => h("div", { class: "cmd" },
+        h("button", { class: "nm link", onclick: () => { closeDialog(); openGroup(x.id); } }, x.label + (x.title ? " - " + x.title : "")),
+        h("button", { class: "btn", onclick: async () => { await setFollowing({ feed: x.id, on: false }); openFollowing(); } }, "Unfollow"))),
+      !f.people.length && !own.length ? h("p", { class: "muted", text: "You follow nobody yet." }) : null),
+    h("div", { class: "df btns" },
+      h("button", { class: "btn", title: "Read their profiles again and follow their new feeds",
+        onclick: async () => { await setFollowing({ refresh: true }); openFollowing(); } }, "Look for new feeds"),
+      h("button", { class: "btn", onclick: () => openFollow() }, "Follow someone"),
+      h("button", { class: "btn primary", onclick: closeDialog }, "Close")));
+  S.dialog = { focus: ".dialog .btn.primary", render: draw };
+  render();
+}
+
+// Your own feed (UN-RFC 0034 section 5): only when you ask, after the warning
+// (UN-RFC 0029 section 2.1), with whether readers may comment.
+async function openMyFeed() {
+  let f;
+  try { f = await api("GET", "/api/feed"); } catch (x) { toast(x.message); return; }
+  if (f.started && f.followed) { S.full = false; openGroup(f.id); return; }
+  const st = { comments: "open", busy: false, err: "" };
+  const draw = () => dialogShell({ label: "Start your feed" },
+    h("div", { class: "dh" }, h("h2", { text: "Start your feed?" }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      h("div", { class: "warnbox" }, f.warning.split("\n\n").map(t => h("p", { text: t }))),
+      h("p", { style: "margin:0", text: "May readers comment on what you post?" }),
+      ["open", "none"].map(c => h("label", { class: "radio" },
+        h("input", { type: "radio", name: "comments", value: c, checked: st.comments === c, onchange: () => { st.comments = c; } }),
+        c === "open" ? " Yes, anybody may comment" : " No comments")),
+      st.err ? h("p", { class: "error", text: st.err }) : null),
+    h("div", { class: "df btns" }, h("span", { class: "mono muted", text: f.id }),
+      h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", disabled: st.busy, onclick: async () => {
+        st.busy = true; st.err = ""; render();
+        try { await api("POST", "/api/feed", { comments: st.comments }); }
+        catch (x) { st.busy = false; st.err = x.message; render(); return; }
+        closeDialog(); toast("Your feed is started: what you post there is public.");
+        await loadSidebar(); S.full = false; openGroup(f.id); } }, st.busy ? "Starting …" : "Start my feed")));
+  S.dialog = { focus: ".dialog .btn", render: draw };
   render();
 }
 
@@ -1969,8 +2201,7 @@ async function jobEvent(e, draw = true) {                   // a post on its way
 async function toggleView() {
   const g = S.data && S.data.group;
   if (!g || !g.type || g.type === "inbox") return;
-  const next = g.view === "chat" ? "threads" : "chat";
-  await api("POST", `/api/groups/${encodeURIComponent(g.id)}/view`, { view: next });
+  await api("POST", `/api/groups/${encodeURIComponent(g.id)}/view`, { view: nextView(g) });
   await loadGroup(); await loadSidebar();
 }
 
@@ -2678,7 +2909,12 @@ async function openProfile(key, who = "") {
       h("div", { class: "prof-head" }, bigAvatar(key), h("div", { class: "keybox", text: key })),
       err ? h("p", { class: "error", text: err }) :
       !p ? h("p", { class: "muted", style: "margin:0", text: "Reading the profile over Tor …" }) : profileBody(p)),
-    h("div", { class: "df btns" },
+    h("div", { class: "df btns wrap" },
+      p && !p.mine && p.feed ? h("button", { class: "btn", title: "Their personal feed, if they have one (UN-RFC 0034)",
+        onclick: () => { closeDialog(); openAddress("unseenet:" + p.feed); } }, "Feed") : null,
+      p && !p.mine && !p.hidden ? h("button", { class: "btn", title: "Follow their feeds - nobody is told (UN-RFC 0034 section 6.1)",
+        onclick: async () => { await setFollowing({ person: key, on: !p.following }, p.label || who); openProfile(key, who); } },
+        p.following ? "Unfollow" : "Follow") : null,
       p && p.address ? h("button", { class: "btn", title: "An unseenet: address for this person (UN-RFC 0031)",
         onclick: () => copy(p.address, "The address is copied.") }, "Copy address") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyPicture() }, "Picture") : null,
@@ -2870,6 +3106,12 @@ function commands() {
     { name: "Unpin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && selectedPost().pinned, run: () => openPin(selectedPost()) },
     { name: "Pinned posts in this group", key: "", when: pinsOf(S.data).length > 0, run: () => openPinList() },
     { name: "Open an unseenet: address", key: "", run: openAddressDialog },
+    { name: "Timeline: every feed you follow", key: "", when: S.sidebar && S.sidebar.timeline.feeds > 0, run: () => openGroup(TIMELINE) },
+    { name: "Follow someone: their feeds, by key, name or address", key: "", run: openFollow },
+    { name: "Whom you follow", key: "", run: openFollowing },
+    { name: "Your feed: start it, or go to it", key: "", run: openMyFeed },
+    { name: "Show this group as a feed", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type) && g.view !== "feed",
+      run: async () => { await api("POST", `/api/groups/${encodeURIComponent(g.id)}/view`, { view: "feed" }); await loadGroup(); await loadSidebar(); render(); } },
     { name: "Copy the address of this group", key: "", when: g && g.address, run: () => copy(g.address, "The group's address is copied.") },
     { name: "Copy the address of the selected post", key: "", when: selectedPost() && selectedPost().address && !selectedPost().private,
       run: () => copy(selectedPost().address, "The post's address is copied.") },
