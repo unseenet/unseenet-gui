@@ -219,3 +219,23 @@ async def test_a_feed_switches_to_threads_and_back(feed_page):
     page, _ = feed_page
     await open_feed(page)
     await expect(page.get_by_role("button", name="Show as threads")).to_be_visible()
+
+
+async def test_folded_comments_keep_your_conversations(feed_page):
+    # a comment naming you is shown with what it answers and the answers under it,
+    # besides the newest two; the rest stay folded
+    page, api = feed_page
+    api.comments[0]["for_me"] = "mention"                    # Læser 0 names you
+    api.comments.insert(1, row("<f@x>", "Svar til Læser 0", 2, refs=["<a@x>", "<c0@x>"],
+                               who="Svarer", key="ed25519:f"))
+    await open_feed(page)
+    note = page.locator(".entry").first
+    shown = note.locator(".comment")
+    await expect(shown).to_have_count(4)                     # c0, its answer, and the newest two
+    await expect(note.locator('.comment[data-id="<c0@x>"]')).to_be_visible()
+    await expect(note.locator('.comment[data-id="<f@x>"]')).to_be_visible()
+    await expect(note.locator('.comment[data-id="<c2@x>"]')).to_have_count(0)
+    await note.get_by_role("button", name="Show all 7 comments").click()
+    await expect(shown).to_have_count(7)
+    await note.get_by_role("button", name="Show fewer").click()
+    await expect(shown).to_have_count(4)
