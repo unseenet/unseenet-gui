@@ -83,6 +83,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Fixed
 
+- Form dialogs no longer reset while you write (#85): Your profile, Add contact,
+  Signature and the other forms are kept on screen while the page redraws, as
+  the compose window is, so a text area you made bigger, the text, the cursor
+  and undo stay; an error is written into the dialog instead of drawing it anew.
 - Emoji suggestions while typing `:` no longer fail to show when the page
   redraws just as the emoji data arrives, for example while a group loads.
 
