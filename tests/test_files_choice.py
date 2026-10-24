@@ -22,6 +22,7 @@ TOKEN = "t" * 43
 CHAT = "dk.foto.chat@abcd"
 INBOX = "inbox:test"
 PICTURES = {"max_size": 4194304, "types": ["image/*"]}
+SONIA = "ed25519:sonia"
 PNG = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg==")
 
 
@@ -37,6 +38,8 @@ class LocalAPI:
 
     def __init__(self):
         self.sent, self.created, self.settings, self.unexpected = [], [], [], []
+        self.closed, self.contact_changes = [], []
+        self.people = [{"id": "contact:" + SONIA, "key": SONIA, "name": "Sonia", "contact": True, "unread": 0}]
 
     async def events(self, request):
         ws = web.WebSocketResponse(protocols=["unseenet"])
@@ -61,8 +64,21 @@ class LocalAPI:
             self.created.append(await request.json())
             data = {"id": "dk.ny@abcd"}
         elif path == "/api/groups":
-            data = {"groups": [group()], "people": [], "inbox": {"id": INBOX},
+            data = {"groups": [group()], "people": self.people, "inbox": {"id": INBOX},
+                    "contacts": [{"id": "contact:" + SONIA, "key": SONIA, "name": "Sonia",
+                                  "closed": not self.people}],
                     "hierarchies": [{"name": "dk", "tree": None}]}
+        elif path == "/api/chats/close":
+            self.closed.append(await request.json())
+            self.people = []
+            data = {"ok": True}
+        elif path == "/api/contacts":
+            self.contact_changes.append(await request.json())
+            data = {"ok": True}
+        elif path == "/api/profile":
+            data = {"key": SONIA, "label": "Sonia", "mine": False, "hidden": False, "profile": None,
+                    "address": "unseenet:" + "s" * 16, "feed": None, "following": False,
+                    "theirs": {"feed": None, "site": None}}
         elif path.startswith("/x/gui/write/"):
             data = {"post": {"allowed": True}, "chat": {"allowed": True}}
         elif path.endswith("/settings"):
@@ -74,6 +90,10 @@ class LocalAPI:
         elif request.method == "GET" and path.startswith("/api/groups/"):
             gid = path.removeprefix("/api/groups/")
             data = {"group": group(gid), "rows": []}
+            if gid.startswith("contact:"):            # a chat with a person
+                data["group"] = {"id": gid, "label": "Sonia √", "type": "contact", "key": SONIA,
+                                 "contact": True, "view": "chat", "hierarchy": "", "may_post": True,
+                                 "kinds": ["chat", "post"], "unread": 0}
         elif path.endswith("/read"):
             data = {}
         elif path == "/api/pictures":
@@ -197,3 +217,42 @@ async def test_create_a_feed_with_comments(files_page):
     await expect(page.locator(".toast")).to_contain_text("created")
     body = api.created[-1]
     assert body["view"] == "feed" and body["type"] == "channel" and body["comments"] == "none"
+
+
+async def test_close_a_chat_from_the_list(files_page):
+    """A chat leaves the list with ⋯ Close chat (UN-RFC 0044 4.2); the contact stays."""
+    page, api, _ = files_page
+    row = page.locator(".personrow").filter(has_text="Sonia")
+    await row.hover()
+    await row.get_by_role("button", name=re.compile("More about the chat")).click()
+    await row.get_by_role("menuitem", name="Close chat").click()
+    await expect(page.locator(".toast")).to_contain_text("Closed the chat with Sonia")
+    assert api.closed == [{"key": SONIA, "on": True}]
+    await expect(page.locator(".personrow")).to_have_count(0)
+    await page.keyboard.press("Control+k")                # still a contact
+    await page.keyboard.type("Contacts")
+    await page.keyboard.press("Enter")
+    await expect(page.locator(".dialog")).to_contain_text("Sonia")
+
+
+async def test_a_chat_has_close_chat_not_unsubscribe(files_page):
+    page, api, _ = files_page
+    await page.locator(".personrow .item").filter(has_text="Sonia").click()
+    await expect(page.get_by_role("button", name="Close chat")).to_be_visible()
+    await page.get_by_role("button", name="About this group").click()
+    dialog = page.locator(".dialog")
+    await expect(dialog.get_by_role("button", name="Close chat")).to_be_visible()
+    assert await dialog.get_by_role("button", name="Unsubscribe").count() == 0
+
+
+async def test_contacts_from_the_profile_and_chats_fold_away(files_page):
+    page, api, _ = files_page
+    await page.evaluate("openProfile('ed25519:sonia', 'Sonia')")
+    await page.locator(".dialog").get_by_role("button", name="Remove contact").click()
+    await expect(page.locator(".toast")).to_contain_text("no longer a contact")
+    assert api.contact_changes == [{"key": SONIA, "remove": True}]
+    fold = page.locator(".fold-chats")
+    await fold.click()
+    await expect(page.locator(".personrow")).to_have_count(0)
+    await fold.click()
+    await expect(page.locator(".personrow")).to_have_count(1)
