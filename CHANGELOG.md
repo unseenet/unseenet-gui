@@ -85,6 +85,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- A site's list of pages has a quiet label ("pages · 5") in the sidebar's style
+  instead of a heading.
 - A paused key ripening stays paused on this device, also after a restart,
   until you resume it (unseenet#488); the ripening dialog says so.
 - The theme is kept with your settings in the core (#84), so it is no longer
