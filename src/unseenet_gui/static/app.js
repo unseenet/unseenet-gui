@@ -776,10 +776,7 @@ function sidebar() {
         avatar({ key: me.key, who: me.display, colour: 4 }, true)),
       h("div", { class: "who" }, h("div", {}, h("button", { class: "me-name", title: "Your profile", onclick: openMyProfile,
           text: me.label || me.display || "" })),
-        // the node by name, the full address on hover; a click opens your nodes (#111)
-        h("button", { class: "hint node-link", "data-k": "node-link", title: nodeTitle(S.state.node), onclick: openNodes },
-          h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
-          S.state.connected ? (S.state.web ? "Entrance and Tor · " : "Tor · ") + nodeLabel(S.state.node) : "Not connected"),
+        nodeLink(),
         ripeLine()),
       h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
 }
@@ -894,6 +891,27 @@ function shortNode(address) {
 function nodeLabel(address) {
   const n = address && (S.state.node_names || {})[address];
   return (n && n.label) || (address === S.state.node && S.state.node_label) || shortNode(address);
+}
+// Is a node reached right now? Its own node-state event (UN-RFC 0046 section 5) once
+// there is one; before that, whether the last round reached the network.
+function nodeUp(address) {
+  const live = address && (S.nodes || {})[address];
+  return live ? live.up : (S.state.connected ? true : null);     // null: not known yet
+}
+// The default node in the box at the bottom left, by name, always (#111): whether it
+// is reached is said for that node, not guessed from the status line.
+function nodeLink() {
+  const node = S.state.node, up = nodeUp(node), live = node && (S.nodes || {})[node];
+  const how = up === true ? (S.state.web ? "Entrance and Tor" : "Tor")
+    : up === false ? "Not reachable" : "Connecting";
+  const why = up === false && live && live.error ? "\n" + live.error : "";
+  return h("button", { class: "hint node-link", "data-k": "node-link", title: nodeTitle(node) + why, onclick: openNodes },
+    h("span", { class: "dot" + (up === true ? " ok" : up === false ? " bad" : "") }), " ",
+    node ? how + " · " + nodeLabel(node) : "No node");
+}
+function redrawNodeLink() {
+  const el = document.querySelector("[data-k='node-link']");
+  if (el) el.replaceWith(nodeLink());
 }
 function nodeTitle(address) {
   if (!address) return "Your nodes";
@@ -4332,9 +4350,11 @@ function connectEvents() {
     if (type === "status") {
       S.state.status = e.text;
       S.state.status_idle = !!e.idle;                           // unseenet#518
-      S.state.connected = /^Connected/.test(e.text) ? true : /^Offline/.test(e.text) ? false : S.state.connected;
+      // "Connected to <a node>" may be any of your nodes: only the core's round says
+      // the network is reached; each node says itself with node-state (#111)
+      if (/^Offline/.test(e.text)) S.state.connected = false;
       const st = document.querySelector(".statusbar");
-      if (st && !S.dialog) st.replaceWith(statusbar()); else render();
+      if (st && !S.dialog) { st.replaceWith(statusbar()); redrawNodeLink(); } else render();
     } else if (type === "release-offer") {
       try { await loadState(); } catch (_) { }
       const st = document.querySelector(".statusbar");
@@ -4342,6 +4362,7 @@ function connectEvents() {
     } else if (type === "x-gui-update") {
       updateProgress(e.text);
     } else if (type === "groups-changed" || type === "refreshed" || type === "inbox-ready") {
+      if (type === "refreshed") { S.state.connected = !e.error; redrawNodeLink(); }
       sidebarSoon();
     } else if (type === "group-updated") {
       if (e.new) sidebarSoon();                                // counts in the sidebar
@@ -4352,6 +4373,7 @@ function connectEvents() {
     } else if (type === "node-state") {
       S.nodes = S.nodes || {};
       S.nodes[e.address] = { up: e.up, error: e.error };
+      if (e.address === S.state.node) redrawNodeLink();
     } else if (type === "tor-state") {
       S.tor = { progress: e.progress, summary: e.summary };
       if (e.progress < 100 && !S.dialog) {

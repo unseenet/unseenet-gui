@@ -824,3 +824,4 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 @media (hover: none), (max-width: 760px) {
   .item, .fold-t, .fold-chats { min-height: 40px; }
 }
+.dot.bad { background: var(--red); }

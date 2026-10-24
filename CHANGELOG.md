@@ -18,8 +18,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   they answer and what they say about themselves, with *Add* (a known node or
   any address), *Make default* and *Remove*. The first start's list of nodes
   shows the address too. The status bar no longer repeats *Connected to ...*;
-  it shows what is happening (Tor starting, offline, sending). Needs a core
-  with `/api/nodes` (unseenet 0.5.0).
+  it shows what is happening (Tor starting, offline, sending). The box always
+  names the default node and says how that node is - *Connecting*, *Tor* or
+  *Not reachable* (why, on hover) - from its own state, so it no longer says
+  *Not connected* while the status bar says *Connected to* another of your
+  nodes. Needs a core with `/api/nodes` (unseenet 0.5.0).
 - A tidier sidebar (#114): the big *Search and commands* box is now a filter of
   the sidebar - what you follow and your chats, as `/` in the terminal client;
   Enter opens the first, Esc clears it - and the palette opens with Ctrl P or a
