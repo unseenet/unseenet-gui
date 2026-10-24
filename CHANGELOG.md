@@ -9,6 +9,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Your state, as in the terminal client (UN-RFC 0044 section 7.4): from the
+  palette, keep it on this device only, after a warning, or in the network
+  again.
 - Private profiles (#65, UN-RFC 0022 section 6): share a profile with one
   person ("Share yours" in their profile) or with a closed group (the
   palette), after saying who can read it, and take it back. A profile shared
@@ -82,6 +85,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- The theme is kept with your settings in the core (#84), so it is no longer
+  forgotten when the GUI starts on another port, and it follows you to other
+  devices. "Follow the system's theme" in the palette goes back to the
+  system's choice.
 - Your picture is set in Your profile (#82): choose, preview exactly as it will be
   published, describe or remove it in the same dialog, published with Publish; the
   separate Your picture dialog is gone (its palette entry opens your profile).
