@@ -220,8 +220,9 @@ release needs is said in `pyproject.toml` and at the top of its release notes.
 
 To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
 new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
-`src/unseenet_gui/__init__.py`, and the core release the builds use
-(`CORE_REF` in `.github/workflows/build.yml`); commit, then
+`src/unseenet_gui/__init__.py`, the core release it needs (`unseenet[api]` in
+`pyproject.toml`) and the one the builds use (`CORE_REF` in
+`.github/workflows/build.yml`); commit, then
 `git tag -a vX.Y.Z -m "unseenet-gui X.Y.Z" && git push origin vX.Y.Z`.
 `release.yml` publishes to PyPI and makes the release with the changelog
 notes, `build.yml` adds the builds. Afterwards set `__version__` on main to
