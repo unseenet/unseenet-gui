@@ -7,6 +7,8 @@ Run with: pip install -e '.[dev]' playwright; playwright install chromium;
 python -m pytest -q tests/test_emoji.py
 """
 
+import asyncio
+
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
@@ -33,6 +35,7 @@ class API:
     def __init__(self, emoji=True):
         self.emoji = emoji
         self.posts = []
+        self.emoji_gate = None                  # GET /api/emoji waits on this, when set
 
     async def events(self, request):
         ws = web.WebSocketResponse(protocols=["unseenet"])
@@ -51,6 +54,8 @@ class API:
         elif path == "/x/gui/state":
             data = {"bootable": False, "web": False}
         elif path == "/api/emoji" and self.emoji:
+            if self.emoji_gate is not None:
+                await self.emoji_gate.wait()
             data = EMOJI
         elif path == "/api/groups":
             data = {"groups": [group], "people": [], "hierarchies": [{"name": "alt", "tree": None}],
@@ -171,3 +176,14 @@ async def test_no_button_with_a_core_without_api_emoji(chat):
     page, _ = chat
     await page.locator("#chat").press_sequentially("hi :ta")
     await expect(page.get_by_role("button", name="Emoji")).to_have_count(0)
+
+
+async def test_suggestions_survive_a_redraw_while_the_data_comes(chat):
+    """The page redraws (a group reloads, say) while the emoji data is on its way: the
+    field is a new element then, found again by its data-k - suggestions still come."""
+    page, api = chat
+    api.emoji_gate = asyncio.Event()
+    await page.locator("#chat").press_sequentially(":thu")
+    await page.evaluate("render()")
+    api.emoji_gate.set()
+    await expect(page.get_by_role("listbox", name="Emoji").get_by_role("option")).to_have_count(1)

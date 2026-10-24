@@ -41,11 +41,25 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   publish or remove it. "Identicons only" in the commands (Ctrl P) turns
   pictures off; "Show people's pictures" turns them on again.
 
+- Pinned posts (#62, UN-RFC 0033): a group's pinned posts are in a Pinned
+  section above the threads, with their notes, and marked in their place too;
+  a chat has a pinned bar with the newest pin - select it to go to the line,
+  then the next - and a list of all pins. Both can be folded away, remembered
+  per group. The owner and moderators pin and unpin from the post's tools, under
+  a chat line or the commands, with an optional note; a full group says which
+  pin stops counting, and unpinning a post older than the group keeps posts
+  warns that the nodes then delete it. The pins are the core's (unseenet#448).
+
 ### Changed
 
 - Write permission, changing the passphrase and profiles come from the core's
   local API (unseenet#320) instead of this client's own copies under `/x/gui/`,
   so every front end says the same. This needs unseenet 0.5 (#59).
+
+### Fixed
+
+- Emoji suggestions while typing `:` no longer fail to show when the page
+  redraws just as the emoji data arrives, for example while a group loads.
 
 ## [0.1.2] - 2026-10-23
 
