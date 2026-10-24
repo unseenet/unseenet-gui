@@ -800,3 +800,27 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .node-add h3 { margin: 6px 0 0; font-size: 14px; }
 .node-other { display: flex; gap: 8px; }
 .node-other .field { flex: 1; min-width: 0; font-size: 14px; min-height: 0; padding: 8px 12px; }
+/* ---- the sidebar, tidier (unseenet-gui#114): a filter instead of the big palette
+   button, headings that look and act like folds, and denser rows ---------------- */
+.brand .grow { flex: 1; }
+.cmd-btn { width: 30px; height: 30px; }
+.side-filter { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px;
+  border-radius: 8px; border: 1px solid var(--line-2); background: var(--ink); color: var(--muted); }
+.side-filter input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--paper);
+  font-size: 13px; outline: none; padding: 6px 0; }
+.side-filter:focus-within { border-color: var(--green); }
+.side-scroll { gap: 10px; }
+.nav { gap: 0; }
+.item { min-height: 28px; }
+.sub { gap: 0; }
+/* headings: bigger, the whole row a fold with a clear arrow */
+.nav h3, .pagelist .list-h { font-size: 12.5px; letter-spacing: 0.04em; color: var(--paper-2); padding: 0 4px 2px; }
+.nav h3.fold-h, .nav h3.row-h { padding: 0 4px 0 0; }
+.fold-t, .fold-chats { flex: 1; display: flex; align-items: center; gap: 6px; min-height: 28px;
+  padding: 0 8px 0 6px; border-radius: 6px; text-align: left; }
+.fold-t:hover, .fold-chats:hover { background: var(--ink-2); color: var(--paper); }
+.fold-t .car { width: 14px; font-size: 14px; color: var(--muted); }
+.fold-chats { font-size: inherit; }
+@media (hover: none), (max-width: 760px) {
+  .item, .fold-t, .fold-chats { min-height: 40px; }
+}

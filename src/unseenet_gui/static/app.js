@@ -170,6 +170,7 @@ function svg(path, size = 16, width = 2) {
 }
 const ICON = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5",
+  cmd: "M5 7l5 5-5 5M12 17h7",
   plus: "M12 5v14M5 12h14",
   send: "M5 12h14M13 6l6 6-6 6",
   check: "M20 6L9 17l-5-5",
@@ -709,10 +710,24 @@ function sidebar() {
   // the groups scroll; you stay at the bottom, however many groups there are
   return h("nav", { class: "side", "aria-label": "Groups" },
     h("div", { class: "side-scroll", "data-scroll": "side" },
-    h("div", { class: "brand" }, logo(30), "Unseenet"),
-    h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
-      h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl P" })),
-    sb ? h("div", { class: "nav" },
+    h("div", { class: "brand" }, logo(30), h("span", { class: "grow", text: "Unseenet" }),
+      h("button", { class: "mini cmd-btn", "aria-label": "Commands", title: "Commands and search (Ctrl P)",
+        onclick: () => openPalette() }, svg(ICON.cmd, 16, 2.5))),
+    // a filter for what the sidebar lists, as / in the terminal client; Esc clears it
+    h("div", { class: "side-filter" }, svg(ICON.search, 16),
+      h("label", { for: "sidefilter", class: "sr", text: "Filter groups and chats" }),
+      h("input", { id: "sidefilter", type: "search", "data-k": "sidefilter", autocomplete: "off",
+        placeholder: "Filter groups and chats", value: S.sideFilter || "",
+        oninput: (e) => { S.sideFilter = e.target.value; render(); },
+        onkeydown: (e) => {
+          if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); S.sideFilter = ""; render(); }
+          else if (e.key === "Enter") {
+            const first = document.querySelector("nav.side .side-results .item");
+            if (first) { e.preventDefault(); first.click(); }
+          }
+        } })),
+    filtering() ? sideResults(sb, item) : null,
+    filtering() ? null : sb ? h("div", { class: "nav" },
       item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
       sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
       // your own feed and site at the top, or the way to start them, as in the terminal client (gui#101)
@@ -731,12 +746,12 @@ function sidebar() {
       sb.name_requests ? h("button", { class: "item", onclick: openNames },
         h("span", { class: "ic", text: "@" }), h("span", { class: "nm", text: "Name requests" }),
         h("span", { class: "count", text: sb.name_requests })) : null) : null,
-    sb ? h("div", { class: "nav" },
+    filtering() ? null : sb ? h("div", { class: "nav" },
       h("h3", { class: "row-h" },
         h("button", { class: "fold-chats", "aria-expanded": String(foldState().chats !== false),
           title: foldState().chats !== false ? "Fold the chats away" : "Show the chats",
           onclick: () => { setFold("chats", foldState().chats === false); render(); } },
-          (foldState().chats !== false ? "▾ " : "▸ ") + "chats",
+          h("span", { class: "car", text: foldState().chats !== false ? "▾" : "▸" }), "chats",
           foldState().chats === false && sb.people.some(p => p.unread) ?
             h("span", { class: "count", text: sb.people.reduce((n, p) => n + (p.unread || 0), 0) }) : null),
         h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
@@ -750,7 +765,7 @@ function sidebar() {
         p.unread ? h("span", { class: "count", text: p.unread }) : null),
         chatMenu(p))) :
         h("p", { class: "hint", style: "margin:0 10px", text: "Your chats, one per person. Add people as contacts, or start a chat with +." })) : null,
-    sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
+    filtering() ? null : sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
       h("p", { class: "muted", text: "Loading your groups …" }),
     sb && !sb.hierarchies.length ? h("div", { class: "nav" },
       h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
@@ -808,6 +823,29 @@ function revealGroup(gid) {
 
 function dotted(name) {           // ".history.egypt" with a quiet leading dot
   return name.startsWith(".") ? [h("span", { class: "dot-pre", text: "." }), name.slice(1)] : name;
+}
+
+// The sidebar's filter (as / in the terminal client): what matches, in one list.
+function filtering() { return !!(S.sideFilter || "").trim(); }
+function sideResults(sb, item) {
+  if (!sb) return null;
+  const q = S.sideFilter.trim().toLowerCase();
+  const hit = (...s) => s.some(x => (x || "").toLowerCase().includes(q));
+  const people = sb.people.filter(p => hit(p.label, p.key));
+  const groups = sb.hierarchies.flatMap(hr => hr.groups).filter(g => hit(g.label, g.id, g.title, g.shown));
+  return h("div", { class: "nav side-results" },
+    people.length ? [h("h3", { text: "chats" }), people.map(p => h("button", {
+      class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}`,
+      onclick: () => { S.sideFilter = ""; openGroup(p.id); } },
+      h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+      h("span", { class: "nm", text: p.label }), p.unread ? h("span", { class: "count", text: p.unread }) : null))] : null,
+    groups.length ? [h("h3", { text: "groups" }), groups.map(g => h("button", {
+      class: `item group${S.gid === g.id ? " on" : ""}${g.unread ? " unread" : ""}`, title: g.label,
+      onclick: () => { S.sideFilter = ""; openGroup(g.id); } },
+      h("span", { class: "ic", text: (g.access || "") + g.icon }), h("span", { class: "nm", text: g.shown || g.label }),
+      g.unread ? h("span", { class: "count", text: g.unread }) : null))] : null,
+    !people.length && !groups.length ? h("p", { class: "hint", style: "margin:0 10px",
+      text: "Nothing you follow matches. G finds groups on your node." }) : null);
 }
 
 function hierarchyNav(hier, item) {

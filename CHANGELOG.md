@@ -20,6 +20,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   shows the address too. The status bar no longer repeats *Connected to ...*;
   it shows what is happening (Tor starting, offline, sending). Needs a core
   with `/api/nodes` (unseenet 0.5.0).
+- A tidier sidebar (#114): the big *Search and commands* box is now a filter of
+  the sidebar - what you follow and your chats, as `/` in the terminal client;
+  Enter opens the first, Esc clears it - and the palette opens with Ctrl P or a
+  small button by the logo. Headings (chats, alt.\*, dk.\* ...) are bigger and
+  fold as a whole row with a clear arrow, and the rows sit closer, so more
+  groups fit (touch screens keep bigger targets).
 - Close a chat (unseenet#519): *Close chat* in the chat, in its info instead of
   the Unsubscribe that did nothing, and with ⋯ on each chat in the list; it
   leaves the list on all your devices and comes back when one of you writes.
