@@ -89,6 +89,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   forgotten when the GUI starts on another port, and it follows you to other
   devices. "Follow the system's theme" in the palette goes back to the
   system's choice.
+- Folded comments in a feed keep your conversations: besides the newest two,
+  a comment that is yours, answers you or names you is shown with what it
+  answers and the answers under it. "Show all" and "Show fewer" as before.
 - Your picture is set in Your profile (#82): choose, preview exactly as it will be
   published, describe or remove it in the same dialog, published with Publish; the
   separate Your picture dialog is gone (its palette entry opens your profile).
@@ -100,6 +103,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Fixed
 
+- A long feed no longer gives the window a second scroll bar: the hidden labels
+  of its comment boxes made the page itself taller than the window.
 - Form dialogs no longer reset while you write (#85): Your profile, Add contact,
   Signature and the other forms are kept on screen while the page redraws, as
   the compose window is, so a text area you made bigger, the text, the cursor
