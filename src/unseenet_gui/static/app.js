@@ -104,6 +104,8 @@ function fromRow(r) {
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
     depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null,
     pinned: !!r.pinned, address: r.address || "",
+    // reactions (UN-RFC 0048): the counts, may you react, and its own group's set
+    reactions: r.reactions || [], react: r.react || null, react_offered: r.react_offered || null,
     comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "" };
 }
 
@@ -1251,6 +1253,7 @@ function entryCard(d, e) {
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null)),
     m.kind !== "chat" ? h("h3", { class: "etitle", text: subjectOf(m) }) : null,
     h("div", { class: "ebody" }, m.kind === "chat" && m.readable ? [m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false)] : messageBody(m)),
+    reactionBar(m),
     h("div", { class: "eact" },
       cp.allowed ? h("button", { class: "link", onclick: () => focusLater(`[data-k="c:${m.id}"]`) }, "Comment") : null,
       m.replyPerm && m.replyPerm.allowed && (own.kinds || ["post"]).includes("post") ?
@@ -1291,8 +1294,79 @@ function commentEl(c, entry, byId) {
         parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null),
       h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
         [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
+      reactionBar(c),
       entry.comment && entry.comment.allowed ? h("button", { class: "link", onclick: () => {
         S.answering = S.answering || {}; S.answering[entry.id] = c.id; render(); focusLater(`[data-k="c:${entry.id}"]`); } }, "Answer") : null));
+}
+
+// --- reactions (UN-RFC 0048, unseenet-gui#107) -----------------------------------
+// Under every post, comment and chat line: each emoji with its count, yours marked; a
+// click gives that one (or takes yours back), right-click says who, and + offers the
+// group's set. Never shown as comments, never used to order anything (section 7.2).
+function reactionBar(m) {
+  const may = !!(m.react && m.react.allowed);
+  const list = m.reactions || [];
+  if (!m.readable || (!list.length && !may)) return null;
+  return h("div", { class: "reacts", role: "group", "aria-label": "Reactions" },
+    list.map(r => h("button", { type: "button", class: "react" + (r.mine ? " mine" : "") + (r.pending ? " pending" : ""),
+      disabled: !may, "aria-pressed": String(!!r.mine),
+      "aria-label": `${r.emoji} ${r.count}` + (r.mine ? ", yours" : ""),
+      title: (r.mine ? "Yours - click to take it back" : "React with " + r.emoji) + " · right-click: who",
+      onclick: () => reactTo(m, r.emoji),
+      oncontextmenu: (ev) => { ev.preventDefault(); whoReacted(m, r.emoji); } },
+      h("span", { class: "re", text: r.emoji }), h("span", { class: "rn", text: String(r.count) }))),
+    may ? h("button", { type: "button", class: "react add", "aria-label": "Add a reaction", "aria-haspopup": "dialog",
+      title: "React", onclick: (ev) => openReactions(m, ev.currentTarget) }, svg(ICON.smile, 15), "+") : null);
+}
+
+let reactPop = null;
+function closeReactions() { if (reactPop) { reactPop.remove(); reactPop = null; } }
+
+function openReactions(m, button) {
+  if (reactPop) { closeReactions(); return; }
+  const set = m.react_offered || (S.data && S.data.group && S.data.group.reactions) || { offered: [], any: false };
+  const mine = (m.reactions || []).find(r => r.mine);
+  reactPop = h("div", { class: "react-pop", role: "dialog", "aria-label": "React" },
+    set.offered.map(e => h("button", { type: "button", class: "emo" + (mine && mine.emoji === e ? " mine" : ""), "aria-label": e,
+      title: mine && mine.emoji === e ? "Yours - takes it back" : e, text: e,
+      onclick: () => { closeReactions(); reactTo(m, e); } })),
+    set.any && emojiOn() ? h("button", { type: "button", class: "btn icon", "aria-label": "More emoji", title: "More emoji",
+      onclick: (ev) => { closeReactions(); openEmojiPicker("react:" + m.id, ev.currentTarget, (e) => reactTo(m, e)); } }, "…") : null);
+  document.body.append(reactPop);
+  placePopover(reactPop, button.getBoundingClientRect(), 40 * set.offered.length + (set.any ? 48 : 10), true);
+  const first = reactPop.querySelector("button");
+  if (first) first.focus();
+}
+
+async function reactTo(m, emoji) {
+  const list = m.reactions || [];
+  const mine = list.find(r => r.mine);
+  try { if (!localStorage.getItem("unseenet.reacted")) {
+    toast("Reactions are public and signed: anybody can see which key reacted to what.");
+    localStorage.setItem("unseenet.reacted", "1"); } } catch (_) { /* no storage here */ }
+  // shown at once, marked as on its way, until the group comes back (section 7.3)
+  let next = list.map(r => ({ ...r }));
+  if (mine) next = next.map(r => r.mine ? { ...r, count: r.count - 1, mine: false } : r);
+  if (!mine || mine.emoji !== emoji) {
+    const at = next.find(r => r.emoji === emoji);
+    if (at) { at.count += 1; at.mine = true; at.pending = true; }
+    else next.push({ emoji, count: 1, mine: true, pending: true });
+  }
+  m.reactions = next.filter(r => r.count > 0);
+  render();
+  try {
+    await api("POST", `/api/groups/${encodeURIComponent(m.group)}/react`, { id: m.id, emoji });
+  } catch (x) {
+    toast("Not sent: " + x.message);
+    await loadGroup();
+  }
+}
+
+async function whoReacted(m, emoji) {
+  try {
+    const d = await api("POST", `/api/groups/${encodeURIComponent(m.group)}/react`, { id: m.id, emoji, who: true });
+    toast(emoji + "  " + ((d.who || []).join(", ") || "nobody yet"));
+  } catch (x) { toast(x.message); }
 }
 
 function focusLater(sel) {
@@ -2050,7 +2124,8 @@ function readerPane(g, m, msgs) {
             "In reply to ", h("span", { class: "mono", text: parent.who })) : null)),
       h("div", { class: "pbody" },
         messageBody(m),
-        m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null)),
+        m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null,
+        reactionBar(m))),
     h("div", { class: "pbar" },
       canReply ? h("button", offProps(rp, { class: "btn primary", onclick: () => openReply(m, g) }),
         commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,
@@ -2415,6 +2490,7 @@ function chatView(d) {
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
       m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
       m.readable ? filesOf(m, true) : null,
+      reactionBar(m),
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },
           commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null,
@@ -2683,11 +2759,16 @@ function openEditGroup() {
   if (!g || !g.owner) return;
   let view = g.owner_view || g.view, kinds = (g.kinds || []).length === 1 ? g.kinds[0] : "both";
   let files = fileChoice(g.files);
+  // reactions (UN-RFC 0048 section 4): the view's default, none, any, or your own set
+  const rset = (g.reactions && g.reactions.setting) || "default";
+  let reacts = Array.isArray(rset) ? "own" : rset;
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
-    onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value; else view = value; redrawDialog(); } },
+    onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value;
+      else if (name === "reactions") reacts = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
     values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
+      reaction_set: Array.isArray(rset) ? rset.join(" ") : "",
       // Markdown if the rules already are, or - for new rules - if you write posts in Markdown
       markdown: g.rules ? !!g.rules_markdown : !(S.sidebar && S.sidebar.markdown === false) },
     note: "Saved as a new version of the group's manifest, signed with your key and sent to your node. The type, owner and ID cannot change.",
@@ -2706,6 +2787,14 @@ function openEditGroup() {
       h("label", { text: "Files" }),
       h("div", { class: "choices row" }, FILE_PICKS.map(([v, l, s]) => pick("files", v, files, l, s)),
         files === "custom" ? pick("files", "custom", files, "As it is now", "limits set elsewhere") : null),
+      h("label", { text: "Reactions" }),
+      h("div", { class: "choices row" },
+        pick("reactions", "default", reacts, "As the view has them", "feeds, chat: 👍 👎 ❤️ 😂 😮 😢; discussion: none"),
+        pick("reactions", "none", reacts, "None", "no likes here"),
+        pick("reactions", "any", reacts, "Any emoji", "the six first"),
+        pick("reactions", "own", reacts, "Your own", "up to 12, below")),
+      reacts === "own" ? h("input", { id: "ereacts", name: "reaction_set", class: "in", "data-k": "ereacts",
+        "aria-label": "Your own reactions", placeholder: "e.g. 🎉 ❤️ 👏", value: vals.reaction_set }) : null,
       h("label", { for: "erules", text: "Rules - shown to people before they post" }),
       h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules }),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
@@ -2715,6 +2804,7 @@ function openEditGroup() {
       await api("POST", `/api/groups/${encodeURIComponent(g.id)}/settings`,
         { title: v.title.trim(), description: v.description.trim(), rules,
           rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds,
+          reactions: reacts === "own" ? [...new Set((v.reaction_set || "").split(/[\s,]+/).filter(Boolean))] : reacts,
           ...(files !== "custom" ? { files } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
@@ -3741,12 +3831,13 @@ function emojiButton(k) {
     title: "Emoji - or type : and a name", onclick: (e) => openEmojiPicker(k, e.currentTarget) }, svg(ICON.smile, 18));
 }
 
-function openEmojiPicker(k, button) {
+function openEmojiPicker(k, button, onPick = null) {
   if (picker && picker.k === k) { closeEmojiPicker(); return; }
   closeEmojiPicker(); closeSuggest();
   const node = h("div", { class: "emoji-picker", role: "dialog", "aria-label": "Choose an emoji" },
     h("p", { class: "hint", text: "Loading emoji …" }));
-  picker = { k, node, rect: button.getBoundingClientRect(), tab: recentEmoji().length ? "recent" : 0, q: "" };
+  // onPick: the emoji itself goes there (a reaction) instead of into a field
+  picker = { k, node, onPick, rect: button.getBoundingClientRect(), tab: recentEmoji().length ? "recent" : 0, q: "" };
   document.body.append(node);
   placePopover(node, picker.rect, 344);
   loadEmoji().then(() => { if (picker && picker.node === node) drawPicker(); },
@@ -3765,7 +3856,10 @@ function drawPicker() {
   const recent = recentEmoji().filter(c => d.table[c]);
   const tabs = [...(recent.length ? [{ id: "recent", name: "Recently used", icon: "🕘", codes: recent }] : []),
     ...d.categories.map((c, i) => ({ id: i, name: c.name, icon: d.table[c.codes[0]], codes: c.codes }))];
-  const pick = (code) => { closeEmojiPicker(); insertEmoji(P.k, code); };
+  const pick = (code) => {
+    closeEmojiPicker();
+    if (P.onPick) { rememberEmoji(code); P.onPick(d.table[code]); } else insertEmoji(P.k, code);
+  };
   const cell = (c) => h("button", { type: "button", class: "emo", title: ":" + c + ":", "aria-label": c,
     "data-code": c, onclick: () => pick(c), text: d.table[c] });
   const grid = h("div", { class: "emo-grid", role: "group" });
@@ -3844,8 +3938,9 @@ document.addEventListener("click", (e) => {
 }, true);
 document.addEventListener("mousedown", (e) => {                       // a click outside closes the picker
   if (picker && !picker.node.contains(e.target) && !(e.target.closest && e.target.closest(".emoji-btn"))) closeEmojiPicker();
+  if (reactPop && !reactPop.contains(e.target) && !(e.target.closest && e.target.closest(".react.add"))) closeReactions();
 }, true);
-window.addEventListener("resize", () => { closeEmojiPicker(); closeSuggest(); });
+window.addEventListener("resize", () => { closeEmojiPicker(); closeSuggest(); closeReactions(); });
 // before the page's own keys: Enter must not send while a suggestion is up, Esc
 // closes the picker before it closes a dialog
 window.addEventListener("keydown", (e) => {
@@ -3857,6 +3952,9 @@ window.addEventListener("keydown", (e) => {
     else if (e.key === "Escape") closeSuggest();
     else return;
     e.preventDefault(); e.stopImmediatePropagation();
+  } else if (reactPop && e.key === "Escape") {
+    e.preventDefault(); e.stopImmediatePropagation();
+    closeReactions();
   } else if (picker && e.key === "Escape") {
     e.preventDefault(); e.stopImmediatePropagation();
     closeEmojiPicker(true);

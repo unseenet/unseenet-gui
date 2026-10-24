@@ -9,6 +9,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Reactions (#107, unseenet#510, UN-RFC 0048): under every feed entry, comment,
+  post and chat line, each emoji with its count, yours marked; a click gives
+  that one or takes yours back, *+* offers the group's set (and the emoji
+  picker where the group takes any emoji), right-click says who reacted.
+  Shown at once while it is on its way; nothing to click where the group
+  takes no reactions; the first time, a note that reactions are public and
+  signed. *Reactions* in the group's settings: as the view has them, none,
+  any, or your own set. Needs core 0.5.
 - Tables in Markdown (unseenet#508, UN-RFC 0031 section 3.6): a real table, in
   posts, chat lines and pages, in a box that scrolls sideways when it is wider
   than the text; each column aligned as written. Needs core 0.5.
