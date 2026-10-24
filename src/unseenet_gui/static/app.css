@@ -772,3 +772,11 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .more .mi:hover, .more .mi:focus-visible { background: var(--ink-2); }
 .bubble { position: relative; }
 .bubble > .more { position: absolute; top: 2px; right: 2px; }
+
+/* chats: foldable, and ⋯ on each (close it, add or remove the contact) */
+.fold-chats { border: 0; background: transparent; color: inherit; font: inherit; text-transform: inherit;
+  letter-spacing: inherit; padding: 0; cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.personrow { position: relative; display: flex; align-items: center; }
+.personrow > .item { flex: 1; min-width: 0; }
+.personrow > .more { position: absolute; right: 4px; }
+.personrow:hover .morebtn, .personrow .more.open .morebtn { opacity: 1; }

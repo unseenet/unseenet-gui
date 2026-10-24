@@ -9,6 +9,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Close a chat (unseenet#519): *Close chat* in the chat, in its info instead of
+  the Unsubscribe that did nothing, and with ⋯ on each chat in the list; it
+  leaves the list on all your devices and comes back when one of you writes.
+  *Add contact* / *Remove contact* on a person's profile and with ⋯; the
+  contacts list keeps everyone, also with the chat closed. The chats in the
+  sidebar fold away (remembered), showing their unread count when folded.
 - A "⋯" menu on posts, feed entries, comments and chat lines (on hover; always
   on touch screens): *Edit* and *Withdraw (delete)* where they are yours, *Pin*
   where you may, *Copy address*. Comments and chat lines can now be withdrawn

@@ -118,6 +118,9 @@ function fromSidebar(d, st) {
     my_feed: d.my_feed || null,          // your own feed at the top (gui#101; core 0.5)
     my_site: d.my_site || null,          // ... and your own site, the same way
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
+    // every contact, also those whose chat is closed (core 0.5; before: the chats' contacts)
+    contacts: (d.contacts || d.people.filter(p => p.contact)).map(p => ({ ...p, contact: true,
+      label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
     state_local: !!st.state_local,
@@ -728,15 +731,23 @@ function sidebar() {
         h("span", { class: "ic", text: "@" }), h("span", { class: "nm", text: "Name requests" }),
         h("span", { class: "count", text: sb.name_requests })) : null) : null,
     sb ? h("div", { class: "nav" },
-      h("h3", { class: "row-h" }, h("span", { text: "chats" }),
+      h("h3", { class: "row-h" },
+        h("button", { class: "fold-chats", "aria-expanded": String(foldState().chats !== false),
+          title: foldState().chats !== false ? "Fold the chats away" : "Show the chats",
+          onclick: () => { setFold("chats", foldState().chats === false); render(); } },
+          (foldState().chats !== false ? "▾ " : "▸ ") + "chats",
+          foldState().chats === false && sb.people.some(p => p.unread) ?
+            h("span", { class: "count", text: sb.people.reduce((n, p) => n + (p.unread || 0), 0) }) : null),
         h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
         h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
-      sb.people.length ? sb.people.map(p => h("button", {
+      foldState().chats === false ? null :
+      sb.people.length ? sb.people.map(p => h("div", { class: "personrow" }, h("button", {
         class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`, onclick: () => openGroup(p.id),
         title: p.contact ? null : "Not a contact - open the chat to add them" },
         h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
         h("span", { class: "nm", text: p.label }),
-        p.unread ? h("span", { class: "count", text: p.unread }) : null)) :
+        p.unread ? h("span", { class: "count", text: p.unread }) : null),
+        chatMenu(p))) :
         h("p", { class: "hint", style: "margin:0 10px", text: "Your chats, one per person. Add people as contacts, or start a chat with +." })) : null,
     sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
       h("p", { class: "muted", text: "Loading your groups …" }),
@@ -919,6 +930,8 @@ function mainArea() {
     h("div", { class: "actions" },
       g.type === "contact" ? [
         h("button", { class: "btn", onclick: () => openAddContact(g.key, g.contact ? g.label.replace(/ √$/, "") : "") }, g.contact ? "Rename" : "Add contact"),
+        h("button", { class: "btn", title: "Off the list of chats; it comes back when one of you writes",
+          onclick: () => closeChat(g.key, g.label.replace(/ √$/, "")) }, "Close chat"),
         h("button", { class: "btn", onclick: () => copy(g.key, "Their key is copied.") }, "Copy key"),
         h("button", { class: "btn primary", title: "A post with a subject instead of a chat line (N)",
           onclick: () => openPost(g.key, g.label.replace(/ √$/, "")) }, "Write a post", h("kbd", { text: "N" }))] : null,
@@ -2243,6 +2256,20 @@ function openEditLine(m) {
 // "⋯" on a post, an entry, a comment or a chat line: what you may do with it - edit and
 // withdraw your own, pin where you may, copy its address. Shown on hover (always where
 // there is no hover, on a touch screen).
+// "⋯" on a chat in the list: close it, or add or remove the person as a contact.
+function chatMenu(p) {
+  const id = "chat:" + p.key, open = S.menuFor === id;
+  const items = [["Close chat", () => closeChat(p.key, p.label)],
+    p.contact ? ["Remove contact", () => removeContact(p.key, p.label)]
+      : ["Add contact", () => openAddContact(p.key, p.label.replace(/~.*$/, "").replace(/^@/, ""))]];
+  return h("div", { class: "more" + (open ? " open" : "") },
+    h("button", { class: "morebtn", type: "button", "aria-label": "More about the chat with " + p.label,
+      "aria-haspopup": "menu", "aria-expanded": String(open),
+      onclick: (e) => { e.stopPropagation(); S.menuFor = open ? null : id; render(); } }, "⋯"),
+    open ? h("div", { class: "menu", role: "menu" }, items.map(([label, run]) => h("button", { class: "mi", type: "button", role: "menuitem",
+      onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))) : null);
+}
+
 function moreMenu(m) {
   if (!m || !m.readable) return null;
   const here = S.data && S.data.group;
@@ -2784,6 +2811,9 @@ function openInfo() {
       g.owner ? h("button", { class: "btn danger", onclick: openRemoveGroup }, "Remove group") : null,
       h("span", { class: "grow" }),
       g.address ? h("button", { class: "btn", onclick: () => copy(g.address, "The group's address is copied.") }, "Copy address") : null,
+      g.type === "contact" ? [
+        g.contact ? h("button", { class: "btn", onclick: () => { closeDialog(); removeContact(g.key, g.label.replace(/ √$/, "")); } }, "Remove contact") : null,
+        h("button", { class: "btn", onclick: () => closeChat(g.key, g.label.replace(/ √$/, "")) }, "Close chat")] :
       g.id !== FOR_YOU ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Unsubscribe") : null)) };
   render();
 }
@@ -3268,7 +3298,22 @@ function openAddContact(key, name) {
 
 // Your contacts, from the sidebar's chats (contacts are always among them).
 function contactList() {
-  return ((S.sidebar && S.sidebar.people) || []).filter(p => p.contact);
+  return (S.sidebar && S.sidebar.contacts) || [];
+}
+
+// Close a chat (UN-RFC 0044 section 4.2): off the list on all your devices; the messages
+// stay, and it comes back when one of you writes.
+async function closeChat(key, label) {
+  try { await api("POST", "/api/chats/close", { key, on: true }); } catch (x) { toast(x.message); return; }
+  if (S.gid === "contact:" + key) { S.gid = null; S.data = null; }
+  closeDialog(); await loadSidebar(); render();
+  toast(`Closed the chat with ${label}. It comes back when one of you writes.`);
+}
+
+async function removeContact(key, label) {
+  try { await api("POST", "/api/contacts", { key, remove: true }); } catch (x) { toast(x.message); return; }
+  await loadSidebar(); render();
+  toast(label + " is no longer a contact. The chat stays while you have one - close it with ⋯.");
 }
 
 // Who "To" means: a key, or a contact by name or the start of one (as the TUI's m).
@@ -3514,6 +3559,9 @@ async function openProfile(key, who = "", context = S.gid) {
         onclick: () => copy(p.address, "The address is copied.") }, "Copy address") : null,
       p && !p.mine ? h("button", { class: "btn", title: "A profile only they can read, shown only to them (UN-RFC 0022 section 6)",
         onclick: () => openShareProfile(key, p.label || who) }, "Share yours") : null,
+      p && !p.mine ? (contactList().some(c => c.key === key)
+        ? h("button", { class: "btn", onclick: () => { closeDialog(); removeContact(key, p.label || who); } }, "Remove contact")
+        : h("button", { class: "btn", onclick: () => { closeDialog(); openAddContact(key, (p.label || who || "").replace(/~.*$/, "").replace(/^@/, "")); } }, "Add contact")) : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && p.mine ? h("button", { class: "btn", title: "Your own feed (UN-RFC 0034) - public",
         onclick: () => { closeDialog(); openMyFeed(); } },
@@ -3742,6 +3790,8 @@ function commands() {
     { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
     { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
+    { name: "Close this chat", key: "", also: "hide archive remove luk skjul", when: g && g.type === "contact",
+      run: () => closeChat(g.key, g.label.replace(/ √$/, "")) },
     { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
     { name: "Profile of this author: about, languages, links (UN-RFC 0022)", key: "", when: selectedPost() && selectedPost().key,
