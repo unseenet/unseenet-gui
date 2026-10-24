@@ -93,6 +93,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Fixed
 
+- A long feed no longer gives the window a second scroll bar: the hidden labels
+  of its comment boxes made the page itself taller than the window.
 - Form dialogs no longer reset while you write (#85): Your profile, Add contact,
   Signature and the other forms are kept on screen while the page redraws, as
   the compose window is, so a text area you made bigger, the text, the cursor

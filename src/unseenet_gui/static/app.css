@@ -53,7 +53,10 @@ a { color: var(--green); }
 kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius: 5px;
   background: var(--ink-2); color: var(--paper-2); }
 :focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* A hidden label sits where it would be in its scrolling pane: kept inside that pane, it
+   never makes the page itself scroll (a second scroll bar beside a long feed). */
+.feed, .scroll, .msgs, .threads, .ptable, .side, .dialog .db { position: relative; }
 #root { height: 100%; }
 
 /* ---- buttons ------------------------------------------------------------ */

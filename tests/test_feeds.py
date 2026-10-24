@@ -40,6 +40,7 @@ class FeedAPI:
     def __init__(self):
         self.posted, self.follows, self.started = [], [], []
         self.following = False
+        self.many = 0                     # more entries, for a feed taller than the window
         self.comments = [row(f"<c{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
                              key=f"ed25519:r{i}") for i in range(4)]
         self.comments.append(row("<d@x>", "Svar på svar", 2, refs=["<a@x>", "<c1@x>"], who="Dybt",
@@ -50,7 +51,8 @@ class FeedAPI:
     def rows(self, group=FEED):
         return [row("<a@x>", "En kort note", group=group), *self.comments,
                 row("<b@x>", "Lang tekst her", kind="post", subject="En overskrift", comment=CLOSED,
-                    group=group)]
+                    group=group),
+                *[row(f"<m{i}@x>", f"Note {i}", group=group) for i in range(self.many)]]
 
     def group(self, gid=FEED):
         return {"id": gid, "label": "Bob's feed", "type": "channel", "view": "feed",
@@ -219,3 +221,16 @@ async def test_a_feed_switches_to_threads_and_back(feed_page):
     page, _ = feed_page
     await open_feed(page)
     await expect(page.get_by_role("button", name="Show as threads")).to_be_visible()
+
+
+async def test_a_long_feed_scrolls_by_itself_not_the_page(feed_page):
+    # the hidden labels of the comment boxes (.sr) sat where they would be in the
+    # document, far below the window, and gave the page a second scroll bar
+    page, api = feed_page
+    api.many = 30
+    await open_feed(page)
+    await expect(page.locator(".entry")).to_have_count(32)
+    size = await page.evaluate("[document.scrollingElement.scrollHeight, innerHeight]")
+    assert size[0] <= size[1]
+    feed = await page.evaluate("(e => [e.scrollHeight, e.clientHeight])(document.querySelector('.feed'))")
+    assert feed[0] > feed[1]                                             # the feed scrolls
