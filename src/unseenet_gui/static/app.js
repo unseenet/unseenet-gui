@@ -1090,10 +1090,20 @@ function feedView(d) {
 
 // what shows under an entry: all when opened; else the newest few, and always your own
 // (section 4.4 - never chosen by how many answers or reactions)
+// Many comments are folded to the newest few - and every conversation you are in: the
+// comments that are yours, answer you or name you, with what they answer and the answers
+// under them, so you can follow your own threads without opening them all.
 function visibleComments(e) {
   if (S.feedOpen && S.feedOpen[e.m.id]) return e.comments;
-  const newest = new Set(e.comments.slice(-FEED_SHOWN).map(c => c.id));
-  return e.comments.filter(c => newest.has(c.id) || c.mine || c.for_me);
+  const shown = new Set(e.comments.slice(-FEED_SHOWN).map(c => c.id));
+  const yours = e.comments.filter(c => c.mine || c.for_me);
+  const ids = new Set(e.comments.map(c => c.id));
+  yours.forEach(c => {
+    shown.add(c.id);
+    (c.references || []).forEach(r => { if (ids.has(r)) shown.add(r); });          // what it answers
+    e.comments.forEach(o => { if ((o.references || []).includes(c.id)) shown.add(o.id); });  // answers to it
+  });
+  return e.comments.filter(c => shown.has(c.id));
 }
 
 function entryCard(d, e) {

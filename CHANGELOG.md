@@ -82,6 +82,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- Folded comments in a feed keep your conversations: besides the newest two,
+  a comment that is yours, answers you or names you is shown with what it
+  answers and the answers under it. "Show all" and "Show fewer" as before.
 - Your picture is set in Your profile (#82): choose, preview exactly as it will be
   published, describe or remove it in the same dialog, published with Publish; the
   separate Your picture dialog is gone (its palette entry opens your profile).
