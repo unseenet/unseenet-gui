@@ -49,6 +49,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   a chat line or the commands, with an optional note; a full group says which
   pin stops counting, and unpinning a post older than the group keeps posts
   warns that the nodes then delete it. The pins are the core's (unseenet#448).
+- `unseenet:` addresses (#66, UN-RFC 0031): an address in a post or a chat line
+  (a link, or written out in plain text) opens what it names: a post in a
+  group you follow is selected, a group you do not follow is shown first and
+  you choose to follow it, a person's opens their profile. The older forms work
+  too. Copy address is on posts, chat lines, About this group and profiles,
+  and the commands can open an address you paste. What an address names is the
+  core's (unseenet#460).
 
 ### Changed
 

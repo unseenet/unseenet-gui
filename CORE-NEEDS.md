@@ -142,6 +142,15 @@ and `POST /api/groups/{id}/pin` pins or unpins (UN-RFC 0046 section 4.12,
 unseenet#448). This client shows and sets them (#62). The terminal client
 gets them in its own PR (unseenet#442).
 
+## 14. unseenet: addresses
+
+**Status:** done. A group's head, each row and a profile carry their `address`
+(with an `n=` hint when the group is read from an onion node), and
+`GET /api/address?a=` says what any address names - the older forms too -
+and whether you have it (UN-RFC 0046 section 4.13, unseenet#460). This client
+opens and copies them (#66). The terminal client gets them in its own PR
+(unseenet#442).
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

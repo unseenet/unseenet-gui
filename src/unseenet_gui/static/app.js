@@ -85,7 +85,7 @@ function fromRow(r) {
     tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
     depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null,
-    pinned: !!r.pinned };
+    pinned: !!r.pinned, address: r.address || "" };
 }
 
 function fromSidebar(d, st) {
@@ -1132,15 +1132,15 @@ function renderChatLine(m) {
   return out;
 }
 
-function renderInline(nodes) {
+function renderInline(nodes, inLink = false) {
   return nodes.map(n => {
     switch (n.t) {
-      case "text": return linkGroups(n.v);
+      case "text": return inLink ? n.v : linkGroups(n.v);      // never a link inside a link
       case "br": return h("br");
       case "code": return h("code", { text: n.v });
-      case "em": return h("em", {}, renderInline(n.c));
-      case "strong": return h("strong", {}, renderInline(n.c));
-      case "del": return h("del", {}, renderInline(n.c));
+      case "em": return h("em", {}, renderInline(n.c, inLink));
+      case "strong": return h("strong", {}, renderInline(n.c, inLink));
+      case "del": return h("del", {}, renderInline(n.c, inLink));
       case "emoji": return h("span", { class: "emoji", title: ":" + n.name + ":", text: n.v });
       case "image": {                         // a picture the post carries, where its text puts it
         const a = RENDERING && n.blob && RENDERING.attachments.find(x => x.blob === n.blob);
@@ -1151,7 +1151,7 @@ function renderInline(nodes) {
         const shown = inlineText(n.c);
         return h("a", { class: "mdlink", href: n.href, title: n.href, rel: "noopener noreferrer",
           onclick: (e) => { e.preventDefault(); openLink(n.href); } },
-          renderInline(n.c), shown.trim() !== n.href ? h("span", { class: "addr", text: " " + n.href }) : null);
+          renderInline(n.c, true), shown.trim() !== n.href ? h("span", { class: "addr", text: " " + n.href }) : null);
       }
       default: return null;
     }
@@ -1285,7 +1285,25 @@ function filePicker(dialog, g, carries) {
 // not '#170', not inside a word or a URL.
 const GROUP_REF = /(?<![\p{L}\p{N}_@#\/&.+-])#(?=[a-z0-9+_.-]*[a-z])([a-z0-9][a-z0-9+_-]*(?:\.[a-z0-9][a-z0-9+_-]*)*)(?:@([a-z2-7]{4,16}))?(?![\p{L}\p{N}_+@-]|\.[\p{L}\p{N}_])/gu;
 
+// A bare unseenet: address in plain text is a link too (UN-RFC 0031 section 3.4.1);
+// a full stop or a bracket after it is the sentence's, not the address's.
+const ADDRESS_REF = /(?<![\p{L}\p{N}_])unseenet:[^\s<>"']*[^\s<>"'.,;:!?)\]]/gu;
+
 function linkGroups(text) {
+  const t = text || "", out = [];
+  let last = 0;
+  for (const m of t.matchAll(ADDRESS_REF)) {
+    if (m.index > last) out.push(...linkGroupRefs(t.slice(last, m.index)));
+    const ref = m[0];
+    out.push(h("a", { class: "mdlink aref", href: "#", title: "Open " + ref,
+      onclick: (e) => { e.preventDefault(); e.stopPropagation(); openAddress(ref); } }, ref));
+    last = m.index + ref.length;
+  }
+  if (last < t.length) out.push(...linkGroupRefs(t.slice(last)));
+  return out;
+}
+
+function linkGroupRefs(text) {
   const out = [];
   let last = 0;
   for (const m of (text || "").matchAll(GROUP_REF)) {
@@ -1329,6 +1347,67 @@ async function goToGroup(ref) {
   render();
 }
 
+// An unseenet: address (UN-RFC 0031 section 3.4.1, the older forms too): the core says
+// what it names (UN-RFC 0046 section 4.13). A group you follow opens, at the post or the
+// page it names; one you do not is shown first and you choose to follow it - never without
+// asking. Its n= hints are only said: this client reads from your own nodes.
+async function openAddress(text) {
+  let a;
+  try { a = await api("GET", "/api/address?a=" + encodeURIComponent(String(text || "").trim())); }
+  catch (x) { toast(x.message); return; }
+  if (a.kind === "identity") {
+    if (a.key) { openProfile(a.key, a.label || ""); return; }
+    toast(`Someone this client has not met yet: fingerprint ${a.fingerprint}.`);
+    return;
+  }
+  if (!a.available) {
+    toast("Your nodes do not have that group" + (a.nodes && a.nodes.length ?
+      `. The address says it is on ${a.nodes.join(", ")}: add that node to read it.` : "."));
+    return;
+  }
+  const go = async () => {
+    S.full = false;
+    await openGroup(a.group_id);
+    if (a.kind === "post") {
+      const here = S.data && S.data.messages.find(x => x.id === (a.message && a.message.id));
+      if (!here) { toast("That post is not here - it may have been withdrawn or have expired."); return; }
+      if (S.data.group.view === "chat") jumpToLine(here.id);
+      else { S.post = here.id; render(); }
+    } else if (a.kind === "page") {
+      toast(a.page ? `The page "${a.page.title}" is in this group; this client does not show pages yet.` :
+        "That page is not in this group.");
+    }
+  };
+  if (a.followed) { go(); return; }
+  const g = a.group, what = a.kind === "post" ? (a.message ? ` - the post "${a.message.subject || "(no subject)"}"` : "") :
+    a.kind === "page" && a.page ? ` - the page "${a.page.title}"` : "";
+  S.dialog = { focus: "[data-k='follow-address']", render: () => dialogShell({ label: "Address" },
+    h("div", { class: "dh" }, h("h2", {}, `Follow ${g.label}?`),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      g.title ? h("p", { style: "margin:0", text: g.title + what }) : what ? h("p", { style: "margin:0", text: what.slice(3) }) : null,
+      g.type === "closed" ? h("p", { class: "muted", style: "margin:0", text: "Closed: you can read it only if its owner invites you." }) : null,
+      h("p", { class: "hint", style: "margin:0", text: "The address took you here; you are not following it yet." })),
+    h("div", { class: "df btns" }, h("span", { class: "mono muted", text: g.id }),
+      h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", "data-k": "follow-address", onclick: async () => {
+        try { await api("POST", "/api/subscribe", { id: g.id, on: true }); }
+        catch (x) { toast(x.message); return; }
+        closeDialog(); await loadSidebar(); go(); } }, "Follow"))) };
+  render();
+}
+
+function openAddressDialog() {
+  formDialog({ label: "Address", title: "Open an address", focus: "#addr", button: "Open",
+    note: "An unseenet: address of a group, a post, a page or a person - copied from a post, a chat or a profile.",
+    fields: (vals) => [h("input", { id: "addr", name: "a", class: "in mono", value: vals.a || "", "data-k": "addr",
+      placeholder: "unseenet:…", autocomplete: "off", spellcheck: "false" })],
+    submit: async (v) => {
+      if (!(v.a || "").trim()) throw new Error("Paste an unseenet: address.");
+      closeDialog(); await openAddress(v.a);
+    } });
+}
+
 // A mention notice (UN-RFC 0032): the post, or its group first (asking before following)
 async function openMentioned(m) {
   const n = m.notice;
@@ -1365,10 +1444,8 @@ function inlineTextDeep(blocks) {
 function openLink(href) {
   let url;
   try { url = new URL(href); } catch (_) { return; }
-  if (url.protocol === "unseenet:" || url.protocol === "news:") {
-    copy(href, "The link is copied.");
-    return;
-  }
+  if (url.protocol === "unseenet:") { openAddress(href); return; }
+  if (url.protocol === "news:") { copy(href, "The link is copied."); return; }
   if (!url.hostname.endsWith(".onion") &&
       !window.confirm(`Open ${href}?\n\nThis is on the ordinary web, not a .onion address. Unless this browser is Tor Browser, the site sees your real address.`)) return;
   window.open(href, "_blank", "noopener,noreferrer");
@@ -1422,6 +1499,8 @@ function readerPane(g, m, msgs) {
       m.may_withdraw ? h("button", { class: "btn", title: "Withdraw the post from the network (D)", onclick: () => openWithdraw(m) }, "Withdraw", h("kbd", { text: "D" })) : null,
       g.may_pin && m.readable ? h("button", { class: "btn", title: m.pinned ? "Stop keeping it at the top" : "Keep it at the top of the group, for everyone",
         onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
+      m.address && !m.private ? h("button", { class: "btn", title: "An unseenet: address others can open (UN-RFC 0031)",
+        onclick: () => copy(m.address, "The post's address is copied.") }, "Copy address") : null,
       !m.mine && !m.private && g.id !== FOR_YOU ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
@@ -1762,8 +1841,9 @@ function chatView(d) {
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },
           commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null,
-      g.may_pin && m.readable ? h("div", { class: "lact pinact" }, h("button", { class: "link", onclick: () => openPin(m) },
-        m.pinned ? "Unpin" : "Pin")) : null));
+      (g.may_pin && m.readable) || (m.address && !m.private) ? h("div", { class: "lact pinact" },
+        g.may_pin && m.readable ? h("button", { class: "link", onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
+        m.address && !m.private ? h("button", { class: "link", onclick: () => copy(m.address, "The line's address is copied.") }, "Copy address") : null) : null));
     if (m.mine) grp.lastMine = m;
   }
   flush();
@@ -1967,7 +2047,8 @@ function openInfo() {
           "posts and chat lines" }),
         h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
         h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
-        h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id })),
+        h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id }),
+        g.address ? [h("dt", { text: "Address" }), h("dd", { class: "mono", text: g.address })] : null),
       g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }),
         g.rules_markdown ? h("div", { class: "md rules" }, renderTree(g.rules_tree || []))
           : h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
@@ -1988,6 +2069,7 @@ function openInfo() {
       g.owner ? h("button", { class: "btn", onclick: () => openBanned() }, `Banned (${(g.banned || []).length})`) : null,
       g.owner ? h("button", { class: "btn danger", onclick: openRemoveGroup }, "Remove group") : null,
       h("span", { class: "grow" }),
+      g.address ? h("button", { class: "btn", onclick: () => copy(g.address, "The group's address is copied.") }, "Copy address") : null,
       g.id !== FOR_YOU ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Unsubscribe") : null)) };
   render();
 }
@@ -2597,6 +2679,8 @@ async function openProfile(key, who = "") {
       err ? h("p", { class: "error", text: err }) :
       !p ? h("p", { class: "muted", style: "margin:0", text: "Reading the profile over Tor …" }) : profileBody(p)),
     h("div", { class: "df btns" },
+      p && p.address ? h("button", { class: "btn", title: "An unseenet: address for this person (UN-RFC 0031)",
+        onclick: () => copy(p.address, "The address is copied.") }, "Copy address") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyPicture() }, "Picture") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
@@ -2785,6 +2869,10 @@ function commands() {
     { name: "Pin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && !selectedPost().pinned, run: () => openPin(selectedPost()) },
     { name: "Unpin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && selectedPost().pinned, run: () => openPin(selectedPost()) },
     { name: "Pinned posts in this group", key: "", when: pinsOf(S.data).length > 0, run: () => openPinList() },
+    { name: "Open an unseenet: address", key: "", run: openAddressDialog },
+    { name: "Copy the address of this group", key: "", when: g && g.address, run: () => copy(g.address, "The group's address is copied.") },
+    { name: "Copy the address of the selected post", key: "", when: selectedPost() && selectedPost().address && !selectedPost().private,
+      run: () => copy(selectedPost().address, "The post's address is copied.") },
     { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
     { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
