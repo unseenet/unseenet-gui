@@ -969,14 +969,15 @@ function entryCard(d, e) {
       cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
 }
 
-// two levels (section 4.2): a deeper answer sits under its comment and says whom it answers
+// two levels (section 4.2; the core caps the depth at 2): a deeper answer sits at the
+// second level and says whom it answers
 function commentEl(c, entry, byId) {
   const parent = c.references.length ? byId[c.references[c.references.length - 1]] : null;
   return h("div", { class: "comment" + (c.depth > 1 ? " answer" : "") + (c.mine ? " mine" : ""), "data-id": c.id },
     avatar(c, true),
     h("div", { class: "cb" },
       h("div", { class: "chd" }, whoEl(c), h("span", { class: "hint", text: when(c.date) }),
-        c.depth > 2 && parent ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null),
+        parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null),
       h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
         [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
       entry.comment && entry.comment.allowed ? h("button", { class: "link", onclick: () => {

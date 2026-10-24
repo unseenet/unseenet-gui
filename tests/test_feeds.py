@@ -44,7 +44,7 @@ class FeedAPI:
                              key=f"ed25519:r{i}") for i in range(4)]
         self.comments.append(row("<d@x>", "Svar på svar", 2, refs=["<a@x>", "<c1@x>"], who="Dybt",
                                  key="ed25519:deep"))
-        self.comments.append(row("<e@x>", "Dybere", 3, refs=["<a@x>", "<c1@x>", "<d@x>"],
+        self.comments.append(row("<e@x>", "Dybere", 2, refs=["<a@x>", "<c1@x>", "<d@x>"],
                                  who="Dybest", key="ed25519:deeper"))
 
     def rows(self, group=FEED):
