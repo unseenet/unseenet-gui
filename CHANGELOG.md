@@ -41,6 +41,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   publish or remove it. "Identicons only" in the commands (Ctrl P) turns
   pictures off; "Show people's pictures" turns them on again.
 
+- Pinned posts (#62, UN-RFC 0033): a group's pinned posts are in a Pinned
+  section above the threads, with their notes, and marked in their place too;
+  a chat has a pinned bar with the newest pin - select it to go to the line,
+  then the next - and a list of all pins. Both can be folded away, remembered
+  per group. The owner and moderators pin and unpin from the post's tools, under
+  a chat line or the commands, with an optional note; a full group says which
+  pin stops counting, and unpinning a post older than the group keeps posts
+  warns that the nodes then delete it. The pins are the core's (unseenet#448).
+
 ### Changed
 
 - Write permission, changing the passphrase and profiles come from the core's

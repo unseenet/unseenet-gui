@@ -84,7 +84,8 @@ function fromRow(r) {
     readable: m.readable, error: m.error, edited: m.edited,
     tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
-    depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null };
+    depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null,
+    pinned: !!r.pinned };
 }
 
 function fromSidebar(d, st) {
@@ -873,6 +874,131 @@ function currentPost(msgs) {
   return msgs.find(m => !m.read) || msgs[0];
 }
 
+// ---- pinned posts (UN-RFC 0033, UN-RFC 0046 section 4.12) --------------------
+// The core works out which pins are in force, with the rules every node uses; this
+// shows them: a Pinned section above the threads, a bar above a chat (sections 7.2,
+// 7.3), and pin and unpin for the owner and moderators only (section 7.1).
+const PIN = "📌";
+const pinsOf = (d) => (d && d.group && d.group.pins) || [];
+function pinsHidden(gid, where) {
+  try { return localStorage.getItem(`pins-hidden:${where}:${gid}`) === "1"; } catch (_) { return false; }
+}
+function hidePins(gid, where, on) {
+  try { if (on) localStorage.setItem(`pins-hidden:${where}:${gid}`, "1"); else localStorage.removeItem(`pins-hidden:${where}:${gid}`); }
+  catch (_) { /* remembered for this page only */ }
+  render();
+}
+// a pin's first line: the subject of a post, the text of a chat line
+function pinLine(p, m) {
+  if (m && m.kind === "chat") return ((m.text || "").split("\n").find(l => l.trim()) || "").slice(0, 140);
+  return p.subject || (m ? subjectOf(m) : "") || "A post this client has not fetched yet";
+}
+
+function pinnedSection(d, msgs) {
+  const g = d.group, pins = pinsOf(d);
+  if (!pins.length) return null;
+  const hidden = pinsHidden(g.id, "threads");
+  return h("section", { class: "pins", "aria-label": "Pinned posts" },
+    h("button", { class: "pins-hd", "aria-expanded": hidden ? "false" : "true", onclick: () => hidePins(g.id, "threads", !hidden) },
+      h("span", { "aria-hidden": "true", text: hidden ? "▸" : "▾" }), " " + PIN + " Pinned ",
+      h("span", { class: "muted", text: String(pins.length) })),
+    hidden ? null : pins.map(p => {
+      const m = msgs.find(x => x.id === p.id);
+      return h("button", { class: "pin" + (m && m.id === S.post ? " on" : ""), disabled: !m,
+        title: m ? "Show the post" : "This client has not fetched the post yet",
+        onclick: () => { S.post = m.id; S.mobileReading = true; render(); } },
+        h("span", { class: "sj", text: PIN + " " + pinLine(p, m) }),
+        h("span", { class: "from mono", text: p.who || (m && m.who) || "" }),
+        p.note ? h("span", { class: "pnote", text: p.note }) : null);
+    }));
+}
+
+// Scroll a chat to a line and show it briefly; say so when it is not here (section 7.3).
+function jumpToLine(id) {
+  setTimeout(() => {
+    const el = [...document.querySelectorAll(".msgs [data-id]")].find(x => x.dataset.id === id);
+    if (!el) { toast("That message is no longer here: earlier messages have expired."); return; }
+    el.scrollIntoView({ block: "center" });
+    el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1600);
+  });
+}
+
+function pinBar(d, msgs) {
+  const g = d.group, pins = pinsOf(d);
+  if (!pins.length) return null;
+  if (pinsHidden(g.id, "chat")) {
+    return h("div", { class: "pinbar off" }, h("button", { class: "link", onclick: () => hidePins(g.id, "chat", false) },
+      `${PIN} Show the pins (${pins.length})`));
+  }
+  S.pinAt = S.pinAt || {};
+  const i = (S.pinAt[g.id] || 0) % pins.length, p = pins[i], m = msgs.find(x => x.id === p.id);
+  return h("div", { class: "pinbar", role: "region", "aria-label": "Pinned" },
+    h("button", { class: "pb-main", title: pins.length > 1 ? "Go to it; then the next pin" : "Go to it",
+      onclick: () => { S.pinAt[g.id] = i + 1; jumpToLine(p.id); render(); } },
+      h("span", { "aria-hidden": "true", text: PIN }),
+      h("span", { class: "pb-text" }, h("b", { text: (p.who || (m && m.who) || "") + " " }), pinLine(p, m),
+        p.note ? h("span", { class: "muted", text: " - " + p.note }) : null),
+      pins.length > 1 ? h("span", { class: "hint", text: `${i + 1}/${pins.length}` }) : null),
+    pins.length > 1 || g.may_pin ? h("button", { class: "link", onclick: () => openPinList() }, "All pins") : null,
+    h("button", { class: "btn icon", "aria-label": "Hide the pins", title: "Hide the pins", onclick: () => hidePins(g.id, "chat", true) }, svg(ICON.x)));
+}
+
+async function pinRequest(g, body, done) {
+  toast(body.unpin ? "Unpinning … the marker needs its proof of work first." : "Pinning … the marker needs its proof of work first.");
+  await api("POST", `/api/groups/${encodeURIComponent(g.id)}/pin`, body);
+  if (S.pinAt) S.pinAt[g.id] = 0;                 // the bar starts again at the newest pin
+  closeDialog(); await loadGroup(); render(); toast(done);
+}
+
+function openPinList() {
+  const d = S.data, g = d && d.group;
+  if (!g) return;
+  const chat = g.view === "chat";
+  S.dialog = { focus: ".dialog .btn.primary", render: () => {
+    const pins = pinsOf(S.data);
+    return dialogShell({ label: "Pinned" },
+      h("div", { class: "dh" }, h("h2", { text: PIN + " Pinned in " + g.label }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "db" }, pins.length ? h("ul", { class: "pinlist" }, pins.map(p => {
+        const m = S.data.messages.find(x => x.id === p.id);
+        return h("li", {},
+          h("button", { class: "link", disabled: !m, onclick: () => { closeDialog(); S.post = p.id; if (chat) jumpToLine(p.id); render(); } }, pinLine(p, m)),
+          h("span", { class: "muted", text: " " + (p.who || (m && m.who) || "") + " · pinned by " + p.by_label + ", " + when(p.pinned) }),
+          p.note ? h("div", { class: "pnote", text: p.note }) : null,
+          g.may_pin ? h("button", { class: "btn", onclick: () => openUnpin(p, m) }, "Unpin") : null);
+      })) : h("p", { class: "muted", text: "Nothing is pinned here." })),
+      h("div", { class: "df btns" }, h("button", { class: "btn primary", onclick: closeDialog }, "Close")));
+  } };
+  render();
+}
+
+function openUnpin(p, m) {
+  const g = S.data && S.data.group;
+  if (!g || !g.may_pin) return;
+  confirmDialog({ title: "Unpin “" + pinLine(p, m) + "”?", button: "Unpin", danger: !!p.beyond_window,
+    text: p.beyond_window ? "It is older than this group keeps posts, so the nodes delete it as soon as it is unpinned." :
+      "It stays where it is, and goes when it is older than this group keeps posts.",
+    ok: async () => { try { await pinRequest(g, { id: p.id, unpin: true }, "Unpinned."); } catch (x) { toast(x.message); } } });
+}
+
+// Pin (or unpin) a post: the owner and moderators only (UN-RFC 0033 section 7.1).
+function openPin(m) {
+  const d = S.data, g = d && d.group;
+  if (!g || !m || !g.may_pin) return;
+  const pins = pinsOf(d), now = pins.find(p => p.id === m.id);
+  if (now) { openUnpin(now, m); return; }
+  const out = pins.length >= g.max_pins ? pins[pins.length - 1] : null;   // the oldest pin stops counting
+  formDialog({ label: "Pin", title: "Pin “" + (m.kind === "chat" ? pinLine({}, m) : subjectOf(m)) + "”", focus: "#pnote", button: "Pin",
+    note: "Everyone sees it at the top of " + g.label + ", and the nodes keep it until it is unpinned.",
+    fields: (vals) => [
+      out ? h("div", { class: "warnbox" },
+        h("p", { style: "margin:0", text: `This group shows at most ${g.max_pins} pins, so “${pinLine(out, S.data.messages.find(x => x.id === out.id))}” stops counting.` }),
+        h("button", { type: "button", class: "link", onclick: () => openPinList() }, "Unpin another one instead")) : null,
+      h("label", { for: "pnote", text: "A note shown with it (optional)" }),
+      h("input", { id: "pnote", name: "note", class: "in", "data-k": "pnote", maxlength: 256, value: vals.note || "" })],
+    submit: async (v) => pinRequest(g, { id: m.id, note: (v.note || "").trim() }, "Pinned.") });
+}
+
 function threadsView(d) {
   const g = d.group, msgs = d.messages;
   if (!msgs.length) {
@@ -889,6 +1015,7 @@ function threadsView(d) {
   markRead([cur]);
   const pend = pendingIn(g, msgs, false);
   const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
+    pinnedSection(d, msgs),
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
       h("span", { text: "From" }), h("span", { text: "Date" })),
     msgs.map(m => h("button", {
@@ -900,6 +1027,7 @@ function threadsView(d) {
       h("span", { class: "sj" },
         m.depth ? h("span", { class: "tree", "aria-hidden": "true", text: "  ".repeat(m.depth - 1) + "└ " }) : null,
         m.for_me === "reply" ? h("span", { class: "you", text: "◄ " }) : m.for_me === "mention" ? h("span", { class: "you", text: "♦ " }) : null,
+        m.pinned ? h("span", { class: "pinmark", title: "Pinned", text: PIN + " " }) : null,
         m.private && !m.notice ? h("span", { class: "muted", text: "@ " }) : m.encrypted && !m.notice ? h("span", { class: "muted", text: "∩ " }) : null,
         // a reply with the thread's own subject: quieter, so new subjects stand out
         h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
@@ -1292,6 +1420,8 @@ function readerPane(g, m, msgs) {
       m.may_edit && m.kind !== "chat" ? h("button", { class: "btn", title: "Post a new version: everyone sees the newest (UN-RFC 0042)",
         onclick: () => openEdit(m, g) }, "Edit") : null,
       m.may_withdraw ? h("button", { class: "btn", title: "Withdraw the post from the network (D)", onclick: () => openWithdraw(m) }, "Withdraw", h("kbd", { text: "D" })) : null,
+      g.may_pin && m.readable ? h("button", { class: "btn", title: m.pinned ? "Stop keeping it at the top" : "Keep it at the top of the group, for everyone",
+        onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
       !m.mine && !m.private && g.id !== FOR_YOU ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
@@ -1622,14 +1752,18 @@ function chatView(d) {
     grp.at = d0 || grp.at;
     const quoted = m.references.length && byId[m.references[m.references.length - 1]];
     const isPost = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
-    grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : ""), title: when(m.date) + (m.encrypted ? " · encrypted" : "") },
+    grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : "") + (m.pinned ? " pinned" : ""), "data-id": m.id,
+      title: when(m.date) + (m.encrypted ? " · encrypted" : "") + (m.pinned ? " · pinned" : "") },
+      m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN + " " }) : null,
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
       m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
       m.readable ? filesOf(m, true) : null,
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },
-          commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null));
+          commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null,
+      g.may_pin && m.readable ? h("div", { class: "lact pinact" }, h("button", { class: "link", onclick: () => openPin(m) },
+        m.pinned ? "Unpin" : "Pin")) : null));
     if (m.mine) grp.lastMine = m;
   }
   flush();
@@ -1657,6 +1791,7 @@ function chatView(d) {
     else doPost(g.id, { body: text, chat: true }, { text, chat: true });
   };
   return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
+    pinBar(d, msgs),
     h("div", { class: "msgs", "data-scroll": "chat:" + g.id, "data-stick": "bottom" }, out),
     g.type !== "contact" && g.kinds && !g.kinds.includes("chat") ?
       h("div", { class: "chatbar hint", text: mayWrite(d, "post").allowed ?
@@ -2647,6 +2782,9 @@ function commands() {
     { name: "Remove this group from the network", key: "", when: g && g.owner, run: openRemoveGroup },
     { name: "Unsubscribe from this group", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type), run: () => leaveGroup(g) },
     { name: "Withdraw the selected post", key: "D", when: selectedPost() && selectedPost().may_withdraw, run: () => openWithdraw(selectedPost()) },
+    { name: "Pin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && !selectedPost().pinned, run: () => openPin(selectedPost()) },
+    { name: "Unpin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && selectedPost().pinned, run: () => openPin(selectedPost()) },
+    { name: "Pinned posts in this group", key: "", when: pinsOf(S.data).length > 0, run: () => openPinList() },
     { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
     { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },

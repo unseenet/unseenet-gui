@@ -134,6 +134,14 @@ cannot tell whose you look at; `POST /api/profile/picture` previews, publishes
 and removes your own, with the warning before the first (UN-RFC 0046 section
 4.11, unseenet#447). This client shows them (#64).
 
+## 13. Pinned posts
+
+**Status:** done. A group's head has the pins in force with the pinned posts'
+subject and author, `max_pins` and `may_pin`, each row whether it is `pinned`,
+and `POST /api/groups/{id}/pin` pins or unpins (UN-RFC 0046 section 4.12,
+unseenet#448). This client shows and sets them (#62). The terminal client
+gets them in its own PR (unseenet#442).
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without
