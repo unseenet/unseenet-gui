@@ -257,7 +257,7 @@ function nameEl(label) {
 // the author's name opens their profile (#20), as Profile of this author does in the TUI
 function whoEl(m) {
   if (!m.key || m.mine) return nameEl(m.who);
-  return h("button", { class: "name-btn", title: "Their profile", onclick: (e) => { e.stopPropagation(); openProfile(m.key, m.who); } }, nameEl(m.who));
+  return h("button", { class: "name-btn", title: "Their profile", onclick: (e) => { e.stopPropagation(); openProfile(m.key, m.who, m.private ? "me" : S.gid); } }, nameEl(m.who));
 }
 const typing = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
@@ -3107,8 +3107,11 @@ function profileBody(p) {
       h("ul", { class: "profile-links" }, obj.links.map(l => h("li", { class: "mono", text: `${l.kind}: ${l.value}${l.label ? "  (" + l.label + ")" : ""}` })))] : null];
 }
 
-async function openProfile(key, who = "") {
+// where it is opened decides whether a profile shared with you or this closed group is
+// shown (UN-RFC 0022 section 6): the core answers one shared there, never from elsewhere
+async function openProfile(key, who = "", context = S.gid) {
   let p = null, err = "";
+  const again = () => openProfile(key, who, context);
   const draw = () => dialogShell({ label: "Profile" },
     h("div", { class: "dh" }, h("h2", { text: (p && p.label) || who || "Profile" }),
       p && p.profile && p.profile.bot ? h("span", { class: "chip", text: "bot" }) : null,
@@ -3116,25 +3119,31 @@ async function openProfile(key, who = "") {
     h("div", { class: "db" },
       h("div", { class: "prof-head" }, bigAvatar(key), h("div", { class: "keybox", text: key })),
       err ? h("p", { class: "error", text: err }) :
-      !p ? h("p", { class: "muted", style: "margin:0", text: "Reading the profile over Tor …" }) : profileBody(p)),
+      !p ? h("p", { class: "muted", style: "margin:0", text: "Reading the profile over Tor …" }) :
+      p.shared && !p.hidden ? [h("p", { class: "hint shared-note", style: "margin:0",
+        text: p.shared.context === "me" ? "Shared with you only - shown only in your private posts and chats with them."
+          : `Shared with ${p.shared.context_label} only - shown only there.` }), profileBody({ ...p, ...p.shared })] :
+      profileBody(p)),
     h("div", { class: "df btns wrap" },
       p && !p.mine && p.feed ? h("button", { class: "btn", title: "Their personal feed, if they have one (UN-RFC 0034)",
         onclick: () => { closeDialog(); openAddress("unseenet:" + p.feed); } }, "Feed") : null,
       p && !p.mine && !p.hidden ? h("button", { class: "btn", title: "Follow their feeds - nobody is told (UN-RFC 0034 section 6.1)",
-        onclick: async () => { await setFollowing({ person: key, on: !p.following }, p.label || who); openProfile(key, who); } },
+        onclick: async () => { await setFollowing({ person: key, on: !p.following }, p.label || who); again(); } },
         p.following ? "Unfollow" : "Follow") : null,
       p && p.address ? h("button", { class: "btn", title: "An unseenet: address for this person (UN-RFC 0031)",
         onclick: () => copy(p.address, "The address is copied.") }, "Copy address") : null,
+      p && !p.mine ? h("button", { class: "btn", title: "A profile only they can read, shown only to them (UN-RFC 0022 section 6)",
+        onclick: () => openShareProfile(key, p.label || who) }, "Share yours") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyPicture() }, "Picture") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
         try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
         catch (x) { toast(x.message); return; }
-        toast(p.hidden ? "Profile shown." : "Profile hidden."); openProfile(key, who); } }, p.hidden ? "Show" : "Hide") : null,
+        toast(p.hidden ? "Profile shown." : "Profile hidden."); again(); } }, p.hidden ? "Show" : "Hide") : null,
       h("button", { class: "btn primary", onclick: closeDialog }, "Close")));
   S.dialog = { focus: ".dialog .btn.primary", render: draw };
   render();
-  try { p = await api("GET", "/api/profile?key=" + encodeURIComponent(key)); }
+  try { p = await api("GET", "/api/profile?key=" + encodeURIComponent(key) + (context ? "&context=" + encodeURIComponent(context) : "")); }
   catch (x) { err = x.message; }
   if (S.dialog && S.dialog.render === draw) render();
 }
@@ -3234,14 +3243,41 @@ async function openMyProfile() {
   editProfile(p);
 }
 
-function editProfile(p) {
+// A profile for one person or a closed group only (UN-RFC 0022 section 6, as the TUI's
+// Share your profile): for those who want no public profile, or another one for friends.
+// `to` is their key (or their chat) or the closed group; nothing is published.
+async function openShareProfile(to, who) {
+  let p;
+  try { p = await api("GET", "/api/profile"); } catch (x) { toast(x.message); return; }
+  editProfile(p, { to, who });
+}
+function shareTarget() {
+  const g = S.data && S.data.group;
+  if (!g) return null;
+  if (g.type === "closed") return { to: g.id, who: "the members of " + g.label };
+  if (String(g.id || "").startsWith("contact:")) return { to: g.id, who: g.label };
+  return null;
+}
+function withdrawShared({ to, who }) {
+  confirmDialog({ title: "Take back your shared profile?", button: "Take back",
+    text: `An empty profile goes to ${who}, and the one you shared is no longer shown. Copies they already kept cannot be taken back.`,
+    ok: async () => { try { await api("POST", "/api/profile/share", { to, withdraw: true }); closeDialog(); toast(`Shared profile taken back from ${who}.`); }
+      catch (x) { toast(x.message); } } });
+}
+
+function editProfile(p, share = null) {
   const cur = p.profile || {};
   const md = cur.about ? /markdown/i.test(cur.about_type || "") : !(S.sidebar && S.sidebar.markdown === false);
   const publish = async (body) => {
     await api("POST", "/api/profile", body.remove ? null : { edit: body });
     closeDialog(); toast(body.remove ? "Your profile is removed." : "Your profile is published.");
   };
-  formDialog({ label: "Your profile", title: "Your public profile - anybody can read it", focus: "#pabout", button: "Publish",
+  const shareIt = (body) => confirmDialog({ title: "Share your profile", button: "Share",
+    text: `Only ${share.who} can read it, and it is shown only there - your public profile, if you have one, stays as it is. You can take it back later.`,
+    ok: async () => { try { await api("POST", "/api/profile/share", { to: share.to, profile: { edit: body } }); closeDialog(); toast(`Profile shared with ${share.who}.`); }
+      catch (x) { toast(x.message); } } });
+  formDialog({ label: share ? "Share your profile" : "Your profile", focus: "#pabout", button: share ? "Share …" : "Publish",
+    title: share ? `A profile for ${share.who} only` : "Your public profile - anybody can read it",
     values: { about: cur.about || "", markdown: md, lang: (cur.lang || []).join(", "), links: linksText(cur.links) },
     note: "Kinds of links: " + (p.link_kinds || []).join(", ") + ", or x-something. Links are shown as written; nobody checks them.",
     fields: (vals) => [
@@ -3253,12 +3289,13 @@ function editProfile(p) {
       h("input", { id: "plang", name: "lang", class: "in", "data-k": "plang", value: vals.lang }),
       h("label", { for: "plinks", text: "Links, one per line: kind address  (# a label)" }),
       h("textarea", { id: "plinks", name: "links", class: "in mono", "data-k": "plinks", value: vals.links, style: "min-height:80px" }),
-      p.published ? h("button", { type: "button", class: "link", onclick: () => confirmDialog({ title: "Remove your profile?",
+      p.published && !share ? h("button", { type: "button", class: "link", onclick: () => confirmDialog({ title: "Remove your profile?",
         text: "Nodes stop showing it. Copies others already kept cannot be taken back.", button: "Remove", danger: true,
         ok: () => publish({ remove: true }).catch(x => toast(x.message)) }) }, "Remove your profile") : null],
     submit: async (v) => {
       const links = parseLinks(v.links || "");
       const body = { about: v.about || "", markdown: !!v.markdown, lang: v.lang || "", links };
+      if (share) { shareIt(body); return; }
       const old = new Set((cur.links || []).map(l => l.kind + " " + l.value));
       const added = links.filter(l => !old.has(l.kind + " " + l.value) && l.kind !== "onion");
       if (added.length && p.published) {     // each new link ties this identity to that account
@@ -3334,6 +3371,9 @@ function commands() {
     { name: "Profile of this author: about, languages, links (UN-RFC 0022)", key: "", when: selectedPost() && selectedPost().key,
       run: () => openProfile(selectedPost().key, selectedPost().who) },
     { name: "Your profile: write, change or remove it", key: "", run: openMyProfile },
+    { name: g && g.type === "closed" ? "Share your profile with this group only" : "Share your profile with this person only", key: "",
+      when: !!shareTarget(), run: () => openShareProfile(shareTarget().to, shareTarget().who) },
+    { name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
     { name: "Update Unseenet", key: "", when: !!S.state.update, run: openUpdate },
     { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },

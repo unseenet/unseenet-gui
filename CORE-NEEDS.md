@@ -171,6 +171,15 @@ remove - as a job) and `GET/POST /api/site` (UN-RFC 0046 section 4.15,
 unseenet#480). This client shows and writes them (#61). The terminal
 client shows a site as its pages since unseenet#473.
 
+## 17. Private profiles
+
+**Status:** waiting for unseenet#485. `POST /api/profile/share` (share a
+profile with one person or a closed group, or take it back) and `GET
+/api/profile?context=` with `shared`, the profile shared where it is opened
+and never one from elsewhere (UN-RFC 0046 section 4.16, UN-RFC 0022 section
+6). This client shares and shows them (#65). The terminal client does since
+unseenet#477.
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without
