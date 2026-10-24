@@ -85,6 +85,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- A paused key ripening stays paused on this device, also after a restart,
+  until you resume it (unseenet#488); the ripening dialog says so.
 - The theme is kept with your settings in the core (#84), so it is no longer
   forgotten when the GUI starts on another port, and it follows you to other
   devices. "Follow the system's theme" in the palette goes back to the
