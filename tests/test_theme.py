@@ -58,7 +58,11 @@ class ThemeAPI:
                         self.gui[k] = v
             data = {"client": "gui", "settings": self.gui}
         elif path == "/api/groups":
-            data = {"groups": [], "people": [], "hierarchies": [], "inbox": {"id": "inbox:test"}}
+            groups = [{"id": f"dk.g{i}@abcdabcdabcdabcd", "label": f"dk.g{i}", "type": "open",
+                       "view": "threads", "hierarchy": "dk", "may_post": True, "unread": 0,
+                       "subscribed": True, "kinds": ["post"]} for i in range(60)]
+            data = {"groups": groups, "people": [], "inbox": {"id": "inbox:test"},
+                    "hierarchies": [{"name": "dk", "tree": None}]}
         elif path == "/api/pictures":
             data = {"pictures": {}}
         else:
@@ -129,3 +133,15 @@ async def test_your_state_on_this_device_only_after_a_warning(theme_page):
     await page.locator(".dialog").get_by_role("button", name="Keep in the network").click()
     await expect(page.locator(".toast")).to_contain_text("in the network again")
     assert api.posted[-1] == ("settings", {"state_local": False})
+
+
+async def test_you_stay_at_the_bottom_however_many_groups(theme_page):
+    # many groups scroll by themselves; your name, picture and connection stay in view
+    page, _ = theme_page
+    await expect(page.locator(".side .item").nth(40)).to_be_attached()
+    me = await page.locator(".side .me").bounding_box()
+    assert me and me["y"] + me["height"] <= 900 - 20               # above the footer
+    sc = await page.evaluate("(e => [e.scrollHeight, e.clientHeight])(document.querySelector('.side-scroll'))")
+    assert sc[0] > sc[1]                                           # the groups scroll
+    await page.locator(".side-scroll").evaluate("e => e.scrollTop = e.scrollHeight")
+    assert await page.locator(".side .me").bounding_box() == me    # and you do not move

@@ -698,7 +698,9 @@ function sidebar() {
     "aria-current": S.gid === gid ? "page" : null, title },
     h("span", { class: "ic", text: ic }),
     typeof label === "string" ? h("span", { class: "nm", text: label }) : h("span", { class: "nm" }, label), extra);
-  return h("nav", { class: "side", "aria-label": "Groups", "data-scroll": "side" },
+  // the groups scroll; you stay at the bottom, however many groups there are
+  return h("nav", { class: "side", "aria-label": "Groups" },
+    h("div", { class: "side-scroll", "data-scroll": "side" },
     h("div", { class: "brand" }, logo(30), "Unseenet"),
     h("button", { class: "search", onclick: () => openPalette() }, svg(ICON.search),
       h("span", { text: "Search and commands" }), h("kbd", { text: "Ctrl P" })),
@@ -729,7 +731,7 @@ function sidebar() {
       h("p", { class: "muted", text: "Loading your groups …" }),
     sb && !sb.hierarchies.length ? h("div", { class: "nav" },
       h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
-      h("button", { class: "btn", onclick: openBrowse }, "Find groups", h("kbd", { text: "G" }))) : null,
+      h("button", { class: "btn", onclick: openBrowse }, "Find groups", h("kbd", { text: "G" }))) : null),
     h("div", { class: "me" },
       // your picture and name open your profile (#83), as in most apps
       h("button", { class: "me-open", title: "Your profile", "aria-label": "Your profile", onclick: openMyProfile },

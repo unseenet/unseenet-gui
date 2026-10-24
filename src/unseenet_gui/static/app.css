@@ -56,7 +56,7 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 /* A hidden label sits where it would be in its scrolling pane: kept inside that pane, it
    never makes the page itself scroll (a second scroll bar beside a long feed). */
-.feed, .scroll, .msgs, .threads, .ptable, .side, .dialog .db { position: relative; }
+.feed, .scroll, .msgs, .threads, .ptable, .side-scroll, .dialog .db { position: relative; }
 #root { height: 100%; }
 
 /* ---- buttons ------------------------------------------------------------ */
@@ -128,8 +128,11 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .me .ripe { display: block; padding: 0; font-size: 12px; text-align: left; max-width: 100%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .me .ripe:hover { background: none; color: var(--paper); text-decoration: underline; }
-.side { flex: 0 0 272px; min-height: 0; overflow-y: auto; background: var(--ink-deep);
-  border-right: 1px solid var(--line); display: flex; flex-direction: column; padding: 16px 12px; gap: 16px; }
+.side { flex: 0 0 272px; min-height: 0; overflow: hidden; background: var(--ink-deep);
+  border-right: 1px solid var(--line); display: flex; flex-direction: column; }
+.side-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; display: flex; flex-direction: column;
+  padding: 16px 12px; gap: 16px; position: relative; }
+.side > .me { flex: none; margin: 0 12px 12px; }
 .brand { display: flex; align-items: center; gap: 10px; padding: 0 4px; font-family: var(--mono);
   font-weight: 700; font-size: 17px; }
 .brand img { width: 30px; height: 30px; }

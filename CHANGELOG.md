@@ -85,6 +85,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- You stay at the bottom of the sidebar: with many groups only the groups
+  scroll, and your picture, name and connection are always in view.
 - The footer shows the keys of the view you are in (unseenet#490), the same as
   the terminal client, and each is a button too. Threads: N, R, ↑↓, Space,
   Enter. Chat: Enter, Esc. A feed: N, ↑↓ from entry to entry, Space to the next
