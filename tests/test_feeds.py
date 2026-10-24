@@ -40,6 +40,7 @@ class FeedAPI:
     def __init__(self):
         self.posted, self.follows, self.started = [], [], []
         self.following = False
+        self.many = 0                     # more entries, for a feed taller than the window
         self.comments = [row(f"<c{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
                              key=f"ed25519:r{i}") for i in range(4)]
         self.comments.append(row("<d@x>", "Svar på svar", 2, refs=["<a@x>", "<c1@x>"], who="Dybt",
@@ -50,7 +51,8 @@ class FeedAPI:
     def rows(self, group=FEED):
         return [row("<a@x>", "En kort note", group=group), *self.comments,
                 row("<b@x>", "Lang tekst her", kind="post", subject="En overskrift", comment=CLOSED,
-                    group=group)]
+                    group=group),
+                *[row(f"<m{i}@x>", f"Note {i}", group=group) for i in range(self.many)]]
 
     def group(self, gid=FEED):
         return {"id": gid, "label": "Bob's feed", "type": "channel", "view": "feed",
@@ -219,3 +221,36 @@ async def test_a_feed_switches_to_threads_and_back(feed_page):
     page, _ = feed_page
     await open_feed(page)
     await expect(page.get_by_role("button", name="Show as threads")).to_be_visible()
+
+
+async def test_folded_comments_keep_your_conversations(feed_page):
+    # a comment naming you is shown with what it answers and the answers under it,
+    # besides the newest two; the rest stay folded
+    page, api = feed_page
+    api.comments[0]["for_me"] = "mention"                    # Læser 0 names you
+    api.comments.insert(1, row("<f@x>", "Svar til Læser 0", 2, refs=["<a@x>", "<c0@x>"],
+                               who="Svarer", key="ed25519:f"))
+    await open_feed(page)
+    note = page.locator(".entry").first
+    shown = note.locator(".comment")
+    await expect(shown).to_have_count(4)                     # c0, its answer, and the newest two
+    await expect(note.locator('.comment[data-id="<c0@x>"]')).to_be_visible()
+    await expect(note.locator('.comment[data-id="<f@x>"]')).to_be_visible()
+    await expect(note.locator('.comment[data-id="<c2@x>"]')).to_have_count(0)
+    await note.get_by_role("button", name="Show all 7 comments").click()
+    await expect(shown).to_have_count(7)
+    await note.get_by_role("button", name="Show fewer").click()
+    await expect(shown).to_have_count(4)
+
+
+async def test_a_long_feed_scrolls_by_itself_not_the_page(feed_page):
+    # the hidden labels of the comment boxes (.sr) sat where they would be in the
+    # document, far below the window, and gave the page a second scroll bar
+    page, api = feed_page
+    api.many = 30
+    await open_feed(page)
+    await expect(page.locator(".entry")).to_have_count(32)
+    size = await page.evaluate("[document.scrollingElement.scrollHeight, innerHeight]")
+    assert size[0] <= size[1]
+    feed = await page.evaluate("(e => [e.scrollHeight, e.clientHeight])(document.querySelector('.feed'))")
+    assert feed[0] > feed[1]                                             # the feed scrolls
