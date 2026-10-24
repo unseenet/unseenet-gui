@@ -9,6 +9,17 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- **Your nodes** (#111, unseenet#518): change node while the client is open.
+  The node in the box at the bottom left shows its name (from the list of
+  known nodes; a node's own name marked *unlisted*; else the start of its
+  address), with the full address on hover; clicking it - or *Your nodes* in
+  the palette, also found by *node*, *server* and *switch* - lists your nodes
+  by name with their onion addresses (copyable), groups read there, whether
+  they answer and what they say about themselves, with *Add* (a known node or
+  any address), *Make default* and *Remove*. The first start's list of nodes
+  shows the address too. The status bar no longer repeats *Connected to ...*;
+  it shows what is happening (Tor starting, offline, sending). Needs a core
+  with `/api/nodes` (unseenet 0.5.0).
 - Close a chat (unseenet#519): *Close chat* in the chat, in its info instead of
   the Unsubscribe that did nothing, and with ⋯ on each chat in the list; it
   leaves the list on all your devices and comes back when one of you writes.
