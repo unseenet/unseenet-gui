@@ -212,6 +212,12 @@ releases on [PyPI](https://pypi.org/p/unseenet-gui) and here with the
 portable builds and the image. Each release names the minor version of
 unseenet it works with (`unseenet[api]>=0.4.1,<0.5`).
 
+The version numbers are this client's own and do not follow the core's: a
+client can gain features, or get fixes, while the core stays where it is, and
+that must not have to wait for a core release. So unseenet-gui 0.2.0 may need
+unseenet 0.5, and a later 0.2.x or 0.3.0 may need the same core. Which core a
+release needs is said in `pyproject.toml` and at the top of its release notes.
+
 To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
 new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
 `src/unseenet_gui/__init__.py`, and the core release the builds use
