@@ -9,6 +9,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Tables in Markdown (unseenet#508, UN-RFC 0031 section 3.6): a real table, in
+  posts, chat lines and pages, in a box that scrolls sideways when it is wider
+  than the text; each column aligned as written. Needs core 0.5.
 - From a person to their feed and site without following them
   (unseenet#506): a profile shows *Their feed* and *Their site* when they have
   them and opens them at once; a group you read without following says so,

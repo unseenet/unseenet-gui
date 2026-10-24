@@ -26,7 +26,13 @@ def tree(path):
     nodes = [{"t": "text", "v": TEXT[path] + " "}]
     if path == "index":
         nodes.append({"t": "link", "href": f"unseenet:{SITE}?p=about", "c": [{"t": "text", "v": "om mig"}]})
-    return [{"t": "p", "c": nodes}]
+    out = [{"t": "p", "c": nodes}]
+    if path == "about":                  # a table (UN-RFC 0031 section 3.6)
+        out.append({"t": "table", "align": [None, "right"],
+                    "head": [[{"t": "text", "v": "Dyr"}], [{"t": "text", "v": "Antal"}]],
+                    "rows": [[[{"t": "strong", "c": [{"t": "text", "v": "Marsvin"}]}],
+                              [{"t": "text", "v": "2"}]]]})
+    return out
 
 
 class SiteAPI:
@@ -242,3 +248,16 @@ async def test_a_page_with_its_own_heading_has_one_title(site_page):
     await page.keyboard.press("ArrowDown")                                # the next page
     await expect(reader.locator(".pbody .mdh").first).to_have_text("Stor overskrift")
     await expect(reader.locator("h2")).to_have_count(0)                   # not twice
+
+
+@pytest.mark.parametrize("site_page", [False], indirect=True)
+async def test_a_table_on_a_page(site_page):
+    """UN-RFC 0031 section 3.6: a real table, in a box that scrolls sideways."""
+    page, _ = site_page
+    reader = page.get_by_role("article", name="Page")
+    await reader.get_by_role("link", name="om mig").click()
+    table = reader.locator(".mdtable table")
+    await expect(table.locator("th")).to_have_text(["Dyr", "Antal"])
+    await expect(table.locator("td strong")).to_have_text("Marsvin")
+    await expect(table.locator("td.al-right")).to_have_text("2")
+    assert await reader.locator(".mdtable").evaluate("e => getComputedStyle(e).overflowX") == "auto"

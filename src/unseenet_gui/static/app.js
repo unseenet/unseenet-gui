@@ -1573,9 +1573,20 @@ function renderTree(blocks) {
         : h("blockquote", { class: "quote-block md" }, inner));
     } else if (b.t === "ul" || b.t === "ol") {
       out.push(h(b.t, b.t === "ol" && b.start !== 1 ? { start: b.start } : {}, b.items.map(item => h("li", {}, renderTree(item)))));
-    }
+    } else if (b.t === "table") out.push(renderTable(b));
   });
   return out;
+}
+
+// A table (UN-RFC 0031 section 3.6): a real table in a box of its own that scrolls
+// sideways when it is wider than the text, so it never pushes the page or a chat
+// bubble out of shape.
+function renderTable(b) {
+  const al = (j) => (b.align || [])[j] ? { class: "al-" + b.align[j] } : {};
+  return h("div", { class: "mdtable", tabindex: "0", role: "region", "aria-label": "Table" },
+    h("table", {},
+      (b.head || []).length ? h("thead", {}, h("tr", {}, b.head.map((c, j) => h("th", al(j), renderInline(c))))) : null,
+      h("tbody", {}, (b.rows || []).map(r => h("tr", {}, r.map((c, j) => h("td", al(j), renderInline(c))))))));
 }
 
 // A chat line: its paragraphs inline, as one bubble (the chat subset has no blocks but code).
