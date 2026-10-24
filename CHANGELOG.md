@@ -85,6 +85,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- You stay at the bottom of the sidebar: with many groups only the groups
+  scroll, and your picture, name and connection are always in view.
 - A site's list of pages has a quiet label ("pages · 5") in the sidebar's style
   instead of a heading.
 - The footer shows the keys of the view you are in (unseenet#490), the same as
