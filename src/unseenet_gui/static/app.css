@@ -735,3 +735,24 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .mdtable th + th, .mdtable td + td { border-left: 1px solid var(--line); }
 .mdtable .al-center { text-align: center; } .mdtable .al-right { text-align: right; }
 .bubble .mdtable { margin: 6px 0; }
+
+/* reactions (UN-RFC 0048, #107): counts under posts, comments and chat lines - a chip
+   per emoji, yours marked - and the set to choose from, above the page like the picker */
+.reacts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 2px; }
+.react { display: inline-flex; align-items: center; gap: 4px; height: 26px; padding: 0 8px;
+  border: 1px solid var(--line-2); border-radius: 13px; background: none; color: var(--paper);
+  font-size: 13px; line-height: 1; cursor: pointer; }
+.react .re { font-size: 15px; }
+.react .rn { color: var(--muted); font-variant-numeric: tabular-nums; }
+.react:hover:not(:disabled), .react:focus-visible { background: var(--ink-2); outline: none; }
+.react.mine { border-color: var(--green); background: color-mix(in srgb, var(--green) 16%, transparent); }
+.react.mine .rn { color: var(--paper); }
+.react.pending { opacity: 0.6; }
+.react:disabled { cursor: default; }
+.react.add { color: var(--muted); padding: 0 7px; }
+.react.add svg { vertical-align: -2px; }
+.react-pop { position: fixed; z-index: 15; display: flex; gap: 2px; padding: 4px; background: var(--ink);
+  color: var(--paper); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45); }
+.react-pop .emo { width: 36px; }
+.react-pop .emo.mine { background: color-mix(in srgb, var(--green) 22%, transparent); }
+.bubble .reacts { margin-bottom: 0; }
