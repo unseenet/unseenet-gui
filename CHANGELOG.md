@@ -9,6 +9,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Create a group as a feed or a site (unseenet#514): *Feed* and *Site* under
+  *Shown as*. Site makes the group a channel, as a site must be, and says who
+  writes it; a channel shown as a feed asks whether anyone may comment. *Takes*
+  is left out for a site and fast delivery offered for chat groups only.
 - Reactions (#107, unseenet#510, UN-RFC 0048): under every feed entry, comment,
   post and chat line, each emoji with its count, yours marked; a click gives
   that one or takes yours back, *+* offers the group's set (and the emoji

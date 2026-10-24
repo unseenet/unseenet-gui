@@ -3320,10 +3320,24 @@ async function openPost(key, who = "", subject = "", replyTo = null, quote = "")
 }
 
 function openCreateGroup() {
-  let gtype = "open", view = "threads", kinds = "both", files = "none";
+  let gtype = "open", view = "threads", kinds = "both", files = "none", comments = "open";
+  // a site is a channel (UN-RFC 0035 section 3): choosing Site makes it one, and
+  // another type takes the group back to threads
+  const choose = (name, value) => {
+    if (name === "type") { gtype = value; if (value !== "channel" && view === "pages") view = "threads"; }
+    else if (name === "kinds") kinds = value;
+    else if (name === "files") files = value;
+    else if (name === "comments") comments = value;
+    else { view = value; if (value === "pages") gtype = "channel"; }
+    redrawDialog();
+  };
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
-    onclick: () => { if (name === "type") gtype = value; else if (name === "kinds") kinds = value; else if (name === "files") files = value; else view = value; redrawDialog(); } },
+    onclick: () => choose(name, value) },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
+  const about = () => view === "pages" ? "A site is a channel: you, and the people you add as posters, write its pages. The first page you write, index, is its home page."
+    : view === "feed" ? (gtype === "channel" ? "A feed: entries newest first, comments under each. Only you (and your posters) post entries."
+      : "A feed: entries newest first, comments under each. As an open group anyone posts entries; a channel is for one voice.")
+    : null;
   formDialog({ label: "Create a group", title: "Create a group", focus: "#gname", button: "Create",
     note: "The group belongs to your key. Creating it costs some proof-of-work, and it is sent to your node now.",
     fields: (vals) => [
@@ -3336,20 +3350,31 @@ function openCreateGroup() {
         pick("type", "channel", gtype, "Channel", "only chosen people"),
         pick("type", "closed", gtype, "Closed", "members only, encrypted")),
       h("label", { text: "Shown as" }),
-      h("div", { class: "choices row" }, pick("view", "threads", view, "≡ Threads", "posts and replies"), pick("view", "chat", view, "» Chat", "messages in order")),
-      h("label", { text: "Takes" }),
       h("div", { class: "choices row" },
-        pick("kinds", "both", kinds, "Both", "posts and chat lines"),
-        pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
-        pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
+        pick("view", "threads", view, "≡ Threads", "posts and replies"),
+        pick("view", "chat", view, "» Chat", "messages in order"),
+        pick("view", "feed", view, "☰ Feed", "entries with comments"),
+        gtype !== "closed" ? pick("view", "pages", view, "⌂ Site", "pages that stay") : null),
+      about() ? h("p", { class: "hint", style: "margin:0", text: about() }) : null,
+      view === "feed" && gtype === "channel" ? [h("label", { text: "Comments" }),
+        h("div", { class: "choices row" },
+          pick("comments", "open", comments, "Anyone may comment", "under each entry"),
+          pick("comments", "none", comments, "No comments", "announcements"))] : null,
+      view !== "pages" ? [h("label", { text: "Takes" }),
+        h("div", { class: "choices row" },
+          pick("kinds", "both", kinds, "Both", "posts and chat lines"),
+          pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
+          pick("kinds", "chat", kinds, "» Chat lines only", "a chat group"))] : null,
       h("label", { text: "Files" }),
       h("div", { class: "choices row" }, FILE_PICKS.map(([v, l, s]) => pick("files", v, files, l, s))),
-      h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)"),
+      view === "chat" ? h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)") : null,
       h("label", { for: "gtitle", text: "Title" }),
       h("input", { id: "gtitle", name: "title", class: "in", "data-k": "gtitle", value: vals.title || "", placeholder: "One line about the group" })],
     submit: async (v) => {
       toast("Creating the group - proof-of-work takes a moment …");
-      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view, kinds, fast: !!v.fast, title: v.title,
+      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view,
+        kinds, fast: view === "chat" && !!v.fast, title: v.title,
+        ...(gtype === "channel" && view === "feed" ? { comments } : {}),
         ...(files !== "none" ? { files } : {}) });
       closeDialog(); await loadSidebar(); await openGroup(id); toast("The group is created.");
     } });
