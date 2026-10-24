@@ -84,7 +84,7 @@ function fromRow(r) {
     readable: m.readable, error: m.error, edited: m.edited,
     tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
-    depth: r.depth };
+    depth: r.depth, attachments: m.attachments || [] };
 }
 
 function fromSidebar(d, st) {
@@ -159,7 +159,11 @@ async function api(method, path, body) {
   });
   let data = null;
   try { data = await res.json(); } catch (_) { /* not JSON */ }
-  if (!res.ok) throw new Error((data && data.error) || `${res.status} ${res.statusText}`);
+  if (!res.ok) {
+    const err = new Error((data && data.error) || `${res.status} ${res.statusText}`);
+    err.status = res.status; err.why = data && data.why;       // files (UN-RFC 0046 section 4.10)
+    throw err;
+  }
   return data;
 }
 
@@ -783,7 +787,9 @@ function mainArea() {
       h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
     h("div", { class: "t" },
       h("div", { class: "row" }, h("h1", { text: g.label }), chips),
-      g.title ? h("p", { text: g.title }) : null),
+      g.title ? h("p", { text: g.title }) : null,
+      g.files && g.node_files === false ? h("p", { class: "hint warn-line",
+        text: "This group takes pictures and files, but your node does not carry them - they will not show here. Another node may." }) : null),
     h("div", { class: "actions" },
       g.type === "contact" ? [
         h("button", { class: "btn", onclick: () => openAddContact(g.key, g.contact ? g.label.replace(/ √$/, "") : "") }, g.contact ? "Rename" : "Add contact"),
@@ -915,7 +921,10 @@ function renderBody(text) {
 // before leaving Tor.
 function messageBody(m) {
   if (!m.readable) return h("p", { class: "text bad", text: m.error || "Could not be read." });
-  return m.markdown ? h("div", { class: "md" }, renderTree(m.tree || [])) : renderBody(m.text || "");
+  RENDERING = m;
+  const body = m.markdown ? h("div", { class: "md" }, renderTree(m.tree || [])) : renderBody(m.text || "");
+  RENDERING = null;
+  return [body, filesOf(m, false)];
 }
 
 function renderTree(blocks) {
@@ -943,9 +952,12 @@ function renderTree(blocks) {
 // A chat line: its paragraphs inline, as one bubble (the chat subset has no blocks but code).
 function renderChatLine(m) {
   const blocks = m.tree || [];
-  return blocks.map((b, i) => [i ? h("br") : null,
+  RENDERING = m;
+  const out = blocks.map((b, i) => [i ? h("br") : null,
     b.t === "code" ? h("pre", { class: "mdcode" }, h("code", { text: b.v })) :
     b.t === "p" ? h("span", {}, renderInline(b.c)) : h("div", { class: "md" }, renderTree([b]))]);
+  RENDERING = null;
+  return out;
 }
 
 function renderInline(nodes) {
@@ -958,7 +970,11 @@ function renderInline(nodes) {
       case "strong": return h("strong", {}, renderInline(n.c));
       case "del": return h("del", {}, renderInline(n.c));
       case "emoji": return h("span", { class: "emoji", title: ":" + n.name + ":", text: n.v });
-      case "image": return h("span", { class: "mdimg", title: "An attachment - attachments come with UN-RFC 0027", text: "[image: " + (n.alt || "no description") + "]" });
+      case "image": {                         // a picture the post carries, where its text puts it
+        const a = RENDERING && n.blob && RENDERING.attachments.find(x => x.blob === n.blob);
+        return a ? fileView(RENDERING, { ...a, alt: n.alt || a.alt }, true) :
+          h("span", { class: "mdimg", title: "A picture this post does not carry", text: "[image: " + (n.alt || "no description") + "]" });
+      }
       case "link": {
         const shown = inlineText(n.c);
         return h("a", { class: "mdlink", href: n.href, title: n.href, rel: "noopener noreferrer",
@@ -968,6 +984,127 @@ function renderInline(nodes) {
       default: return null;
     }
   });
+}
+
+// ---- files on posts (UN-RFC 0027, UN-RFC 0046 section 4.10) -------------------
+// The page never gets anything from the network the core has not checked: a picture
+// comes as the core's own copy, decoded and saved again in a separate process, and a
+// file to save comes checked against its blob ID - and is never opened from here.
+let RENDERING = null;                          // the post whose text is being drawn
+const PICS = new Map();                        // "group blob" -> {state, pic, error, why}
+const ASKED = new Set();                       // pictures by ignored people you chose to see
+const SHOWN = /^image\/(png|jpeg|gif|webp)$/;
+
+function picture(gid, blob) {
+  const k = gid + " " + blob, asked = ASKED.has(k);
+  let p = PICS.get(k);
+  if (!p || (asked && p.why === "ignored")) {
+    p = { state: "loading" };
+    PICS.set(k, p);
+    api("GET", `/api/groups/${encodeURIComponent(gid)}/files/${encodeURIComponent(blob)}` + (asked ? "?asked=1" : ""))
+      .then(pic => { PICS.set(k, { state: "ok", pic }); render(); })
+      .catch(err => {
+        PICS.set(k, { state: "err", error: err.message, why: err.why });
+        if (err.why === "later") setTimeout(() => { PICS.delete(k); render(); }, 8000);   // the node is fetching it
+        render();
+      });
+  }
+  return p;
+}
+
+function size(octets) {
+  return octets >= 1048576 ? (octets / 1048576).toFixed(1) + " MB" : octets >= 1024 ? Math.round(octets / 1024) + " KB" : octets + " bytes";
+}
+
+// The files of a post not already drawn in its text.
+function filesOf(m, chat) {
+  const inline = new Set();
+  (function walk(nodes) { (nodes || []).forEach(n => { if (n.t === "image" && n.blob) inline.add(n.blob); walk(n.c); (n.items || []).forEach(walk); }); })(m.markdown ? m.tree : []);
+  const rest = (m.attachments || []).filter(a => !inline.has(a.blob));
+  return rest.length ? h("div", { class: "files" + (chat ? " in-chat" : "") }, rest.map(a => fileView(m, a, false))) : null;
+}
+
+function fileView(m, a, inline) {
+  const what = a.alt || a.name || "a picture";
+  if (SHOWN.test(a.type)) {
+    const p = picture(m.group, a.blob);
+    const box = (cls, ...kids) => h("span", { class: "pic " + cls + (inline ? " inline" : ""),
+      style: a.dim ? `aspect-ratio:${a.dim[0]}/${a.dim[1]};max-width:min(100%,${a.dim[0]}px)` : null }, ...kids);
+    if (p.state === "ok") {
+      return h("figure", { class: "pic" + (inline ? " inline" : "") },
+        h("img", { src: p.pic.data, alt: what, width: p.pic.width, height: p.pic.height, title: a.name || "" }),
+        a.alt && !inline ? h("figcaption", { text: a.alt }) : null);
+    }
+    if (p.state === "loading") return box("wait", h("span", { class: "hint", text: "Fetching " + what + " …" }));
+    if (p.why === "ignored") {
+      return box("off", h("span", { class: "hint", text: "A picture by someone you ignore." }),
+        h("button", { class: "link", onclick: () => { ASKED.add(m.group + " " + a.blob); render(); } }, "Show it"));
+    }
+    return box("off", h("span", { class: "hint", text: (a.alt ? `[${a.alt}] ` : "") + (p.error || "Not shown.") }),
+      p.why === "not_shown" ? h("button", { class: "link", onclick: () => saveFile(m, a) }, "Save it") : null);
+  }
+  return h("span", { class: "file" + (inline ? " inline" : "") },
+    h("span", { class: "fname mono", text: a.name || "file" }),
+    h("span", { class: "hint", text: " " + a.type + " · " + size(a.size) }),
+    a.alt ? h("span", { class: "falt", text: a.alt }) : null,
+    h("button", { class: "btn", onclick: () => saveFile(m, a) }, "Save"));
+}
+
+// Save a file as it came, checked. The core writes it in Downloads; in a browser the
+// browser saves it. Never opened: another program runs outside Unseenet and Tor.
+function saveFile(m, a) {
+  confirmDialog({ title: "Save " + (a.name || "the file") + "?", button: "Save",
+    text: `${a.name || "The file"} (${a.type}, ${size(a.size)}) is saved as it came, checked against what the post names.\n\n` +
+      "Unseenet does not open it. If you open it in another program, that program runs outside Unseenet and may go to the internet without Tor.",
+    ok: async () => {
+      closeDialog();
+      try {
+        if (GUI && GUI.web) {
+          const f = await api("GET", `/api/groups/${encodeURIComponent(m.group)}/files/${encodeURIComponent(a.blob)}?save=1`);
+          const link = h("a", { href: `data:application/octet-stream;base64,${f.data}`, download: f.name });
+          document.body.append(link); link.click(); link.remove();
+          toast("Saved: " + f.name);
+        } else {
+          const r = await api("POST", "/x/gui/save", { group: m.group, blob: a.blob });
+          toast("Saved in " + r.path);
+        }
+      } catch (err) { toast(err.message); }
+    } });
+}
+
+// Choosing files for a post: at most four, with a description each. The core saves
+// pictures again without their metadata (GPS, time, camera) before they are sent.
+function filePicker(dialog, g, carries) {
+  if (!carries) return h("p", { class: "hint", style: "margin:0",
+    text: "This group takes pictures and files, but your node does not carry them." });
+  const max = g.files.max_size || 0, list = h("div", { class: "picklist" });
+  const draw = () => list.replaceChildren(...dialog.files.map((f, i) => h("div", { class: "pick" },
+    h("span", { class: "fname mono", text: f.name }), h("span", { class: "hint", text: size(f.size) }),
+    h("input", { class: "in", placeholder: "Describe it for people who cannot see it", value: f.alt, maxlength: 400,
+      "aria-label": "Description of " + f.name, oninput: (e) => { f.alt = e.target.value; } }),
+    h("button", { type: "button", class: "btn icon", "aria-label": "Remove " + f.name,
+      onclick: () => { dialog.files.splice(i, 1); draw(); } }, svg(ICON.x)))));
+  const input = h("input", { type: "file", multiple: true, class: "sr", id: "cfiles",
+    accept: (g.files.types || []).length ? g.files.types.join(",") : "image/*,application/pdf",
+    onchange: async (e) => {
+      for (const file of Array.from(e.target.files)) {
+        if (dialog.files.length >= 4) { toast("At most four files on a post."); break; }
+        if (max && file.size > max) { toast(`${file.name} is ${size(file.size)}; this group takes files up to ${size(max)}.`); continue; }
+        const data = await new Promise((ok, bad) => {
+          const r = new FileReader();
+          r.onload = () => ok(String(r.result).split(",", 2)[1] || ""); r.onerror = bad;
+          r.readAsDataURL(file);
+        });
+        dialog.files.push({ name: file.name, size: file.size, type: file.type, data, alt: "" });
+      }
+      e.target.value = "";
+      draw();
+    } });
+  draw();
+  return h("div", { class: "attach" },
+    h("label", { for: "cfiles", class: "btn" }, "Add pictures or files"), input,
+    h("span", { class: "hint", text: " Pictures are saved again without where and when they were taken." + (max ? ` Up to ${size(max)} each.` : "") }),
+    list);
 }
 
 // ---- #group references (unseenet #172) ----------------------------------
@@ -1169,9 +1306,10 @@ async function openReply(m, g) {
   const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
   openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
     subject, body, cursor: top.length, private: !!g.private_reply,
-    send: (subject, text, notify) => g.private_reply ?
+    send: (subject, text, notify, files) => g.private_reply ?
       doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id }, { text }) :
-      doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify }, { text }) });
+      doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify,
+        ...(files && files.length ? { files } : {}) }, { text }) });
 }
 
 // Edit your own post (UN-RFC 0042): a new version, in the same place in its thread.
@@ -1183,7 +1321,9 @@ function openEdit(m, g) {
 }
 
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
-  const dialog = { focus: "#body", node: null };
+  const dialog = { focus: "#body", node: null, files: [] };
+  // files (UN-RFC 0027): where the group takes them; said plainly where its node does not
+  const takes = !priv && !edit && g && g.files, carries = takes && g.node_files !== false;
   // mention notices (UN-RFC 0032): who would be told, and a box to say no
   const N = { may: !priv && !edit && g && g.type !== "closed", names: [], max: 5,
     on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
@@ -1217,9 +1357,12 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     const f = dialog.node.querySelector("form");
     const s = f.subject.value.trim(), b = f.body.value.replace(/\s+$/, "");
     const own = b.split(/\n-- \n/)[0].split("\n").filter(ln => !/^>/.test(ln) && !/ wrote:$/.test(ln)).join("").trim();
-    if (!s || !own) { toast("Write something of your own above the signature."); return; }
+    if (!s || (!own && !dialog.files.length)) { toast("Write something of your own above the signature."); return; }
+    const files = dialog.files.map(f => ({ name: f.name, data: f.data, alt: f.alt.trim() }));
+    if (files.some(f => /^image\//.test(dialog.files.find(x => x.name === f.name).type) && !f.alt) &&
+        !window.confirm("A picture without a description: people who cannot see it - a terminal, a screen reader - get only its name. Post anyway?")) return;
     closeDialog();
-    await send(s, b, N.may ? N.on : undefined);
+    await send(s, b, N.may ? N.on : undefined, files);
     toast(edit ? "Saving the new version - postage takes a few seconds." :
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
@@ -1237,6 +1380,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
         onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
+      takes ? filePicker(dialog, g, carries) : null,
       h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
         "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
         (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),
@@ -1438,6 +1582,7 @@ function chatView(d) {
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
       m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
+      m.readable ? filesOf(m, true) : null,
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },
           commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null));
@@ -2001,7 +2146,8 @@ async function openCompose() {
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
-    send: (subject, text, notify) => doPost(g.id, { subject, body: text, signature: false, notify }, { text }) });
+    send: (subject, text, notify, files) => doPost(g.id, { subject, body: text, signature: false, notify,
+      ...(files && files.length ? { files } : {}) }, { text }) });
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 

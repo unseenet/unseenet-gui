@@ -122,3 +122,18 @@ async def test_the_copies_are_gone(gui):
                          ("POST", "/x/gui/profile/hide")):
         r = await gui.request(method, path, json={} if method == "POST" else None, headers=auth(gui))
         assert r.status in (404, 405)
+
+
+def test_saved_files_get_safe_names(tmp_path):
+    """#63: a name from a post is never a path, never hidden, never overwrites."""
+    from unseenet_gui.server import save_name
+    (tmp_path / "a.png").write_text("x")
+    assert save_name(tmp_path, "../../etc/a.png") == tmp_path / "a (2).png"
+    assert save_name(tmp_path, ".bashrc") == tmp_path / "bashrc"
+    assert save_name(tmp_path, "") == tmp_path / "file"
+
+
+async def test_saving_a_file_no_post_carries(gui):
+    r = await gui.post("/x/gui/save", json={"group": "dk.x@aaaa", "blob": "blob1:" + "a" * 52},
+                       headers=auth(gui))
+    assert r.status == 400 and "no post" in (await r.json())["error"]
