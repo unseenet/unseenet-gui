@@ -126,10 +126,46 @@ async def system_power(request):
     return web.json_response({"ok": True})
 
 
+def save_name(folder: Path, name: str) -> Path:
+    """A file name in ``folder`` that is not taken, from the name a post gives: only its
+    last part, never a path, and nothing hidden."""
+    base = (name or "file").replace("\\", "/").rsplit("/", 1)[-1].lstrip(".") or "file"
+    stem, dot, ext = base.rpartition(".")
+    stem, ext = (stem, "." + ext) if dot and stem else (base, "")
+    path, n = folder / base, 1
+    while path.exists():
+        n += 1
+        path = folder / f"{stem} ({n}){ext}"
+    return path
+
+
+async def save_file(request):
+    """Save a file a post carries in Downloads (else your home folder), as the node sent
+    it and checked against its blob ID (UN-RFC 0027 section 9.2). Never opened: the page
+    says that another program runs outside Unseenet and Tor."""
+    from unseenet.client.session import SessionError
+    s = _api(request).session
+    if s is None or not s.has_identity():
+        raise web.HTTPConflict(text="locked")
+    data = await _body(request)
+    gid, blob = str(data.get("group", "")), str(data.get("blob", ""))
+    try:
+        att, _ = s.attachment(gid, blob)
+        octets = await s.fetch_blob(gid, blob)
+    except SessionError as exc:
+        return web.json_response({"error": str(exc)}, status=400)
+    folder = Path.home() / "Downloads"
+    folder = folder if folder.is_dir() else Path.home()
+    path = save_name(folder, att.get("name") or "")
+    await asyncio.to_thread(path.write_bytes, octets)
+    return web.json_response({"path": str(path)})
+
+
 def gui_routes(sub: web.Application, api: LocalAPI) -> None:
     sub[UPDATER] = Updater()
     sub.router.add_get("/state", state)
     sub.router.add_post("/update", run_update)
+    sub.router.add_post("/save", save_file)
     sub.router.add_get("/system", system_status)
     sub.router.add_post("/system/wifi", system_wifi)
     sub.router.add_post("/system/keyboard", system_keyboard)

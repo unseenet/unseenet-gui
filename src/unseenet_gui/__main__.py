@@ -45,6 +45,9 @@ def use_bundled_tor() -> None:
 
 def main(argv=None) -> None:
     frozen = getattr(sys, "frozen", False)          # the portable build
+    if frozen:                                      # the program decodes pictures as itself (#63)
+        from unseenet.client import decode
+        decode.run_if_asked()
     if sys.platform == "win32":
         from .winfix import hide_child_consoles
         hide_child_consoles()                       # no console window for Tor

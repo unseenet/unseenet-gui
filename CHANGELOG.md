@@ -20,6 +20,17 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   the order of suggestions are the core's (`GET /api/emoji`, unseenet#362), so
   this needs unseenet 0.5; with an older core the button stays away (#21).
 
+- Pictures and files on posts (#63, UN-RFC 0027): pictures show in posts and
+  chat lines, where the text puts them or below it, with their description;
+  they come from the core checked and saved again in a separate process
+  (unseenet#446), never as the octets from the network. Other files, a PDF
+  for example, get a card with their name, type and size and a Save button;
+  saving warns that another program runs outside Unseenet and Tor, and the
+  file goes in your Downloads folder (in a browser, the browser saves it).
+  Pictures by people you ignore wait until you choose to see them. Writing a
+  post in a group that takes files has "Add pictures or files", up to four,
+  each with a description; a group whose node carries no files says so.
+
 ### Changed
 
 - Write permission, changing the passphrase and profiles come from the core's

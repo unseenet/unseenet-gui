@@ -117,6 +117,14 @@ group's head and `reply` on each of its rows, `POST /api/passphrase`, and
 a first profile. This client's copies under `/x/gui/` are gone (#59); this needs
 unseenet 0.5.
 
+## 11. Files on posts
+
+**Status:** done. The core fetches a file a post carries, checks it and decodes a
+picture in a separate process (unseenet#445), and the local API gives a picture
+safe to show, a file to save, and takes files with a post (UN-RFC 0046 section
+4.10, unseenet#446). This client shows them (#63). In a portable build the
+program is its own decoding process (`decode.run_if_asked()` in `__main__`).
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

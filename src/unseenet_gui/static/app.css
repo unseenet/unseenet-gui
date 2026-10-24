@@ -494,6 +494,27 @@ blockquote.quote-block.md { margin: 8px 0; padding: 2px 0 2px 12px; border-left:
 .mdlink { color: var(--green); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .mdlink .addr { font-family: var(--mono); font-size: 0.85em; color: var(--muted); text-decoration: none; }
 .mdimg { font-style: italic; color: var(--muted); }
+
+/* files on posts (UN-RFC 0027): the core's own copy of each picture, files to save */
+.files { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; }
+.files.in-chat { margin: 6px 0 0; }
+figure.pic { margin: 0; max-width: 100%; }
+figure.pic img { display: block; max-width: 100%; max-height: 70vh; height: auto; border-radius: 6px; }
+.files.in-chat figure.pic img { max-height: 260px; }
+figure.pic figcaption { font-size: 0.85em; color: var(--muted); margin-top: 4px; }
+figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; margin: 4px 0; }
+.pic.wait, .pic.off { display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; min-height: 80px; width: 100%; padding: 12px; border: 1px dashed var(--line); border-radius: 6px;
+  text-align: center; }
+.file { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 10px;
+  border: 1px solid var(--line); border-radius: 6px; }
+.file .falt { flex-basis: 100%; color: var(--muted); font-size: 0.9em; }
+.attach { display: flex; flex-direction: column; gap: 6px; }
+.attach > label.btn { align-self: flex-start; }
+.picklist { display: flex; flex-direction: column; gap: 6px; }
+.pick { display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; gap: 8px; }
+.pick .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 14em; }
+.warn-line { color: var(--amber); }
 .emoji { font-family: "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif; }
 
 /* ---- phones: one pane at a time (unseenet-gui #22) ----------------------------------
