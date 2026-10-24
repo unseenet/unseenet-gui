@@ -558,7 +558,8 @@ function setupScreen() {
           type: "button", class: "choice", "aria-pressed": String(S.setupNode === n.address),
           onclick: () => { S.setupNode = n.address; render(); } },
           h("span", {}, h("span", { class: "mono", text: n.name || n.address }),
-            h("small", { text: n.description || n.operator || n.address }))))),
+            h("small", { text: n.description || n.operator || "" }),
+            n.name ? h("small", { class: "mono addr", text: n.address }) : null)))),
         nodesNote,
         h("input", { name: "custom", class: "field mono", "data-k": "custom", placeholder: "or an address: xyz.onion or host:port",
           style: "font-size:14px" })] : null,
@@ -760,8 +761,10 @@ function sidebar() {
         avatar({ key: me.key, who: me.display, colour: 4 }, true)),
       h("div", { class: "who" }, h("div", {}, h("button", { class: "me-name", title: "Your profile", onclick: openMyProfile,
           text: me.label || me.display || "" })),
-        h("div", { class: "hint" }, h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
-          S.state.connected ? (S.state.web ? "Entrance and Tor · " : "Tor · ") + shortNode(S.state.node) : "Not connected"),
+        // the node by name, the full address on hover; a click opens your nodes (#111)
+        h("button", { class: "hint node-link", "data-k": "node-link", title: nodeTitle(S.state.node), onclick: openNodes },
+          h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
+          S.state.connected ? (S.state.web ? "Entrance and Tor · " : "Tor · ") + nodeLabel(S.state.node) : "Not connected"),
         ripeLine()),
       h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
 }
@@ -845,7 +848,20 @@ function hierarchyNav(hier, item) {
 
 function shortNode(address) {
   if (!address) return "";
-  return address.endsWith(".onion") ? address.slice(0, 6) + "….onion" : address;
+  const host = address.split(":")[0];
+  return host.endsWith(".onion") ? host.slice(0, 8) + "….onion" : address;
+}
+// A node by name (unseenet#518): the core's label - the known-node list's name, else the
+// node's own marked "(unlisted)", else the start of its address.
+function nodeLabel(address) {
+  const n = address && (S.state.node_names || {})[address];
+  return (n && n.label) || (address === S.state.node && S.state.node_label) || shortNode(address);
+}
+function nodeTitle(address) {
+  if (!address) return "Your nodes";
+  const n = (S.state.node_names || {})[address] || {};
+  const why = n.source === "self" ? "\nThe node's own name - it is not on the list of known nodes." : "";
+  return address + why + "\nClick for your nodes";
 }
 
 // The shortcuts that work where you are, the same as the terminal client's footer
@@ -895,7 +911,9 @@ function statusbar() {
     S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     h("span", { class: "st", title: S.state.status },
-      h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), S.state.status || "", " · pre-alpha"));
+      h("span", { class: "dot" + (S.state.connected ? " ok" : "") }),
+      // "Connected to <node>" only repeats the box at the bottom left (#111)
+      S.state.status && !S.state.status_idle ? S.state.status + " · " : "", "pre-alpha"));
 }
 
 function mainArea() {
@@ -3232,6 +3250,108 @@ function openBrowse() {
   render();
 }
 
+// ---- your nodes (#111, unseenet#518) -------------------------------------------------
+// As the terminal client's "Your nodes": you are the same on every node - your key is in
+// the vault. Each group is read from one node; new groups and your inbox go to the
+// default. Names come from the core: the known-node list's, else the node's own, marked.
+function nodeSource(n) {
+  return n.source === "known" ? h("span", { class: "chip", title: "On the signed list of known nodes", text: "listed" })
+    : n.source === "self" ? h("span", { class: "chip warn", title: "The node's own name: anyone can give a node any name", text: "unlisted" })
+    : null;
+}
+function openNodes() {
+  let list = null, err = "", info = {}, asked = false, busy = false, open = null, adding = "";
+  const load = async (withInfo) => {
+    try {
+      const r = await api("GET", "/api/nodes" + (withInfo ? "?info=1" : ""));
+      list = r;
+      if (withInfo) { info = Object.fromEntries(r.nodes.map(n => [n.address, n])); asked = true; }
+    } catch (e) { err = e.message; }
+    if (S.dialog && S.dialog.nodes) render();
+  };
+  const change = async (action, address, done) => {
+    if (busy) return;
+    busy = true; render();
+    try {
+      const r = await api("POST", "/api/nodes", { action, address });
+      list = r; adding = "";
+      if (done) toast(done(r));
+      await loadState(); await loadSidebar();
+      load(true);                                    // ask the new one too
+    } catch (e) { toast(e.message); }
+    busy = false;
+    if (S.dialog && S.dialog.nodes) render();
+  };
+  const remove = (n) => confirmDialog({ title: "Stop using this node?", danger: true, button: "Remove",
+    text: `${n.label}\n\n${n.address}\n\nGroups you read from it move to your default node (if it carries them). Nothing is deleted on the node itself.`,
+    ok: () => { S.dialog = dialog; change("remove", n.address, r => r.moved && r.moved.length
+      ? `${n.label} removed - ${r.moved.length} ${r.moved.length === 1 ? "group" : "groups"} now read from ${nodeLabel(S.state.node)}.`
+      : `${n.label} removed.`); } });
+  const state = (n) => {
+    const live = (S.nodes || {})[n.address];
+    if (asked) return info[n.address] && info[n.address].reachable
+      ? h("span", { class: "state ok", text: "answers" }) : h("span", { class: "state bad", text: "does not answer" });
+    if (live) return h("span", { class: "state " + (live.up ? "ok" : "bad"), text: live.up ? "connected" : "not reachable" });
+    return h("span", { class: "muted", text: "asking …" });
+  };
+  const details = (n) => {
+    const i = info[n.address] && info[n.address].info;
+    if (!asked) return h("p", { class: "hint", text: "Asking the node over Tor …" });
+    if (!i) return h("p", { class: "hint", text: i === null ? "The node does not answer right now." : "The node gives no information." });
+    const p = i.policy || {};
+    const row = (k, v) => v === undefined || v === null || v === "" ? null : [h("dt", { text: k }), h("dd", { class: "mono", text: String(v) })];
+    return h("div", { class: "node-info" },
+      i.description ? h("p", { style: "margin:0 0 6px", text: i.description }) : null,
+      h("dl", { class: "kv" },
+        row("Its own name", i.name), row("Software", i.software), row("Node key", i.node_key),
+        row("Operator", i.operator), row("Contact", i.contact),
+        row("New groups", p.new_groups), row("Keeps posts", p.retention_days ? p.retention_days + " days" : null),
+        row("Postage", p.min_pow), row("Key level", p.min_ripe),
+        row("Files", p.files === undefined ? null : (p.files ? "carried" : "not carried")), row("Logs", p.logging)));
+  };
+  const nodeRow = (n) => h("div", { class: "node-row" + (n.default ? " default" : ""), "data-k": "node:" + n.address },
+    h("div", { class: "node-head" },
+      h("span", { class: "ic", title: n.default ? "Default: new groups and your inbox go here" : "", text: n.default ? "♦" : "" }),
+      h("span", { class: "nm" }, h("strong", { text: n.name || shortNode(n.address) }), " ", nodeSource(n)),
+      state(n),
+      h("span", { class: "muted", text: `${n.groups} ${n.groups === 1 ? "group" : "groups"}` })),
+    n.description ? h("div", { class: "hint", text: n.description }) : null,
+    h("div", { class: "node-addr" },
+      h("code", { class: "mono", text: n.address }),
+      h("button", { class: "btn small", onclick: () => copy(n.address, "The address is copied.") }, "Copy")),
+    h("div", { class: "btns" },
+      h("button", { class: "btn small", "aria-expanded": String(open === n.address), onclick: () => { open = open === n.address ? null : n.address; render(); } }, open === n.address ? "Hide details" : "Details"),
+      n.default ? null : h("button", { class: "btn small", disabled: busy, onclick: () => change("default", n.address,
+        () => `New groups and your inbox now go to ${n.label}.`) }, "Make default"),
+      list.nodes.length > 1 ? h("button", { class: "btn small danger", disabled: busy, onclick: () => remove(n) }, "Remove") : null),
+    open === n.address ? details(n) : null);
+  const addPart = () => h("div", { class: "node-add" },
+    h("h3", { text: "Add a node" }),
+    h("p", { class: "hint", style: "margin:0", text: "You keep your key and your groups; the node's groups can then be found with G." }),
+    (list.known || []).map(k => h("div", { class: "cmd" },
+      h("span", { class: "nm" }, h("span", { class: "mono", text: k.name || shortNode(k.address) }), " ",
+        h("small", { text: k.description || "" }), h("small", { class: "mono addr", text: k.address })),
+      h("button", { class: "btn primary", disabled: busy, "data-k": "add:" + k.address,
+        onclick: () => change("add", k.address, () => `Added ${k.label}.`) }, "Add"))),
+    h("form", { class: "node-other", onsubmit: (e) => { e.preventDefault(); const v = adding.trim(); if (v) change("add", v, r => {
+        const n = r.nodes.find(x => x.address === v); return `Added ${n ? n.label : v}.`; }); } },
+      h("label", { for: "naddr", class: "sr", text: "A node's address" }),
+      h("input", { id: "naddr", class: "field mono", "data-k": "naddr", placeholder: "or an address: xyz….onion or host:port", value: adding,
+        oninput: (e) => { adding = e.target.value; } }),
+      h("button", { class: "btn", type: "submit", disabled: busy }, "Add")));
+  const dialog = { nodes: true, render: () => dialogShell({ label: "Your nodes", wide: true },
+    h("div", { class: "dh" }, h("h2", { text: "Your nodes" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db", "data-scroll": "nodes" },
+      h("p", { class: "hint", style: "margin:0", text: "You are the same on every node - your key lives in your vault. Each group is read from one node; new groups and your inbox go to the default node (♦)." }),
+      err ? h("p", { class: "error", text: err }) : null,
+      list === null && !err ? h("p", { class: "muted", text: "Loading …" }) : null,
+      list ? [list.nodes.map(nodeRow), addPart()] : null),
+    h("div", { class: "df" }, h("span", { text: list ? `${list.nodes.length} ${list.nodes.length === 1 ? "node" : "nodes"}` : "" }), h("span", { text: "Esc close" }))) };
+  S.dialog = dialog;
+  render();
+  load(false).then(() => load(true));            // the list at once, what the nodes say after
+}
+
 // A form in a dialog. Built once and kept on screen while the page behind it redraws
 // (#85), as the compose window is (#47): rebuilding it on every redraw lost a resized
 // text area, the scroll and undo in a field, and text typed in between. The dialog is
@@ -3742,6 +3862,7 @@ function commands() {
     { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
     { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
     { name: "Find groups on your nodes", key: "G", run: openBrowse },
+    { name: "Your nodes: add, remove, choose the default", key: "", also: "node server switch change onion noder skift", run: openNodes },
     { name: "Create a group", key: "", run: openCreateGroup },
     { name: "Write a private post", key: "M", run: () => openWrite("", "post") },
     { name: "Contacts", key: "C", run: openContacts },
@@ -4172,6 +4293,7 @@ function connectEvents() {
     };
     if (type === "status") {
       S.state.status = e.text;
+      S.state.status_idle = !!e.idle;                           // unseenet#518
       S.state.connected = /^Connected/.test(e.text) ? true : /^Offline/.test(e.text) ? false : S.state.connected;
       const st = document.querySelector(".statusbar");
       if (st && !S.dialog) st.replaceWith(statusbar()); else render();
@@ -4196,6 +4318,7 @@ function connectEvents() {
       S.tor = { progress: e.progress, summary: e.summary };
       if (e.progress < 100 && !S.dialog) {
         S.state.status = `Tor: ${e.progress}% ${e.summary || ""}`.trim();
+        S.state.status_idle = false;
         const st = document.querySelector(".statusbar");
         if (st) st.replaceWith(statusbar());
       }

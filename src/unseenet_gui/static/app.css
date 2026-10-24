@@ -780,3 +780,23 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .personrow > .item { flex: 1; min-width: 0; }
 .personrow > .more { position: absolute; right: 4px; }
 .personrow:hover .morebtn, .personrow .more.open .morebtn { opacity: 1; }
+
+/* your nodes (#111): the node in the box opens them; each node by name, the address under it */
+.me .node-link { border: none; background: none; padding: 0; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer;
+  text-align: left; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
+.me .node-link:hover, .me .node-link:focus-visible { text-decoration: underline; }
+.btn.small { min-height: 30px; padding: 2px 10px; font-size: 13px; }
+.choice small.addr, .cmd small.addr { display: block; font-size: 11px; overflow-wrap: anywhere; }
+.node-row { border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+.node-row.default { border-color: var(--green-deep); }
+.node-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.node-head .ic { width: 14px; color: var(--green); }
+.node-head .nm { flex: 1; min-width: 0; }
+.node-addr { display: flex; align-items: center; gap: 8px; }
+.node-addr code { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.node-row .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.node-info .kv dd { font-size: 12px; }
+.node-add { display: grid; gap: 8px; margin-top: 6px; }
+.node-add h3 { margin: 6px 0 0; font-size: 14px; }
+.node-other { display: flex; gap: 8px; }
+.node-other .field { flex: 1; min-width: 0; font-size: 14px; min-height: 0; padding: 8px 12px; }
