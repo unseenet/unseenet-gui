@@ -256,3 +256,25 @@ async def test_contacts_from_the_profile_and_chats_fold_away(files_page):
     await expect(page.locator(".personrow")).to_have_count(0)
     await fold.click()
     await expect(page.locator(".personrow")).to_have_count(1)
+
+
+async def test_the_sidebar_filter_and_the_palette_button(files_page):
+    """gui#114: the box filters the sidebar; the palette opens from the small button."""
+    page, api, _ = files_page
+    await page.locator("nav.side .cmd-btn").click()
+    await expect(page.locator("#palette")).to_be_visible()
+    await page.keyboard.press("Escape")
+    box = page.locator("#sidefilter")
+    await box.fill("foto")
+    results = page.locator("nav.side .side-results")
+    await expect(results.locator(".item")).to_have_count(1)
+    await expect(results).to_contain_text("dk.foto.chat")
+    await expect(page.locator(".personrow")).to_have_count(0)      # the rest is hidden
+    await box.fill("sonia")
+    await expect(results).to_contain_text("Sonia")
+    await box.press("Escape")
+    await expect(page.locator("nav.side .side-results")).to_have_count(0)
+    await expect(page.locator(".personrow")).to_have_count(1)
+    await box.fill("foto")
+    await box.press("Enter")                                        # opens the first
+    await expect(page.locator(".ghead h1")).to_contain_text("dk.foto.chat")
