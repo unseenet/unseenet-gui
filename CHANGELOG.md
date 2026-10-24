@@ -18,8 +18,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   they answer and what they say about themselves, with *Add* (a known node or
   any address), *Make default* and *Remove*. The first start's list of nodes
   shows the address too. The status bar no longer repeats *Connected to ...*;
-  it shows what is happening (Tor starting, offline, sending). Needs a core
-  with `/api/nodes` (unseenet 0.5.0).
+  it shows what is happening (Tor starting, offline, sending). The box always
+  names the default node and says how that node is - *Connecting*, *Tor* or
+  *Not reachable* (why, on hover) - from its own state, so it no longer says
+  *Not connected* while the status bar says *Connected to* another of your
+  nodes. Needs a core with `/api/nodes` (unseenet 0.5.0).
 - Close a chat (unseenet#519): *Close chat* in the chat, in its info instead of
   the Unsubscribe that did nothing, and with ⋯ on each chat in the list; it
   leaves the list on all your devices and comes back when one of you writes.

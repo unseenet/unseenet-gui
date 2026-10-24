@@ -800,3 +800,4 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .node-add h3 { margin: 6px 0 0; font-size: 14px; }
 .node-other { display: flex; gap: 8px; }
 .node-other .field { flex: 1; min-width: 0; font-size: 14px; min-height: 0; padding: 8px 12px; }
+.dot.bad { background: var(--red); }

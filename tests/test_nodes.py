@@ -36,9 +36,11 @@ class NodesAPI:
                       entry(TWO, "unseenet-node1", "self", "unseenet-node1 (unlisted)", groups=1)]
         self.known = [entry(THREE, "unseenet-node3", "known", "unseenet-node3", description="Project node 3")]
         self.changes = []
+        self.connected = True
+        self.ws = None
 
     def state(self):
-        return {"unlocked": True, "connected": True, "status": "Connected to unseenet-node1",
+        return {"unlocked": True, "connected": self.connected, "status": "Connected to unseenet-node1",
                 "status_idle": True, "identity": {"display": "Me", "label": "Me", "key": "ed25519:me"},
                 "node": self.nodes[0]["address"], "node_label": self.nodes[0]["label"],
                 "nodes": [n["address"] for n in self.nodes],
@@ -47,6 +49,7 @@ class NodesAPI:
     async def events(self, request):
         ws = web.WebSocketResponse(protocols=["unseenet"])
         await ws.prepare(request)
+        self.ws = ws
         async for _ in ws:
             pass
         return ws
@@ -174,3 +177,26 @@ async def test_in_the_palette(page_api):
     await page.keyboard.type("switch")
     await page.keyboard.press("Enter")
     await expect(page.get_by_role("dialog", name="Your nodes")).to_be_visible()
+
+
+async def test_the_box_says_how_the_default_node_is_not_what_the_status_line_said(page_api):
+    page, api = page_api
+    api.connected = False                                         # the first round is not done
+    await page.reload()
+    await page.wait_for_load_state("networkidle")
+    link = page.locator("[data-k='node-link']")
+    await expect(link).to_have_text("Connecting · unseenet-node1")     # named, always
+    for _ in range(50):
+        if api.ws is not None:
+            break
+        await page.wait_for_timeout(100)
+    await api.ws.send_json({"event": "status", "text": "Connected to unseenet-node3", "idle": True})
+    await api.ws.send_json({"event": "node-state", "address": TWO, "up": True, "error": None})
+    await page.wait_for_timeout(300)
+    await expect(link).to_have_text("Connecting · unseenet-node1")     # another node: not this
+    await expect(page.locator(".statusbar .st")).to_have_text("pre-alpha")
+    await api.ws.send_json({"event": "node-state", "address": ONE, "up": False, "error": "timed out"})
+    await expect(link).to_have_text("Not reachable · unseenet-node1")
+    assert "timed out" in await link.get_attribute("title")
+    await api.ws.send_json({"event": "node-state", "address": ONE, "up": True, "error": None})
+    await expect(link).to_have_text("Tor · unseenet-node1")
