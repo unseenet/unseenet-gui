@@ -42,6 +42,8 @@ class FeedAPI:
         self.following = False
         self.subscribed = True               # False: Bob's feed read without following (#506)
         self.subscribes = []
+        self.changed = []                    # withdraw and edit, from the ⋯ menu
+        self.entry_mine = False
         self.many = 0                     # more entries, for a feed taller than the window
         self.comments = [row(f"<c{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
                              key=f"ed25519:r{i}") for i in range(4)]
@@ -51,7 +53,10 @@ class FeedAPI:
                                  who="Dybest", key="ed25519:deeper"))
 
     def rows(self, group=FEED):
-        return [row("<a@x>", "En kort note", group=group), *self.comments,
+        first = row("<a@x>", "En kort note", group=group)
+        if self.entry_mine:
+            first.update(mine=True, may_withdraw=True, may_edit=True)
+        return [first, *self.comments,
                 row("<b@x>", "Lang tekst her", kind="post", subject="En overskrift", comment=CLOSED,
                     group=group),
                 *[row(f"<m{i}@x>", f"Note {i}", group=group) for i in range(self.many)]]
@@ -85,6 +90,9 @@ class FeedAPI:
                     "timeline": {"id": "timeline:", "feeds": 1},
                     "my_feed": {"id": "feed@memememememememe", "started": False, "unread": 0},
                     "my_site": {"id": "site@memememememememe", "started": True, "unread": 0}}
+        elif path in (f"/api/groups/{FEED}/withdraw", f"/api/groups/{FEED}/edit"):
+            self.changed.append((path.rsplit("/", 1)[1], await request.json()))
+            data = {"ok": True, "job": "jx"}
         elif path == f"/api/groups/{FEED}/post":
             self.posted.append(await request.json())
             data = {"job": f"j{len(self.posted)}"}
@@ -318,3 +326,45 @@ async def test_their_feed_from_the_profile_without_following(feed_page):
     await looking.get_by_role("button", name="Follow").click()
     await expect(page.locator(".toast")).to_contain_text("Following")
     assert api.subscribes == [{"id": FEED, "on": True}]
+
+
+async def test_the_more_menu_withdraws_and_edits_your_comment(feed_page):
+    """"⋯" on your own comment: Withdraw (delete) and Edit (a chat line: one line, no subject)."""
+    page, api = feed_page
+    api.comments[0].update(mine=True, may_withdraw=True, may_edit=True)
+    await open_feed(page)
+    mine = page.locator('.comment[data-id="<c0@x>"]')
+    await mine.hover()
+    await mine.get_by_role("button", name="More").click()
+    await mine.get_by_role("menuitem", name="Withdraw (delete)").click()
+    dialog = page.locator(".dialog")
+    await expect(dialog).to_contain_text("Your comment")
+    await dialog.get_by_role("button", name="Withdraw", exact=True).click()
+    await expect(page.locator(".toast")).to_contain_text("Withdrawn")
+    assert api.changed[-1] == ("withdraw", {"id": "<c0@x>"})
+    await mine.hover()
+    await mine.get_by_role("button", name="More").click()
+    await mine.get_by_role("menuitem", name="Edit").click()
+    await page.locator("#eline").fill("Rettet kommentar")
+    await page.locator(".dialog").get_by_role("button", name="Save").click()
+    for _ in range(50):
+        if any(c[0] == "edit" for c in api.changed):
+            break
+        await page.wait_for_timeout(100)
+    edit = next(c[1] for c in api.changed if c[0] == "edit")
+    assert edit["id"] == "<c0@x>" and edit["subject"] == "" and edit["body"] == "Rettet kommentar\n"
+    assert edit["kind"] == "chat"
+    # someone else's comment has no menu
+    other = page.locator('.comment[data-id="<c1@x>"]')
+    assert await other.get_by_role("button", name="More").count() == 0
+
+
+async def test_withdraw_is_found_by_delete_in_the_palette(feed_page):
+    page, api = feed_page
+    api.entry_mine = True
+    await open_feed(page)
+    await page.evaluate("S.post = '<a@x>'")                       # the entry, as ↑↓ selects it
+    await page.keyboard.press("Control+k")
+    await page.keyboard.type("delete")
+    names = await page.locator(".dialog .cmd .nm").all_inner_texts()
+    assert "Withdraw (delete) the selected post" in names

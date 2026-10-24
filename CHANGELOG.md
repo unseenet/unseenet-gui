@@ -9,6 +9,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- A "⋯" menu on posts, feed entries, comments and chat lines (on hover; always
+  on touch screens): *Edit* and *Withdraw (delete)* where they are yours, *Pin*
+  where you may, *Copy address*. Comments and chat lines can now be withdrawn
+  and edited in the graphical client (a one-line edit, no subject). The palette
+  finds withdrawing by *delete*, *remove*, *slet* and *fjern* too.
 - Create a group as a feed or a site (unseenet#514): *Feed* and *Site* under
   *Shown as*. Site makes the group a channel, as a site must be, and says who
   writes it; a channel shown as a feed asks whether anyone may comment. *Takes*

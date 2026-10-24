@@ -756,3 +756,19 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .react-pop .emo { width: 36px; }
 .react-pop .emo.mine { background: color-mix(in srgb, var(--green) 22%, transparent); }
 .bubble .reacts { margin-bottom: 0; }
+
+/* "⋯" on a post, entry, comment or chat line: on hover, always on touch screens */
+.more { position: relative; margin-left: auto; display: inline-flex; }
+.morebtn { border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1;
+  padding: 2px 8px; border-radius: 6px; cursor: pointer; opacity: 0; transition: opacity .12s; }
+.entry:hover .morebtn, .comment:hover .morebtn, .bubble:hover .morebtn, .prow:hover .morebtn,
+.more.open .morebtn, .morebtn:focus-visible { opacity: 1; }
+.morebtn:hover, .more.open .morebtn { background: var(--ink-2); color: var(--paper); }
+@media (hover: none) { .morebtn { opacity: 1; } }
+.more .menu { position: absolute; right: 0; top: 100%; z-index: 30; min-width: 170px; padding: 4px;
+  background: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.more .mi { display: block; width: 100%; text-align: left; padding: 7px 10px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--paper); cursor: pointer; font: inherit; }
+.more .mi:hover, .more .mi:focus-visible { background: var(--ink-2); }
+.bubble { position: relative; }
+.bubble > .more { position: absolute; top: 2px; right: 2px; }
