@@ -40,6 +40,8 @@ class FeedAPI:
     def __init__(self):
         self.posted, self.follows, self.started = [], [], []
         self.following = False
+        self.subscribed = True               # False: Bob's feed read without following (#506)
+        self.subscribes = []
         self.many = 0                     # more entries, for a feed taller than the window
         self.comments = [row(f"<c{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
                              key=f"ed25519:r{i}") for i in range(4)]
@@ -57,7 +59,7 @@ class FeedAPI:
     def group(self, gid=FEED):
         return {"id": gid, "label": "Bob's feed", "type": "channel", "view": "feed",
                 "owner_view": "feed", "hierarchy": "feed", "may_post": False, "unread": 0,
-                "kinds": ["chat", "post"], "subscribed": True,
+                "kinds": ["chat", "post"], "subscribed": self.subscribed,
                 "write": {"post": {"allowed": False, "reason": "Only Bob writes here", "code": "channel"},
                           "chat": {"allowed": False, "reason": "Only Bob writes here", "code": "channel"}}}
 
@@ -94,7 +96,11 @@ class FeedAPI:
         elif path == "/api/profile":
             data = {"key": request.query.get("key"), "label": "Bob", "mine": False, "hidden": False,
                     "profile": None, "address": "unseenet:" + "b" * 16, "feed": FEED,
-                    "following": self.following}
+                    "following": self.following, "theirs": {"feed": FEED, "site": None}}
+        elif path == "/api/subscribe":
+            self.subscribes.append(await request.json())
+            self.subscribed = True
+            data = {"ok": True}
         elif path == "/api/following" and request.method == "POST":
             body = await request.json()
             self.follows.append(body)
@@ -293,3 +299,22 @@ async def test_keys_in_a_feed_and_the_hints_for_them(feed_page):
     await expect(page.locator(".toast")).to_contain_text("Comments are closed")
     await page.locator(".statusbar .khint", has_text="entries").click()   # a hint is a button too
     await expect(page.locator(".entry.on")).to_have_count(1)
+
+
+async def test_their_feed_from_the_profile_without_following(feed_page):
+    """unseenet#506: their feed opens from the profile at once, read without following,
+    with a Follow there; no "Their site" button when they have none."""
+    page, api = feed_page
+    api.subscribed = False
+    await page.get_by_role("button", name="Timeline").click()
+    await page.locator(".entry").first.get_by_role("button", name="Bob").first.click()   # the profile
+    dialog = page.locator(".dialog")
+    await expect(dialog.get_by_role("button", name="Their feed")).to_be_visible()
+    assert await dialog.get_by_role("button", name="Their site").count() == 0
+    await dialog.get_by_role("button", name="Their feed").click()
+    looking = page.locator(".ghead .looking")
+    await expect(looking).to_contain_text("without following")
+    assert api.subscribes == []
+    await looking.get_by_role("button", name="Follow").click()
+    await expect(page.locator(".toast")).to_contain_text("Following")
+    assert api.subscribes == [{"id": FEED, "on": True}]

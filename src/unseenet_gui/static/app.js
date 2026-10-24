@@ -907,7 +907,13 @@ function mainArea() {
       h("div", { class: "row" }, h("h1", { text: g.label }), chips),
       g.title ? h("p", { text: g.title }) : null,
       g.files && g.node_files === false ? h("p", { class: "hint warn-line",
-        text: "This group takes pictures and files, but your node does not carry them - they will not show here. Another node may." }) : null),
+        text: "This group takes pictures and files, but your node does not carry them - they will not show here. Another node may." }) : null,
+      // read without following (unseenet#506): say so, and offer to follow here
+      canSwitch && g.subscribed === false ? h("p", { class: "hint looking" },
+        "You are reading this without following it. ",
+        h("button", { class: "link", "data-k": "follow-here", onclick: async () => {
+          try { await api("POST", "/api/subscribe", { id: g.id, on: true }); } catch (x) { toast(x.message); return; }
+          g.subscribed = true; toast("Following " + g.label + "."); await loadSidebar(); await loadGroup(); } }, "Follow")) : null),
     h("div", { class: "actions" },
       g.type === "contact" ? [
         h("button", { class: "btn", onclick: () => openAddContact(g.key, g.contact ? g.label.replace(/ √$/, "") : "") }, g.contact ? "Rename" : "Add contact"),
@@ -3326,8 +3332,13 @@ async function openProfile(key, who = "", context = S.gid) {
           : `Shared with ${p.shared.context_label} only - shown only there.` }), profileBody({ ...p, ...p.shared })] :
       profileBody(p)),
     h("div", { class: "df btns wrap" },
-      p && !p.mine && p.feed ? h("button", { class: "btn", title: "Their personal feed, if they have one (UN-RFC 0034)",
+      // their feed and site, when they have them: opened to read, not followed (unseenet#506)
+      p && !p.mine && p.theirs && p.theirs.feed ? h("button", { class: "btn", title: "Their personal feed (UN-RFC 0034) - read it without following",
+        onclick: () => { closeDialog(); S.full = false; openGroup(p.theirs.feed); } }, "Their feed") :
+      p && !p.mine && !p.theirs && p.feed ? h("button", { class: "btn", title: "Their personal feed, if they have one (UN-RFC 0034)",
         onclick: () => { closeDialog(); openAddress("unseenet:" + p.feed); } }, "Feed") : null,
+      p && !p.mine && p.theirs && p.theirs.site ? h("button", { class: "btn", title: "Their personal site (UN-RFC 0035) - read it without following",
+        onclick: () => { closeDialog(); S.full = false; openGroup(p.theirs.site); } }, "Their site") : null,
       p && !p.mine && !p.hidden ? h("button", { class: "btn", title: "Follow their feeds - nobody is told (UN-RFC 0034 section 6.1)",
         onclick: async () => { await setFollowing({ person: key, on: !p.following }, p.label || who); again(); } },
         p.following ? "Unfollow" : "Follow") : null,

@@ -9,6 +9,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- From a person to their feed and site without following them
+  (unseenet#506): a profile shows *Their feed* and *Their site* when they have
+  them and opens them at once; a group you read without following says so,
+  with a *Follow* right there, instead of asking first. Needs core 0.5.
 - Pictures and files where they were forgotten (#102, unseenet#496/#497): a
   *Files* choice (none, pictures, pictures and PDFs) when creating and editing
   a group; pictures on a chat line, also in a chat with a person (+ beside the
