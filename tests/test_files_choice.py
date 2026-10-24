@@ -169,3 +169,31 @@ async def test_a_private_post_takes_pictures(files_page):
     await page.evaluate("openWrite('ed25519:someone', 'post')")
     await expect(page.locator("#body")).to_be_visible()
     await expect(page.locator(".dialog .attach")).to_contain_text("Add pictures or files")
+
+
+async def test_create_a_site_makes_it_a_channel(files_page):
+    """unseenet#515: Site under Shown as - a site is a channel (UN-RFC 0035 section 3)."""
+    page, api, _ = files_page
+    await palette(page, "Create a group")
+    dialog = page.locator(".dialog")
+    await dialog.locator("#gname").fill("dk.side")
+    await dialog.get_by_role("button", name=re.compile("Site")).click()
+    await expect(dialog.get_by_role("button", name=re.compile("^Channel"))).to_have_attribute("aria-pressed", "true")
+    await expect(dialog).to_contain_text("A site is a channel")
+    await dialog.get_by_role("button", name="Create", exact=True).click()
+    await expect(page.locator(".toast")).to_contain_text("created")
+    assert api.created[-1]["view"] == "pages" and api.created[-1]["type"] == "channel"
+
+
+async def test_create_a_feed_with_comments(files_page):
+    page, api, _ = files_page
+    await palette(page, "Create a group")
+    dialog = page.locator(".dialog")
+    await dialog.locator("#gname").fill("dk.nyt")
+    await dialog.get_by_role("button", name=re.compile("^Channel")).click()
+    await dialog.get_by_role("button", name=re.compile("Feed")).click()
+    await dialog.get_by_role("button", name=re.compile("^No comments")).click()
+    await dialog.get_by_role("button", name="Create", exact=True).click()
+    await expect(page.locator(".toast")).to_contain_text("created")
+    body = api.created[-1]
+    assert body["view"] == "feed" and body["type"] == "channel" and body["comments"] == "none"
