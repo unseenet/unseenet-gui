@@ -35,6 +35,7 @@ class SiteAPI:
     def __init__(self, may_write):
         self.may_write = may_write
         self.posted = []
+        self.heading = False              # pages that begin with their own # heading
 
     def group(self):
         return {"id": SITE, "label": "Min side", "type": "channel", "view": "pages",
@@ -45,7 +46,8 @@ class SiteAPI:
 
     def row(self, path):
         return {"who": "Andreas", "who_key": "ed25519:a", "mine": self.may_write, "read": True,
-                "depth": 0, "tree": tree(path),
+                "depth": 0, "tree": ([{"t": "h", "n": 1, "c": [{"t": "text", "v": "Stor overskrift"}]}]
+                                     if self.heading else []) + tree(path),
                 "message": {"id": f"<{path}@x>", "group": SITE, "subject": TITLE[path],
                             "text": TEXT[path], "signature": "", "references": [], "kind": "post",
                             "readable": True, "sender_key": "ed25519:a", "private": False,
@@ -228,3 +230,15 @@ async def test_writers_keys_on_a_site(site_page):
     await expect(keys).to_contain_text("N new page")
     await page.keyboard.press("e")
     await expect(page.locator(".dialog #ptext")).to_have_value("Velkommen hjem")
+
+
+@pytest.mark.parametrize("site_page", [False], indirect=True)
+async def test_a_page_with_its_own_heading_has_one_title(site_page):
+    page, api = site_page
+    reader = page.get_by_role("article", name="Page")
+    await expect(reader.locator("h2")).to_have_text("Velkommen")          # no heading of its own
+    await expect(reader.locator(".pmeta")).to_contain_text("Andreas")     # who and when, below
+    api.heading = True
+    await page.keyboard.press("ArrowDown")                                # the next page
+    await expect(reader.locator(".pbody .mdh").first).to_have_text("Stor overskrift")
+    await expect(reader.locator("h2")).to_have_count(0)                   # not twice

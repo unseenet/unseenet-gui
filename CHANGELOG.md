@@ -85,6 +85,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- A page that begins with its own heading shows that one title, not the page's
+  title above it as well; who wrote it and when is below the page, so the text
+  starts at the top.
 - You stay at the bottom of the sidebar: with many groups only the groups
   scroll, and your picture, name and connection are always in view.
 - A site's list of pages has a quiet label ("pages · 5") in the sidebar's style

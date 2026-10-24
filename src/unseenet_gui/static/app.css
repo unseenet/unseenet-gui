@@ -709,6 +709,9 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .page .scroll > * { max-width: 46em; }
 .page h2 { margin: 0 0 4px; font-size: 24px; }
 .page .pbody { margin-top: 12px; }
+.page .pbody.titled { margin-top: 0; }
+.page .pbody.titled > .md > .mdh:first-child { margin-top: 0; font-size: 24px; }   /* its own title */
+.page .pmeta { margin: 28px 0 0; padding-top: 10px; border-top: 1px solid var(--line); }
 .pagepend { margin-top: 16px; }
 .ppreview { border: 1px dashed var(--line-2); border-radius: 8px; padding: 10px 14px; max-height: 40vh; overflow-y: auto; }
 @media (max-width: 760px) {
