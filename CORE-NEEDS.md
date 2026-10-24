@@ -180,6 +180,15 @@ and never one from elsewhere (UN-RFC 0046 section 4.16, UN-RFC 0022 section
 6). This client shares and shows them (#65). The terminal client does since
 unseenet#477.
 
+## 18. A client's own settings, and where your state is kept
+
+**Status:** waiting for unseenet#487. `GET/POST /api/settings/clients/gui`
+(the settings this client keeps with your state, so they follow you between
+devices, UN-RFC 0044 section 4.2) and `state_local` in `/api/settings`
+(section 7.4; UN-RFC 0046 section 4.8). This client keeps its theme there
+and lets you choose where your state is kept (#84), as the terminal client
+does since unseenet#463 and #467.
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

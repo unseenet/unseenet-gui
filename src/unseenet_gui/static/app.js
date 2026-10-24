@@ -21,13 +21,30 @@ const TOKEN = (() => {
 })();
 
 // ---- theme: the system's choice, or the one picked in the palette -------------
-function theme(set) {
-  let t = null;
-  try { if (set) localStorage.setItem("unseenet-theme", set); t = localStorage.getItem("unseenet-theme"); } catch (_) { t = set || null; }
-  if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme;
-  return t || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+// Kept with your settings in the core (#84, UN-RFC 0046 section 4.8), so it follows you
+// from device to device; the browser's copy only paints the first frame before the core
+// answers (the GUI's port, and so its storage, can change every start).
+const THEMES = ["light", "dark"];
+let THEME = null;
+function theme(set, save = true) {
+  if (set !== undefined) {
+    THEME = THEMES.includes(set) ? set : null;
+    try { if (THEME) localStorage.setItem("unseenet-theme", THEME); else localStorage.removeItem("unseenet-theme"); } catch (_) { /* no storage */ }
+    if (save) api("POST", "/api/settings/clients/gui", { theme: THEME }).catch(() => {});
+  } else if (THEME === null) {
+    try { THEME = localStorage.getItem("unseenet-theme"); } catch (_) { THEME = null; }
+    if (!THEMES.includes(THEME)) THEME = null;
+  }
+  if (THEME) document.documentElement.dataset.theme = THEME; else delete document.documentElement.dataset.theme;
+  return THEME || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
 }
 theme();
+async function loadTheme() {          // the one kept with your settings counts
+  try {
+    const t = ((await api("GET", "/api/settings/clients/gui")).settings || {}).theme;
+    theme(THEMES.includes(t) ? t : null, false);
+  } catch (_) { /* a core without client settings: the browser's copy stays */ }
+}
 
 const S = {
   state: null, sidebar: null, gid: null, data: null, thread: null, replyTo: null,
@@ -99,6 +116,7 @@ function fromSidebar(d, st) {
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
+    state_local: !!st.state_local,
     markdown: st.markdown !== false, notices: st.notices || {},
     hierarchies: d.hierarchies.map(h => ({ name: h.name, tree: h.tree, groups: by[h.name] || [] })) };
 }
@@ -544,7 +562,7 @@ function setupScreen() {
 async function afterUnlock() {
   if (S.state.setup) return;
   connectEvents();
-  await loadSidebar();
+  await Promise.all([loadSidebar(), loadTheme()]);
 }
 
 // ---- app --------------------------------------------------------------
@@ -2763,6 +2781,25 @@ function openBlock(m) {
     } });
 }
 
+// Your state (UN-RFC 0044 section 7.4, as the TUI's Your state): kept in the network,
+// encrypted for your key alone (the default), or on this device only.
+function openStateWhere() {
+  const local = !!(S.sidebar && S.sidebar.state_local);
+  confirmDialog({ title: "Your state", danger: !local, button: local ? "Keep in the network" : "Keep on this device only",
+    text: "Your groups, the people you follow, contacts, settings and what you have read are kept in the network, " +
+      "encrypted so only your key can read them - so a new stick or phone with your key looks the same after one fetch. " +
+      "Nodes see only a block of fixed size.\n\n" +
+      (local ? "Now they are kept on this device only. Keep them in the network again?"
+        : "Keep them on this device only instead, for an identity that should leave no trace of activity at all - " +
+          "not even an encrypted one? What is in the network now is removed."),
+    ok: async () => {
+      try { await api("POST", "/api/settings", { state_local: !local }); }
+      catch (x) { toast("Not changed: " + x.message); return; }
+      closeDialog(); await loadSidebar(); render();
+      toast(local ? "Your state is kept in the network again, from the next sync." : "Your state is kept on this device only.");
+    } });
+}
+
 async function toggleBots() {
   const on = !(S.sidebar && S.sidebar.hide_bots);
   await api("POST", "/api/settings", { hide_bots: on });
@@ -3382,6 +3419,9 @@ function commands() {
     { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
     { name: "Shut down the computer", key: "", when: S.state.bootable, run: () => power("poweroff") },
     { name: theme() === "light" ? "Use the dark theme" : "Use the light theme", key: "", run: () => { theme(theme() === "light" ? "dark" : "light"); render(); } },
+    { name: "Follow the system's theme", key: "", when: !!THEME, run: () => { theme(null); render(); } },
+    { name: S.sidebar && S.sidebar.state_local ? "Your state: keep it in the network again" : "Your state: keep it on this device only",
+      key: "", when: !!S.sidebar, run: openStateWhere },
     { name: "Show my key", key: "K", run: openKey },
     { name: "Key ripening: your level, what it means" + (S.ripening && typeof S.ripening.paused === "boolean" ? ", pause or resume" : ""),
       key: "", when: !!S.ripening, run: openRipening },
