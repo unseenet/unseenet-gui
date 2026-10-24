@@ -151,6 +151,16 @@ and whether you have it (UN-RFC 0046 section 4.13, unseenet#460). This client
 opens and copies them (#66). The terminal client gets them in its own PR
 (unseenet#442).
 
+## 15. Feeds
+
+**Status:** done. A group shown as a feed is laid out by the core
+(`Session.feed_rows()`: every note its own entry, newest first), each row says
+whether you may comment (`comment`); the timeline is the pseudo-group
+`timeline:`; `GET/POST /api/following` and `GET/POST /api/feed`; a profile
+has `feed` and `following` (UN-RFC 0046 section 4.14, unseenet#468). This
+client shows and writes them (#60). The terminal client gets them in its
+own PR (unseenet#470).
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

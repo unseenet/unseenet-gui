@@ -56,6 +56,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   too. Copy address is on posts, chat lines, About this group and profiles,
   and the commands can open an address you paste. What an address names is the
   core's (unseenet#460).
+- Feeds (#60, UN-RFC 0034): a group shown as a feed has its entries newest
+  first, each whole - a note, or a post with its headline - with the newest
+  comments under it and Show all; comment right under an entry, or answer a
+  comment (two levels, deeper answers say whom they answer). A Timeline in
+  the sidebar brings every feed you follow together, each entry saying which
+  feed it is from. Follow and Unfollow on profiles, Feed to open theirs,
+  Whom you follow, and Your feed to start your own after the warning, all in
+  the commands. V switches a feed between feed, threads and chat. The feeds
+  and the timeline are the core's (unseenet#468).
 
 ### Changed
 
