@@ -493,6 +493,7 @@ details.quote-block summary { cursor: pointer; color: var(--muted); font-size: 1
 
 /* a chat with someone who is not a contact (UN-RFC 0028, 6.2) */
 .item.person.stranger .nm { font-style: italic; opacity: 0.85; }
+.item.start .nm, .item.start .ic { opacity: 0.6; }   /* Start my feed, until you have one (gui#101) */
 
 .btn.danger { background: var(--red); color: #fff; border-color: var(--red); }
 

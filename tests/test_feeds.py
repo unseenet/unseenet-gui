@@ -80,7 +80,8 @@ class FeedAPI:
         elif path == "/api/groups":
             data = {"groups": [self.group()], "people": [],
                     "hierarchies": [{"name": "feed", "tree": None}], "inbox": {"id": "inbox:test"},
-                    "timeline": {"id": "timeline:", "feeds": 1}}
+                    "timeline": {"id": "timeline:", "feeds": 1},
+                    "my_feed": {"id": "feed@memememememememe", "started": False, "unread": 0}}
         elif path == f"/api/groups/{FEED}/post":
             self.posted.append(await request.json())
             data = {"job": f"j{len(self.posted)}"}
@@ -215,6 +216,19 @@ async def test_starting_your_feed_warns_first(feed_page):
     await dialog.get_by_role("button", name="Start my feed").click()
     await expect(page.locator(".toast")).to_contain_text("Your feed is started")
     assert api.started == [{"comments": "none"}]
+
+
+async def test_start_my_feed_at_the_top_of_the_sidebar(feed_page):
+    """gui#101: "Start my feed" under For you and Timeline, as in the terminal client."""
+    page, api = feed_page
+    start = page.locator("nav.side .item.start")
+    await expect(start).to_have_text("☰Start my feed")
+    await start.click()
+    dialog = page.locator(".dialog")
+    await expect(dialog.locator(".warnbox")).to_contain_text("public and tied to this identity")
+    await dialog.get_by_role("button", name="Start my feed").click()
+    await expect(page.locator(".toast")).to_contain_text("Your feed is started")
+    assert api.started == [{"comments": "open"}]
 
 
 async def test_a_feed_switches_to_threads_and_back(feed_page):

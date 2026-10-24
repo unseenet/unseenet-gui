@@ -113,6 +113,7 @@ function fromSidebar(d, st) {
   const fy = d.for_you || {};
   return { for_you: (fy.replies || 0) + (fy.mentions || 0), replies: fy.replies || 0, mentions: fy.mentions || 0,
     timeline: d.timeline || { id: TIMELINE, feeds: 0 },
+    my_feed: d.my_feed || null,          // your own feed at the top (gui#101; core 0.5)
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
@@ -707,6 +708,14 @@ function sidebar() {
     sb ? h("div", { class: "nav" },
       item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
       sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
+      // your own feed at the top, or the way to start it, as in the terminal client (gui#101)
+      sb.my_feed ? (sb.my_feed.started
+        ? item(sb.my_feed.id, "☰", "My feed",
+            sb.my_feed.unread ? h("span", { class: "count", text: sb.my_feed.unread }) : null, "",
+            "Your own feed - public, anyone can comment")
+        : h("button", { class: "item start", onclick: openMyFeed,
+            title: "Your own feed, public, where anyone can comment" },
+            h("span", { class: "ic", text: "☰" }), h("span", { class: "nm", text: "Start my feed" }))) : null,
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
@@ -3272,6 +3281,9 @@ async function openProfile(key, who = "", context = S.gid) {
       p && !p.mine ? h("button", { class: "btn", title: "A profile only they can read, shown only to them (UN-RFC 0022 section 6)",
         onclick: () => openShareProfile(key, p.label || who) }, "Share yours") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
+      p && p.mine ? h("button", { class: "btn", title: "Your own feed (UN-RFC 0034) - public",
+        onclick: () => { closeDialog(); openMyFeed(); } },
+        S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started ? "My feed" : "Start my feed") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
         try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
         catch (x) { toast(x.message); return; }

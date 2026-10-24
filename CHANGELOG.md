@@ -9,6 +9,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Your own feed where people look for it (#101, unseenet#495): the sidebar
+  lists **My feed** under For you and Timeline, or a dimmed **Start my feed**
+  until you have one; your own profile has *Start my feed* / *My feed*. Needs
+  `my_feed` from the core's `GET /api/groups` (0.5); without it nothing changes.
 - Your state, as in the terminal client (UN-RFC 0044 section 7.4): from the
   palette, keep it on this device only, after a warning, or in the network
   again.
