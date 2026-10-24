@@ -3003,6 +3003,8 @@ async function updateSuggest(el) {
   if (!q) { closeSuggest(); return; }
   let d;
   try { d = await loadEmoji(); } catch (_) { return; }
+  // a redraw while the data came makes a new field: find it again by its data-k
+  el = document.querySelector(`[data-k="${el.dataset.k}"]`) || el;
   const now = emojiQuery(el);                       // typing went on while the data came
   if (!now || now.q !== q.q || document.activeElement !== el) return;
   const items = findEmoji(d, q.q, 8);

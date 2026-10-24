@@ -56,6 +56,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   local API (unseenet#320) instead of this client's own copies under `/x/gui/`,
   so every front end says the same. This needs unseenet 0.5 (#59).
 
+### Fixed
+
+- Emoji suggestions while typing `:` no longer fail to show when the page
+  redraws just as the emoji data arrives, for example while a group loads.
+
 ## [0.1.2] - 2026-10-23
 
 Fixes, from the new `release/0.1` branch; the builds are made with unseenet
