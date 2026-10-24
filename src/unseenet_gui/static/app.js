@@ -84,7 +84,7 @@ function fromRow(r) {
     readable: m.readable, error: m.error, edited: m.edited,
     tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
-    depth: r.depth, attachments: m.attachments || [] };
+    depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null };
 }
 
 function fromSidebar(d, st) {
@@ -94,7 +94,7 @@ function fromSidebar(d, st) {
   return { for_you: (fy.replies || 0) + (fy.mentions || 0), replies: fy.replies || 0, mentions: fy.mentions || 0,
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
-    show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots,
+    show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
     markdown: st.markdown !== false, notices: st.notices || {},
     hierarchies: d.hierarchies.map(h => ({ name: h.name, tree: h.tree, groups: by[h.name] || [] })) };
 }
@@ -195,8 +195,52 @@ function initials(who) {
   const parts = name.split(/[\s.@_-]+/).filter(Boolean);
   return ((parts[0] || "?")[0] + (parts.length > 1 && name.includes(" ") ? parts[1][0] : "")).toUpperCase();
 }
+// A person's picture, else their identicon, else initials (UN-RFC 0022 section 8; the
+// core's local API section 4.11). Always next to the name with its short fingerprint,
+// never instead of it.
 function avatar(m, small) {
-  return h("span", { class: `av c${m.colour ?? 5}${small ? " s" : ""}`, "aria-hidden": "true", text: initials(m.who) });
+  const cls = "av" + (small ? " s" : "");
+  const p = m.key ? personOf(m.key) : null;
+  if (p && p.picture) return h("img", { class: cls + " pic", src: p.picture.data, alt: "", title: p.picture.alt || "" });
+  const icon = m.identicon || (p && p.identicon);
+  if (icon) return identiconEl(icon, cls);
+  return h("span", { class: `${cls} c${m.colour ?? 5}`, "aria-hidden": "true", text: initials(m.who) });
+}
+function identiconEl(icon, cls) {
+  const NS = "http://www.w3.org/2000/svg", el = document.createElementNS(NS, "svg");
+  el.setAttribute("viewBox", "-1 -1 7 7"); el.setAttribute("class", cls + " idc"); el.setAttribute("aria-hidden", "true");
+  icon.cells.forEach((row, y) => row.forEach((on, x) => {
+    if (!on) return;
+    const r = document.createElementNS(NS, "rect");
+    r.setAttribute("x", x); r.setAttribute("y", y); r.setAttribute("width", 1.02); r.setAttribute("height", 1.02);
+    r.setAttribute("fill", icon.colour); el.append(r);
+  }));
+  return el;
+}
+// Pictures of people come from the core in batches: asked for as they are drawn, read
+// together by the core so a node cannot tell whose you look at.
+const PEOPLE = new Map(), WANTED = new Set();
+let wantTimer = null;
+function personOf(key) {
+  const p = PEOPLE.get(key);
+  if (p) return p;
+  if (!WANTED.has(key)) {
+    WANTED.add(key);
+    clearTimeout(wantTimer);
+    wantTimer = setTimeout(loadPeople, 60);
+  }
+  return null;
+}
+async function loadPeople() {
+  const keys = Array.from(WANTED).filter(k => !PEOPLE.has(k)).slice(0, 255);
+  WANTED.clear();
+  if (!keys.length) return;
+  // every key asked for is known afterwards, answered or not: else each render asks again
+  let got = {};
+  try { got = (await api("GET", "/api/pictures?keys=" + keys.map(encodeURIComponent).join(","))).pictures || {}; }
+  catch (_) { /* an older core, or none: identicons from the rows, initials otherwise */ }
+  keys.forEach(k => PEOPLE.set(k, got[k] || { identicon: null, picture: null }));
+  if (Object.keys(got).length) render();
 }
 // "Mikkel~q7f3": the fingerprint part is shown quieter, like the TUI does.
 function nameEl(label) {
@@ -2083,6 +2127,14 @@ async function toggleBots() {
   toast(on ? "Posts by bots are hidden." : "You see bots again, marked bot.");
 }
 
+async function togglePictures() {
+  const on = !(S.sidebar && S.sidebar.pictures !== false);
+  await api("POST", "/api/settings", { pictures: on });
+  PEOPLE.clear();
+  await loadSidebar(); render();
+  toast(on ? "People's pictures are shown." : "Identicons only: pictures are not fetched or shown.");
+}
+
 async function toggleShowBlocked() {
   const on = !(S.sidebar && S.sidebar.show_blocked);
   await api("POST", "/api/settings", { show_blocked: on });
@@ -2406,10 +2458,11 @@ async function openProfile(key, who = "") {
       p && p.profile && p.profile.bot ? h("span", { class: "chip", text: "bot" }) : null,
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("div", { class: "db" },
-      h("div", { class: "keybox", text: key }),
+      h("div", { class: "prof-head" }, bigAvatar(key), h("div", { class: "keybox", text: key })),
       err ? h("p", { class: "error", text: err }) :
       !p ? h("p", { class: "muted", style: "margin:0", text: "Reading the profile over Tor …" }) : profileBody(p)),
     h("div", { class: "df btns" },
+      p && p.mine ? h("button", { class: "btn", onclick: () => openMyPicture() }, "Picture") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
         try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
@@ -2421,6 +2474,65 @@ async function openProfile(key, who = "") {
   try { p = await api("GET", "/api/profile?key=" + encodeURIComponent(key)); }
   catch (x) { err = x.message; }
   if (S.dialog && S.dialog.render === draw) render();
+}
+
+function bigAvatar(key) {
+  const p = personOf(key);
+  if (p && p.picture) return h("img", { class: "av big pic", src: p.picture.data, alt: p.picture.alt || "", title: p.picture.alt || "" });
+  if (p && p.identicon) return identiconEl(p.identicon, "av big");
+  return null;
+}
+
+// Your picture (UN-RFC 0022 section 8.5): shown exactly as it will be published before
+// it is, with the warning before the first; a drawing or no picture keeps you harder to find.
+async function openMyPicture() {
+  let p;
+  try { p = await api("GET", "/api/profile"); } catch (x) { toast(x.message); return; }
+  const st = { preview: null, file: null, alt: (p.picture && p.picture.alt) || "", err: "", busy: false };
+  const me = p.key;
+  const choose = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    st.err = ""; st.busy = true; render();
+    try {
+      st.file = await new Promise((ok, bad) => { const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(",", 2)[1] || ""); r.onerror = bad; r.readAsDataURL(file); });
+      st.preview = (await api("POST", "/api/profile/picture", { data: st.file, alt: st.alt, preview: true })).picture;
+    } catch (x) { st.err = x.message; }
+    st.busy = false; render();
+  };
+  const publish = async () => {
+    try {
+      const r = await api("POST", "/api/profile/picture", { data: st.file, alt: st.alt });
+      PEOPLE.delete(me); closeDialog(); toast("Your picture is published."); render();
+      return r;
+    } catch (x) { st.err = x.message; render(); }
+  };
+  const remove = () => confirmDialog({ title: "Remove your picture?", danger: true, button: "Remove",
+    text: "Nodes stop showing it, and your identicon is shown instead. Copies others already kept cannot be taken back.",
+    ok: async () => { try { await api("POST", "/api/profile/picture", { remove: true }); PEOPLE.delete(me); closeDialog(); toast("Your picture is removed."); }
+      catch (x) { toast(x.message); } } });
+  const shown = st => st.preview || p.picture;
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Your picture" },
+    h("div", { class: "dh" }, h("h2", { text: "Your picture - anybody can see it" }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      h("div", { class: "prof-head" },
+        shown(st) ? h("img", { class: "av big pic", src: shown(st).data, alt: st.alt || "" }) : bigAvatar(me),
+        h("p", { class: "hint", style: "margin:0", text: st.preview ? "This is exactly what will be published: a square, at most 128 pixels, without where or when it was taken." :
+          p.picture ? "Your published picture." : "You have no picture: your identicon is shown, made from your key." })),
+      h("label", { for: "picfile", class: "btn" }, st.busy ? "Making it …" : "Choose a picture"),
+      h("input", { id: "picfile", type: "file", accept: "image/*", class: "sr", onchange: choose }),
+      h("label", { for: "picalt", text: "A short description, for people who cannot see it" }),
+      h("input", { id: "picalt", class: "in", maxlength: 128, value: st.alt, oninput: (e) => { st.alt = e.target.value; } }),
+      !p.picture ? h("p", { class: "hint warn-line", style: "margin:0;white-space:pre-line", text: p.picture_warning || "" }) : null,
+      st.err ? h("p", { class: "error", text: st.err }) : null),
+    h("div", { class: "df btns" },
+      p.picture ? h("button", { class: "btn", onclick: remove }, "Remove") : null,
+      h("span", { class: "grow" }),
+      h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", disabled: !st.preview || st.busy, onclick: publish }, "Publish"))) };
+  render();
 }
 
 function confirmDialog({ title, text, button, danger, ok }) {
@@ -2525,6 +2637,8 @@ function commands() {
         toast(on ? "You write Markdown: *emphasis*, **strong**, `code`, lists, :tada:" : "You write plain text: sent and shown exactly as typed."); } },
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     { name: S.sidebar && S.sidebar.hide_bots ? "Show bots" : "Hide bots: posts by keys that say they post automatically", key: "", run: toggleBots },
+    { name: S.sidebar && S.sidebar.pictures === false ? "Show people's pictures" : "Identicons only: do not show people's pictures", key: "", run: togglePictures },
+    { name: "Your picture", key: "", run: openMyPicture },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
     { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
     { name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },
