@@ -193,6 +193,9 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .statusbar .grow { flex: 1; }
 .statusbar .link.update { color: var(--amber); font-weight: 600; }
 .statusbar .keys { display: flex; gap: 4px 18px; flex-wrap: wrap; }
+.statusbar .khint { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: default; }
+.statusbar button.khint { cursor: pointer; }
+.statusbar button.khint:hover kbd, .statusbar button.khint:focus-visible kbd { text-decoration: underline; }
 .statusbar .st { display: flex; align-items: center; gap: 6px; max-width: 50%;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -658,6 +661,7 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
   display: flex; flex-direction: column; gap: 8px; }
 .entry.unread { border-color: var(--green-deep); }
 .entry.pinned { border-left: 3px solid var(--amber); }
+.entry.on { box-shadow: 0 0 0 2px var(--green-deep); }
 .entry.pending { opacity: 0.7; }
 .entry .ehd { display: flex; align-items: center; gap: 10px; }
 .entry .ehd .who { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }

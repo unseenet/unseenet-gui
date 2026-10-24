@@ -254,3 +254,26 @@ async def test_a_long_feed_scrolls_by_itself_not_the_page(feed_page):
     assert size[0] <= size[1]
     feed = await page.evaluate("(e => [e.scrollHeight, e.clientHeight])(document.querySelector('.feed'))")
     assert feed[0] > feed[1]                                             # the feed scrolls
+
+
+async def test_keys_in_a_feed_and_the_hints_for_them(feed_page):
+    # unseenet#490: the footer shows the keys of the view you are in, and they work
+    page, api = feed_page
+    await open_feed(page)
+    keys = page.locator(".statusbar .keys")
+    await expect(keys).to_contain_text("↑↓ entries")
+    await expect(keys).to_contain_text("V show as threads")
+    await expect(keys).not_to_contain_text("Enter")              # entries are shown whole
+    await expect(keys).not_to_contain_text("comment")            # nothing chosen yet
+    await page.keyboard.press("ArrowDown")
+    await expect(page.locator(".entry.on")).to_contain_text("En kort note")
+    await expect(keys).to_contain_text("R comment")
+    await page.keyboard.press("r")
+    await expect(page.locator('[data-k="c:<a@x>"]')).to_be_focused()
+    await page.keyboard.press("Escape")
+    await page.keyboard.press("j")
+    await expect(page.locator(".entry.on")).to_contain_text("En overskrift")
+    await page.keyboard.press("r")                                # comments are closed there
+    await expect(page.locator(".toast")).to_contain_text("Comments are closed")
+    await page.locator(".statusbar .khint", has_text="entries").click()   # a hint is a button too
+    await expect(page.locator(".entry.on")).to_have_count(1)
