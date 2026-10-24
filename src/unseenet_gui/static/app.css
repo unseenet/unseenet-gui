@@ -725,3 +725,13 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .chatfiles { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 2px 0; }
 .chatfiles .chip { display: inline-flex; gap: 6px; align-items: center; padding: 2px 8px; border-radius: 999px; background: var(--bg2, rgba(127,127,127,.15)); font-size: .85em; }
 .chatbar .attachbtn { cursor: pointer; }
+
+/* tables in Markdown (UN-RFC 0031 section 3.6): they scroll sideways, never break the layout */
+.mdtable { max-width: 100%; overflow-x: auto; margin: 10px 0; border: 1px solid var(--line); border-radius: 8px; }
+.mdtable table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 0.95em; }
+.mdtable th, .mdtable td { padding: 6px 12px; border-bottom: 1px solid var(--line); vertical-align: top; text-align: left; }
+.mdtable th { font-weight: 600; background: var(--ink-2); }
+.mdtable tr:last-child td { border-bottom: 0; }
+.mdtable th + th, .mdtable td + td { border-left: 1px solid var(--line); }
+.mdtable .al-center { text-align: center; } .mdtable .al-right { text-align: right; }
+.bubble .mdtable { margin: 6px 0; }
