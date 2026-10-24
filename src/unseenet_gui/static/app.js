@@ -114,6 +114,7 @@ function fromSidebar(d, st) {
   return { for_you: (fy.replies || 0) + (fy.mentions || 0), replies: fy.replies || 0, mentions: fy.mentions || 0,
     timeline: d.timeline || { id: TIMELINE, feeds: 0 },
     my_feed: d.my_feed || null,          // your own feed at the top (gui#101; core 0.5)
+    my_site: d.my_site || null,          // ... and your own site, the same way
     people: d.people.map(p => ({ ...p, label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
@@ -708,14 +709,13 @@ function sidebar() {
     sb ? h("div", { class: "nav" },
       item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
       sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
-      // your own feed at the top, or the way to start it, as in the terminal client (gui#101)
-      sb.my_feed ? (sb.my_feed.started
-        ? item(sb.my_feed.id, "☰", "My feed",
-            sb.my_feed.unread ? h("span", { class: "count", text: sb.my_feed.unread }) : null, "",
-            "Your own feed - public, anyone can comment")
-        : h("button", { class: "item start", onclick: openMyFeed,
-            title: "Your own feed, public, where anyone can comment" },
-            h("span", { class: "ic", text: "☰" }), h("span", { class: "nm", text: "Start my feed" }))) : null,
+      // your own feed and site at the top, or the way to start them, as in the terminal client (gui#101)
+      ...[[sb.my_feed, "☰", "feed", openMyFeed, "Your own feed - public, anyone can comment"],
+          [sb.my_site, "▤", "site", openMySite, "Your own site of pages - public"]].map(([m, ic, kind, start, title]) =>
+        !m ? null : m.started
+        ? item(m.id, ic, "My " + kind, m.unread ? h("span", { class: "count", text: m.unread }) : null, "", title)
+        : h("button", { class: "item start", onclick: start, title },
+            h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: "Start my " + kind }))),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
@@ -1697,6 +1697,30 @@ function saveFile(m, a) {
     } });
 }
 
+// Read chosen files as base64 for the local API, at most four and within ``max`` each.
+async function readFiles(fileList, into, max) {
+  for (const file of Array.from(fileList)) {
+    if (into.length >= 4) { toast("At most four files on a post."); break; }
+    if (max && file.size > max) { toast(`${file.name} is ${size(file.size)}; this group takes files up to ${size(max)}.`); continue; }
+    const data = await new Promise((ok, bad) => {
+      const r = new FileReader();
+      r.onload = () => ok(String(r.result).split(",", 2)[1] || ""); r.onerror = bad;
+      r.readAsDataURL(file);
+    });
+    into.push({ name: file.name, size: file.size, type: file.type, data, alt: "" });
+  }
+}
+
+// What files a group takes, as the core's FILE_CHOICES names them (#102, unseenet#496).
+function fileChoice(files) {
+  if (!files) return "none";
+  const types = [...(files.types || [])].sort().join(",");
+  if (files.max_size !== 4194304) return "custom";
+  return types === "image/*" ? "pictures" : types === "application/pdf,image/*" ? "pictures+pdf" : "custom";
+}
+const FILE_PICKS = [["none", "No files", "text only"], ["pictures", "Pictures", "up to 4 MiB each"],
+  ["pictures+pdf", "Pictures and PDFs", "up to 4 MiB each"]];
+
 // Choosing files for a post: at most four, with a description each. The core saves
 // pictures again without their metadata (GPS, time, camera) before they are sent.
 function filePicker(dialog, g, carries) {
@@ -1712,16 +1736,7 @@ function filePicker(dialog, g, carries) {
   const input = h("input", { type: "file", multiple: true, class: "sr", id: "cfiles",
     accept: (g.files.types || []).length ? g.files.types.join(",") : "image/*,application/pdf",
     onchange: async (e) => {
-      for (const file of Array.from(e.target.files)) {
-        if (dialog.files.length >= 4) { toast("At most four files on a post."); break; }
-        if (max && file.size > max) { toast(`${file.name} is ${size(file.size)}; this group takes files up to ${size(max)}.`); continue; }
-        const data = await new Promise((ok, bad) => {
-          const r = new FileReader();
-          r.onload = () => ok(String(r.result).split(",", 2)[1] || ""); r.onerror = bad;
-          r.readAsDataURL(file);
-        });
-        dialog.files.push({ name: file.name, size: file.size, type: file.type, data, alt: "" });
-      }
+      await readFiles(e.target.files, dialog.files, max);
       e.target.value = "";
       draw();
     } });
@@ -2101,7 +2116,8 @@ async function openReply(m, g) {
   openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
     subject, body, cursor: top.length, private: !!g.private_reply,
     send: (subject, text, notify, files) => g.private_reply ?
-      doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id }, { text }) :
+      doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id,
+        ...(files && files.length ? { files } : {}) }, { text }) :
       doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify,
         ...(files && files.length ? { files } : {}) }, { text }) });
 }
@@ -2116,8 +2132,11 @@ function openEdit(m, g) {
 
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
   const dialog = { focus: "#body", node: null, files: [] };
-  // files (UN-RFC 0027): where the group takes them; said plainly where its node does not
-  const takes = !priv && !edit && g && g.files, carries = takes && g.node_files !== false;
+  // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
+  // A private post: pictures, encrypted to them (#102, unseenet#497) - if their inbox
+  // takes none, the runtime says so when it sends.
+  const fg = priv ? { files: { max_size: 4194304 - 40, types: ["image/*"] }, node_files: true } : g;
+  const takes = !edit && fg && fg.files, carries = takes && fg.node_files !== false;
   // mention notices (UN-RFC 0032): who would be told, and a box to say no
   const N = { may: !priv && !edit && g && g.type !== "closed", names: [], max: 5,
     on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
@@ -2174,7 +2193,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
         onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
-      takes ? filePicker(dialog, g, carries) : null,
+      takes ? filePicker(dialog, fg, carries) : null,
       h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
         "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
         (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),
@@ -2403,14 +2422,33 @@ function chatView(d) {
     out.push(h("div", { class: "empty" }, h("h2", { text: "Quiet here" }), h("p", { text: g.type === "contact" || mayWrite(d, "chat").allowed ? "Say hello below." : "" })));
   }
   const cp = g.type === "contact" ? { allowed: true } : mayWrite(d, "chat");
+  // files on a chat line (#102, UN-RFC 0028 section 6.1): where the group takes them,
+  // and in a chat with a person, whose inbox may (the runtime says so when it does not)
+  const takesFiles = g.type === "contact" || (g.files && g.node_files !== false);
+  S.chatFiles = S.chatFiles || {};
+  const pending = S.chatFiles[g.id] || (S.chatFiles[g.id] = []);
   const send = () => {
     const input = document.querySelector('[data-k="chat"]');
     const text = input.value.trim();
-    if (!text) return;
+    if (!text && !pending.length) return;
+    const files = pending.splice(0).map(f => ({ name: f.name, data: f.data, alt: "" }));
+    const shown = text + (files.length ? ` (+ ${files.length} file${files.length > 1 ? "s" : ""})` : "");
     input.value = ""; S.drafts["chat:" + g.id] = "";        // before doSend draws the grey line (#48)
-    if (g.type === "contact") doSend("/api/private", g.id, { key: g.key, body: text, chat: true }, { text, chat: true });
-    else doPost(g.id, { body: text, chat: true }, { text, chat: true });
+    const more = files.length ? { files } : {};
+    if (g.type === "contact") doSend("/api/private", g.id, { key: g.key, body: text, chat: true, ...more }, { text: shown, chat: true });
+    else doPost(g.id, { body: text, chat: true, ...more }, { text: shown, chat: true });
   };
+  const attach = takesFiles ? [
+    h("input", { type: "file", multiple: true, class: "sr", id: "chatfiles",
+      accept: g.files && (g.files.types || []).length ? g.files.types.join(",") : "image/*",
+      onchange: async (e) => { await readFiles(e.target.files, pending, g.files ? g.files.max_size : 0);
+        e.target.value = ""; render(); } }),
+    h("label", { for: "chatfiles", class: "btn icon attachbtn", title: "Add pictures to your next line",
+      "aria-label": "Add pictures" }, svg(ICON.plus, 18, 2.5))] : [];
+  const chips = pending.length ? h("div", { class: "chatfiles" }, pending.map((f, i) => h("span", { class: "chip" },
+    h("span", { class: "mono", text: f.name }),
+    h("button", { type: "button", class: "link", "aria-label": "Remove " + f.name,
+      onclick: () => { pending.splice(i, 1); render(); } }, "×")))) : null;
   return h("div", { class: "content" }, h("section", { class: "chat", "aria-label": "Messages" },
     pinBar(d, msgs),
     h("div", { class: "msgs", "data-scroll": "chat:" + g.id, "data-stick": "bottom" }, out),
@@ -2423,8 +2461,10 @@ function chatView(d) {
         h("input", { id: "chat", type: "text", "data-k": "chat", autocomplete: "off",
           placeholder: "Message " + (g.access || "") + (g.access ? " " : "") + g.label, value: S.drafts["chat:" + g.id] || "",
           oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; } }),
+        ...attach,
         emojiButton("chat"),
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
+      chips,
       h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Esc" }), " for shortcuts",
         g.type === "contact" ? " · sealed to them" : g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
       h("div", { class: "chatbar off" }, h("div", { class: "row" },
@@ -2625,8 +2665,9 @@ function openEditGroup() {
   const g = S.data && S.data.group;
   if (!g || !g.owner) return;
   let view = g.owner_view || g.view, kinds = (g.kinds || []).length === 1 ? g.kinds[0] : "both";
+  let files = fileChoice(g.files);
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
-    onclick: () => { if (name === "kinds") kinds = value; else view = value; render(); } },
+    onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
     values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
@@ -2645,6 +2686,9 @@ function openEditGroup() {
         pick("kinds", "both", kinds, "Both", "posts and chat lines"),
         pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
         pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
+      h("label", { text: "Files" }),
+      h("div", { class: "choices row" }, FILE_PICKS.map(([v, l, s]) => pick("files", v, files, l, s)),
+        files === "custom" ? pick("files", "custom", files, "As it is now", "limits set elsewhere") : null),
       h("label", { for: "erules", text: "Rules - shown to people before they post" }),
       h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules }),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
@@ -2653,7 +2697,8 @@ function openEditGroup() {
       const rules = v.rules.trim();
       await api("POST", `/api/groups/${encodeURIComponent(g.id)}/settings`,
         { title: v.title.trim(), description: v.description.trim(), rules,
-          rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds });
+          rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds,
+          ...(files !== "custom" ? { files } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
 }
@@ -3014,6 +3059,12 @@ function openBrowse() {
 // built again only when it says so - ``refresh()`` on what this returns, for fields that
 // change (a list that arrives, a choice that shows more) - and an error is written into
 // it, not drawn anew.
+// A choice in a form dialog shows as chosen: the dialog is built again with what was
+// typed kept (render() alone keeps the node it has, so the choices did not change).
+function redrawDialog() {
+  if (S.dialog && S.dialog.refresh) S.dialog.refresh(); else render();
+}
+
 function formDialog({ label, title, focus, fields, submit, button, note, values }) {
   let err = "";
   const vals = { ...(values || {}) };       // what you entered, also across a refresh()
@@ -3155,15 +3206,16 @@ async function openPost(key, who = "", subject = "", replyTo = null, quote = "")
   const inbox = S.sidebar && S.sidebar.inbox.id;
   openComposeWindow({ g: null, title: "Post to " + (who || key.slice(0, 20) + "…"), subject, private: true,
     body: top + "\n" + (sig ? "-- \n" + sig + "\n" : ""), cursor: top.length,
-    send: (subject, text) => doSend("/api/private", inbox,
-      { key, subject, body: text, ...(replyTo ? { reply_to: replyTo } : {}) }, { text }) });
+    send: (subject, text, _notify, files) => doSend("/api/private", inbox,
+      { key, subject, body: text, ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(files && files.length ? { files } : {}) }, { text }) });
   if (!subject) setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
 function openCreateGroup() {
-  let gtype = "open", view = "threads", kinds = "both";
+  let gtype = "open", view = "threads", kinds = "both", files = "none";
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
-    onclick: () => { if (name === "type") gtype = value; else if (name === "kinds") kinds = value; else view = value; render(); } },
+    onclick: () => { if (name === "type") gtype = value; else if (name === "kinds") kinds = value; else if (name === "files") files = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Create a group", title: "Create a group", focus: "#gname", button: "Create",
     note: "The group belongs to your key. Creating it costs some proof-of-work, and it is sent to your node now.",
@@ -3183,12 +3235,15 @@ function openCreateGroup() {
         pick("kinds", "both", kinds, "Both", "posts and chat lines"),
         pick("kinds", "post", kinds, "≡ Posts only", "a discussion group"),
         pick("kinds", "chat", kinds, "» Chat lines only", "a chat group")),
+      h("label", { text: "Files" }),
+      h("div", { class: "choices row" }, FILE_PICKS.map(([v, l, s]) => pick("files", v, files, l, s))),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)"),
       h("label", { for: "gtitle", text: "Title" }),
       h("input", { id: "gtitle", name: "title", class: "in", "data-k": "gtitle", value: vals.title || "", placeholder: "One line about the group" })],
     submit: async (v) => {
       toast("Creating the group - proof-of-work takes a moment …");
-      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view, kinds, fast: !!v.fast, title: v.title });
+      const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view, kinds, fast: !!v.fast, title: v.title,
+        ...(files !== "none" ? { files } : {}) });
       closeDialog(); await loadSidebar(); await openGroup(id); toast("The group is created.");
     } });
 }
@@ -3284,6 +3339,9 @@ async function openProfile(key, who = "", context = S.gid) {
       p && p.mine ? h("button", { class: "btn", title: "Your own feed (UN-RFC 0034) - public",
         onclick: () => { closeDialog(); openMyFeed(); } },
         S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started ? "My feed" : "Start my feed") : null,
+      p && p.mine ? h("button", { class: "btn", title: "Your own site of pages (UN-RFC 0035) - public",
+        onclick: () => { closeDialog(); openMySite(); } },
+        S.sidebar && S.sidebar.my_site && S.sidebar.my_site.started ? "My site" : "Start my site") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
         try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
         catch (x) { toast(x.message); return; }

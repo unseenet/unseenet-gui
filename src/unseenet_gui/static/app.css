@@ -409,7 +409,7 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
   font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; }
 .fold-t:hover { color: var(--paper); }
 .fold-t .car { width: 10px; }
-.choices.row { flex-direction: row; flex-wrap: wrap; max-height: none; }
+.choices.row { flex-direction: row; flex-wrap: wrap; max-height: none; flex-shrink: 0; }   /* a tall dialog scrolls instead of squeezing them (#102) */
 .choices.row .choice { flex: 1 1 130px; }
 .check { display: flex; gap: 8px; align-items: flex-start; font-weight: 400 !important; }
 .member { display: flex; align-items: center; gap: 8px; font-size: 13px; }
@@ -720,3 +720,8 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
   .pagelist { flex: none; max-height: 30vh; border-right: none; border-bottom: 1px solid var(--line); }
   .page .scroll { padding: 14px 16px 30px; }
 }
+
+/* files with the next chat line (#102) */
+.chatfiles { display: flex; flex-wrap: wrap; gap: 6px; padding: 4px 2px 0; }
+.chatfiles .chip { display: inline-flex; gap: 6px; align-items: center; padding: 2px 8px; border-radius: 999px; background: var(--bg2, rgba(127,127,127,.15)); font-size: .85em; }
+.chatbar .attachbtn { cursor: pointer; }

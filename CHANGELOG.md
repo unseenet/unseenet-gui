@@ -9,6 +9,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Pictures and files where they were forgotten (#102, unseenet#496/#497): a
+  *Files* choice (none, pictures, pictures and PDFs) when creating and editing
+  a group; pictures on a chat line, also in a chat with a person (+ beside the
+  input, shown as chips until sent); pictures in private posts, encrypted to
+  them. Needs core 0.5 (`files` in the local API).
+- **My site** as My feed (unseenet#495): at the top of the sidebar, or a dimmed
+  *Start my site*, and on your own profile.
 - Your own feed where people look for it (#101, unseenet#495): the sidebar
   lists **My feed** under For you and Timeline, or a dimmed **Start my feed**
   until you have one; your own profile has *Start my feed* / *My feed*. Needs
@@ -121,6 +128,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Fixed
 
+- Choices in the Create and Edit group dialogs did not show which one was
+  picked (the dialog was not drawn again), and in a tall dialog they were
+  squeezed together so a label covered them.
 - A long feed no longer gives the window a second scroll bar: the hidden labels
   of its comment boxes made the page itself taller than the window.
 - Form dialogs no longer reset while you write (#85): Your profile, Add contact,

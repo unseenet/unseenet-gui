@@ -81,7 +81,8 @@ class FeedAPI:
             data = {"groups": [self.group()], "people": [],
                     "hierarchies": [{"name": "feed", "tree": None}], "inbox": {"id": "inbox:test"},
                     "timeline": {"id": "timeline:", "feeds": 1},
-                    "my_feed": {"id": "feed@memememememememe", "started": False, "unread": 0}}
+                    "my_feed": {"id": "feed@memememememememe", "started": False, "unread": 0},
+                    "my_site": {"id": "site@memememememememe", "started": True, "unread": 0}}
         elif path == f"/api/groups/{FEED}/post":
             self.posted.append(await request.json())
             data = {"job": f"j{len(self.posted)}"}
@@ -222,7 +223,8 @@ async def test_start_my_feed_at_the_top_of_the_sidebar(feed_page):
     """gui#101: "Start my feed" under For you and Timeline, as in the terminal client."""
     page, api = feed_page
     start = page.locator("nav.side .item.start")
-    await expect(start).to_have_text("☰Start my feed")
+    await expect(start).to_have_text("☰Start my feed")              # the site is started:
+    await expect(page.locator("nav.side .item", has_text="My site")).to_have_count(1)
     await start.click()
     dialog = page.locator(".dialog")
     await expect(dialog.locator(".warnbox")).to_contain_text("public and tied to this identity")
