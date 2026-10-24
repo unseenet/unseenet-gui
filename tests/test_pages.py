@@ -199,3 +199,32 @@ async def test_new_page_previous_version_and_remove(site_page):
     await page.locator(".dialog").get_by_role("button", name="Remove").click()
     await expect(page.locator(".pagepend")).to_contain_text("Removing about")
     assert api.posted[-1] == {"path": "about", "remove": True, "kind": "post"}
+
+
+@pytest.mark.parametrize("site_page", [False], indirect=True)
+async def test_keys_on_a_site(site_page):
+    # unseenet#490: up and down go through the pages, left and right back and forward
+    page, _ = site_page
+    reader = page.get_by_role("article", name="Page")
+    keys = page.locator(".statusbar .keys")
+    await expect(keys).to_contain_text("↑↓ pages")
+    await expect(keys).not_to_contain_text("edit")               # not a writer
+    await expect(keys).not_to_contain_text("new")
+    await page.keyboard.press("ArrowDown")
+    await expect(reader.locator("h2")).to_have_text("Om mig")
+    await page.keyboard.press("ArrowLeft")
+    await expect(reader.locator("h2")).to_have_text("Velkommen")
+    await page.keyboard.press("ArrowRight")
+    await expect(reader.locator("h2")).to_have_text("Om mig")
+    await page.keyboard.press("n")                                # no compose window on a site
+    await expect(page.locator(".dialog")).to_have_count(0)
+
+
+@pytest.mark.parametrize("site_page", [True], indirect=True)
+async def test_writers_keys_on_a_site(site_page):
+    page, _ = site_page
+    keys = page.locator(".statusbar .keys")
+    await expect(keys).to_contain_text("E edit")
+    await expect(keys).to_contain_text("N new page")
+    await page.keyboard.press("e")
+    await expect(page.locator(".dialog #ptext")).to_have_value("Velkommen hjem")

@@ -85,6 +85,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- The footer shows the keys of the view you are in (unseenet#490), the same as
+  the terminal client, and each is a button too. Threads: N, R, ↑↓, Space,
+  Enter. Chat: Enter, Esc. A feed: N, ↑↓ from entry to entry, Space to the next
+  unread, R to comment. A site: ↑↓ through its pages, ← → back and forward, E
+  and N for its writers. Reading: Esc, N/P, R, Space. V says what it shows next.
 - A paused key ripening stays paused on this device, also after a restart,
   until you resume it (unseenet#488); the ripening dialog says so.
 - The theme is kept with your settings in the core (#84), so it is no longer

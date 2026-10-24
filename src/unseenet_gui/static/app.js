@@ -824,14 +824,49 @@ function shortNode(address) {
   return address.endsWith(".onion") ? address.slice(0, 6) + "….onion" : address;
 }
 
+// The shortcuts that work where you are, the same as the terminal client's footer
+// (unseenet#490): one set a view, and each a button too, for a mouse or a touch screen.
+function keyHints() {
+  const d = S.data, g = d && d.group;
+  if (!g) return [["Ctrl P", "commands", openPalette]];
+  const cur = d.messages.find(x => x.id === S.post) || null;
+  const out = [];
+  const may = (kind) => g.type && mayWrite(d, kind).allowed;
+  if (reading()) {
+    out.push(["Esc", "back", () => { S.full = false; render(); }], ["N P", "next/previous", () => step(1)]);
+    if (cur) out.push(["R", "reply", () => tryReply(cur, g)]);
+    out.push(["Space", "page down", null]);
+    return out;
+  }
+  if (g.view === "chat") out.push(["Enter", "write", () => { const el = document.querySelector('[data-k="chat"]'); if (el) el.focus(); }], ["Esc", "shortcuts", null]);
+  else if (g.view === "feed") {
+    if (may("post")) out.push(["N", "new post", openCompose]);
+    out.push(["↑↓", "entries", () => feedStep(1)], ["Space", "next unread", feedNextUnread]);
+    if (feedCurrent()) out.push(["R", "comment", feedComment]);
+  } else if (g.view === "pages") {
+    const site = d.site || {};
+    out.push(["↑↓", "pages", () => pageStep(1)], ["← →", "back/forward", () => siteStep(-1)]);
+    if (site.may_write && site.page) out.push(["E", "edit", () => openPageEditor(g, site, site.page)]);
+    if (site.may_write) out.push(["N", "new page", () => openPageEditor(g, site, null)]);
+  } else {
+    if (may("post")) out.push(["N", "new post", openCompose]);
+    if (cur && !cur.notice) out.push(["R", "reply", () => tryReply(cur, g)]);
+    out.push(["↑↓", "posts", () => step(1)], ["Space", "next unread", nextUnread]);
+    if (cur) out.push(["Enter", "read", () => { S.full = true; render(); }]);
+  }
+  if (g.type && g.type !== "inbox") out.push(["V", "show as " + nextView(g), toggleView]);
+  if (g.type) out.push(["?", "about group", openInfo]);
+  out.push(["Ctrl P", "commands", openPalette]);
+  return out;
+}
+
 function statusbar() {
-  const g = S.data && S.data.group, chat = g && g.view === "chat";
-  const k = (key, label) => h("span", {}, h("kbd", { text: key }), " " + label);
+  const k = ([key, label, run]) => run ? h("button", { class: "khint", type: "button", tabindex: "-1", onclick: run }, h("kbd", { text: key }), " " + label)
+    : h("span", { class: "khint" }, h("kbd", { text: key }), " " + label);
   return h("footer", { class: "statusbar" },
-    h("span", { class: "keys" },
-      chat ? [k("Esc", "shortcuts"), k("Enter", "write")] :
-        [k("N", "new"), k("R", "reply"), k("↑↓", "posts"), k("Space", "next unread"), k("Enter", "full screen")],
-      k("V", "chat/threads"), k("?", "about group"), k("Ctrl P", "commands")),
+    // the same as the keys and the buttons on the screen: hidden from screen readers, which
+    // have those, and out of the Tab order
+    h("span", { class: "keys", "aria-hidden": "true" }, keyHints().map(k)),
     h("span", { class: "grow" }),
     S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
@@ -1071,6 +1106,48 @@ function feedEntries(d) {
   return pinned.concat(out.filter(e => !e.m.pinned));
 }
 
+// Keys in a feed (unseenet#490): up and down go from entry to entry, Space to the next
+// unread one, R comments on the one you are on - the same keys as the terminal client.
+function feedCurrent() {
+  const entries = S.data && S.data.group && S.data.group.view === "feed" ? feedEntries(S.data) : [];
+  return entries.find(e => e.m.id === S.post) || null;
+}
+function feedGo(e) {
+  if (!e) return;
+  S.post = e.m.id; render();
+  const el = document.querySelector(`.entry[data-id="${CSS.escape(e.m.id)}"]`);
+  if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+function feedStep(delta) {
+  const entries = feedEntries(S.data);
+  if (!entries.length) return;
+  const i = entries.findIndex(e => e.m.id === S.post);
+  feedGo(entries[i < 0 ? 0 : Math.max(0, Math.min(entries.length - 1, i + delta))]);
+}
+async function feedNextUnread() {
+  const entries = feedEntries(S.data);
+  const i = entries.findIndex(e => e.m.id === S.post);
+  const unread = e => !e.m.read || e.comments.some(c => !c.read);
+  const next = entries.slice(i + 1).find(unread) || entries.slice(0, Math.max(0, i)).find(unread);
+  if (next) { feedGo(next); return; }
+  S.post = null; await nextUnread();
+}
+function feedComment() {
+  const e = feedCurrent();
+  const el = e && document.querySelector(`[data-k="c:${CSS.escape(e.m.id)}"]`);
+  if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); }
+  else if (e) toast((e.m.comment && e.m.comment.reason) || "Comments are closed here.");
+}
+
+// Keys on a site: up and down go through its pages, left and right back and forward.
+function pageStep(delta) {
+  const site = S.data && S.data.site;
+  if (!site || !site.pages || !site.pages.length) return;
+  const i = site.pages.findIndex(p => p.path === site.path);
+  const next = site.pages[Math.max(0, Math.min(site.pages.length - 1, (i < 0 ? 0 : i) + delta))];
+  if (next && next.path !== site.path) openPage(S.data.group.id, next.path);
+}
+
 function feedView(d) {
   const g = d.group, timeline = g.id === TIMELINE, entries = feedEntries(d);
   S.feedOpen = S.feedOpen || {};
@@ -1141,7 +1218,7 @@ function entryCard(d, e) {
   };
   const pend = Object.entries(S.pending).filter(([, p]) => p.thread === m.id);
   const own = groupOf(m.group) || g;
-  return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread"), "data-id": m.id },
+  return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread") + (S.post === m.id ? " on" : ""), "data-id": m.id },
     h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
       m.bot ? h("span", { class: "sm", text: "bot" }) : null,
       h("span", { class: "hint", text: when(m.date) }),
@@ -3717,10 +3794,24 @@ document.addEventListener("keydown", (e) => {
     if (k) { e.preventDefault(); k(); }
     return;
   }
+  if (g && g.view === "feed") {                // a feed: entries, not rows (unseenet#490)
+    const fk = { ArrowDown: () => feedStep(1), j: () => feedStep(1), ArrowUp: () => feedStep(-1), k: () => feedStep(-1),
+      " ": feedNextUnread, r: feedComment }[key];
+    if (fk) { e.preventDefault(); fk(); return; }
+  }
+  if (g && g.view === "pages") {               // a site: its pages, back and forward
+    const site = S.data.site || {};
+    const pk = { ArrowDown: () => pageStep(1), j: () => pageStep(1), ArrowUp: () => pageStep(-1), k: () => pageStep(-1),
+      ArrowLeft: () => siteStep(-1), ArrowRight: () => siteStep(1),
+      e: site.may_write && site.page ? () => openPageEditor(g, site, site.page) : null,
+      n: site.may_write ? () => openPageEditor(g, site, null) : () => {} }[key];
+    if (pk) { e.preventDefault(); pk(); return; }
+  }
   const keys = {
     n: () => openCompose(), v: () => toggleView(), m: () => openWrite(), c: () => openContacts(), "@": () => openNames(), g: () => openBrowse(), k: () => openKey(), "?": () => openInfo(),
   };
   if (keys[key]) { e.preventDefault(); keys[key](); return; }
+  if (g && (g.view === "feed" || g.view === "pages")) return;     // their own keys, above
   if (g && g.view === "chat") {
     if (e.key === "Enter") { const el = document.querySelector('[data-k="chat"]'); if (el) { e.preventDefault(); el.focus(); } }
     return;
