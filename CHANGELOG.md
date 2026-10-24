@@ -82,6 +82,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- A paused key ripening stays paused on this device, also after a restart,
+  until you resume it (unseenet#488); the ripening dialog says so.
 - Your picture is set in Your profile (#82): choose, preview exactly as it will be
   published, describe or remove it in the same dialog, published with Publish; the
   separate Your picture dialog is gone (its palette entry opens your profile).

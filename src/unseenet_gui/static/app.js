@@ -2177,7 +2177,7 @@ function openRipening() {
           "and carries on next time from where it stopped."),
         web ? para("In the browser it runs only while this page is open. Closing the page loses only the step in progress - " +
           "as long as your vault is saved as a file or kept on this device.") : null,
-        canPause ? para("Pause it on a warm phone or when on battery. It stays paused until you resume it or close Unseenet. " +
+        canPause ? para("Pause it on a warm phone or when on battery. It stays paused on this device, also after a restart, until you resume it here. " +
           "A post that needs a riper key still waits for what it needs.") : null,
         r.available === false ? h("p", { class: "hint", style: "margin:0",
           text: "This copy of Unseenet cannot ripen keys (chiavdf is missing). Your key can still read, and post where groups ask for no ripening." }) : null),
