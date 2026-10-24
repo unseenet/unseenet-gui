@@ -192,6 +192,11 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
   justify-content: center; font-family: var(--mono); font-weight: 700; font-size: 13px; color: #10302a; }
 .av.s { width: 28px; height: 28px; font-size: 11px; }
 .av.xs { width: 22px; height: 22px; font-size: 10px; }
+.av.pic { object-fit: cover; background: var(--ink-2); }
+.av.idc { background: var(--ink-2); border-radius: 8px; }
+.av.big { width: 96px; height: 96px; border-radius: 12px; }
+.prof-head { display: flex; gap: 14px; align-items: center; }
+.prof-head .keybox { flex: 1; min-width: 0; }
 .c0 { background: #7cc4f0; } .c1 { background: #f5c26b; } .c2 { background: #c7b3f5; }
 .c3 { background: #f0a3c4; } .c4 { background: #34d399; } .c5 { background: #9cc3b6; }
 

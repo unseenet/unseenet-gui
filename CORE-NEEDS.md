@@ -125,6 +125,15 @@ safe to show, a file to save, and takes files with a post (UN-RFC 0046 section
 4.10, unseenet#446). This client shows them (#63). In a portable build the
 program is its own decoding process (`decode.run_if_asked()` in `__main__`).
 
+## 12. Pictures of people
+
+**Status:** done. The local API gives every row an `identicon`, and
+`GET /api/pictures?keys=` each key's identicon and picture, decoded and saved
+again in a separate process and read together with the other authors' so a node
+cannot tell whose you look at; `POST /api/profile/picture` previews, publishes
+and removes your own, with the warning before the first (UN-RFC 0046 section
+4.11, unseenet#447). This client shows them (#64).
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

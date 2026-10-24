@@ -137,3 +137,34 @@ async def test_saving_a_file_no_post_carries(gui):
     r = await gui.post("/x/gui/save", json={"group": "dk.x@aaaa", "blob": "blob1:" + "a" * 52},
                        headers=auth(gui))
     assert r.status == 400 and "no post" in (await r.json())["error"]
+
+
+async def test_identicons_and_pictures_for_the_page(gui):
+    """#64: every key gets an identicon; a picture only when one is known (unseenet#447)."""
+    me, other = gui.s.identity().key_text, crypto.Identity.generate().key_text
+    r = await gui.get("/api/pictures", params={"keys": f"{me},{other}"}, headers=auth(gui))
+    body = await r.json()
+    assert r.status == 200
+    for key in (me, other):
+        idc = body["pictures"][key]["identicon"]
+        assert body["pictures"][key]["picture"] is None             # the node is away
+        assert [len(row) for row in idc["cells"]] == [5] * 5 and 0 <= idc["hue"] < 360
+        assert all(row == row[::-1] for row in idc["cells"])        # mirrored (UN-RFC 0022 8.4)
+
+
+async def test_previewing_my_picture_publishes_nothing(gui):
+    """#64: the dialog shows the picture exactly as it would be published, before it is."""
+    import base64
+    import io
+
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new("RGB", (300, 200), (200, 40, 40)).save(buf, "PNG")
+    r = await gui.post("/api/profile/picture", headers=auth(gui), json={
+        "data": base64.b64encode(buf.getvalue()).decode(), "alt": "A red square", "preview": True})
+    pic = (await r.json())["picture"]
+    assert r.status == 200 and pic["px"] <= 128 and pic["alt"] == "A red square"
+    assert pic["data"].startswith("data:image/")
+    base64.b64decode(pic["data"].split(",", 1)[1], validate=True)        # whole, padded base64
+    p = await (await gui.get("/api/profile", headers=auth(gui))).json()
+    assert not p.get("picture")                                          # nothing published

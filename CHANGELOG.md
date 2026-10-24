@@ -30,6 +30,16 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   Pictures by people you ignore wait until you choose to see them. Writing a
   post in a group that takes files has "Add pictures or files", up to four,
   each with a description; a group whose node carries no files says so.
+- Pictures of people (#64, UN-RFC 0022 section 8): beside posts, chat lines
+  and in profiles, each author has their picture or else their identicon, a
+  pattern made from their key, so two people with the same name look
+  different. Pictures come from the core decoded and saved again in a separate
+  process (unseenet#447), read in batches so a node cannot tell whose you look
+  at. Your own profile has "Picture": choose an image, see exactly what will be
+  published (square, at most 128 pixels, without where or when it was taken)
+  with its description and the warning before your first picture, then
+  publish or remove it. "Identicons only" in the commands (Ctrl P) turns
+  pictures off; "Show people's pictures" turns them on again.
 
 ### Changed
 

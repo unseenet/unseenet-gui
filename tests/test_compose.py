@@ -110,6 +110,8 @@ class LocalAPI:
             data = {"job": "job-" + str(len(self.sent))}
         elif path.endswith("/read"):
             data = {}
+        elif path == "/api/pictures":                       # #64: nobody has a picture here
+            data = {"pictures": {}}
         else:
             self.unexpected.append((request.method, path))
             raise web.HTTPNotFound()
