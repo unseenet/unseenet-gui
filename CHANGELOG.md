@@ -9,6 +9,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Added
 
+- Private profiles (#65, UN-RFC 0022 section 6): share a profile with one
+  person ("Share yours" in their profile) or with a closed group (the
+  palette), after saying who can read it, and take it back. A profile shared
+  with you or the group is shown where it was shared, with a note saying so,
+  and never elsewhere.
 - Key ripening is explained where it shows: your key's level under your name,
   and a dialog with the progress, the time left, and what the levels do. With
   a core that can (unseenet#337), it pauses and resumes. On the web, a new key
