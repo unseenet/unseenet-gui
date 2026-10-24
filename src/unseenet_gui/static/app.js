@@ -1250,7 +1250,8 @@ function entryCard(d, e) {
       m.bot ? h("span", { class: "sm", text: "bot" }) : null,
       h("span", { class: "hint", text: when(m.date) }),
       timeline ? h("button", { class: "link efeed", onclick: () => openGroup(m.group) }, "in " + (m.group_label || labelOf(m.group))) : null,
-      m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null)),
+      m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null),
+      moreMenu(m)),
     m.kind !== "chat" ? h("h3", { class: "etitle", text: subjectOf(m) }) : null,
     h("div", { class: "ebody" }, m.kind === "chat" && m.readable ? [m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false)] : messageBody(m)),
     reactionBar(m),
@@ -1291,7 +1292,8 @@ function commentEl(c, entry, byId) {
     avatar(c, true),
     h("div", { class: "cb" },
       h("div", { class: "chd" }, whoEl(c), h("span", { class: "hint", text: when(c.date) }),
-        parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null),
+        parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null,
+        moreMenu(c)),
       h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
         [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
       reactionBar(c),
@@ -2222,6 +2224,44 @@ function openEdit(m, g) {
       { id: m.id, subject, body: text }, { text }) });
 }
 
+// Edit a chat line or a comment (UN-RFC 0042): one line, no subject, no signature.
+function openEditLine(m) {
+  const gid = m.group || (S.data && S.data.group && S.data.group.id);
+  formDialog({ label: "Edit", title: m.depth ? "Edit your comment" : "Edit your chat line", focus: "#eline", button: "Save",
+    values: { line: (m.text || "").trimEnd() },
+    note: "A new version: people may already have read the earlier one, and may keep it.",
+    fields: (vals) => [h("label", { for: "eline", class: "sr", text: "Text" }),
+      h("textarea", { id: "eline", name: "line", class: "in", "data-k": "eline", style: "min-height:80px", value: vals.line })],
+    submit: async (v) => {
+      const text = (v.line || "").trim();
+      if (!text) throw new Error("Write something, or withdraw it instead.");
+      closeDialog();
+      await doSend(`/api/groups/${encodeURIComponent(gid)}/edit`, gid, { id: m.id, subject: "", body: text + "\n", chat: true }, { text, chat: true });
+    } });
+}
+
+// "⋯" on a post, an entry, a comment or a chat line: what you may do with it - edit and
+// withdraw your own, pin where you may, copy its address. Shown on hover (always where
+// there is no hover, on a touch screen).
+function moreMenu(m) {
+  if (!m || !m.readable) return null;
+  const here = S.data && S.data.group;
+  const pinHere = here && here.may_pin && (!m.group || m.group === here.id);
+  const items = [
+    m.may_edit ? ["Edit", () => (m.kind === "chat" ? openEditLine(m) : openEdit(m, groupOf(m.group) || here))] : null,
+    m.may_withdraw ? ["Withdraw (delete)", () => openWithdraw(m)] : null,
+    pinHere ? [m.pinned ? "Unpin" : "Pin", () => openPin(m)] : null,
+    m.address && !m.private ? ["Copy address", () => copy(m.address, "The address is copied.")] : null,
+  ].filter(Boolean);
+  if (!items.length) return null;
+  const open = S.menuFor === m.id;
+  return h("div", { class: "more" + (open ? " open" : "") },
+    h("button", { class: "morebtn", type: "button", "aria-label": "More", "aria-haspopup": "menu", "aria-expanded": String(open),
+      onclick: (e) => { e.stopPropagation(); S.menuFor = open ? null : m.id; render(); } }, "⋯"),
+    open ? h("div", { class: "menu", role: "menu" }, items.map(([label, run]) => h("button", { class: "mi", type: "button", role: "menuitem",
+      onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))) : null);
+}
+
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
   const dialog = { focus: "#body", node: null, files: [] };
   // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
@@ -2485,6 +2525,7 @@ function chatView(d) {
     const isPost = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
     grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : "") + (m.pinned ? " pinned" : ""), "data-id": m.id,
       title: when(m.date) + (m.encrypted ? " · encrypted" : "") + (m.pinned ? " · pinned" : "") },
+      moreMenu(m),
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN + " " }) : null,
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
@@ -3078,13 +3119,14 @@ async function removeMember(g, m) {
 
 // Withdraw a post (D): yours, or any in a group you own or moderate (UN-RFC 0004, 7).
 function openWithdraw(m) {
-  const g = S.data && S.data.group;
-  if (!g || !m || !m.may_withdraw) return;
-  formDialog({ label: "Withdraw post", title: "Withdraw “" + subjectOf(m) + "”", focus: ".dialog .btn.primary", button: "Withdraw",
+  const gid = m && (m.group || (S.data && S.data.group && S.data.group.id));
+  if (!gid || !m || !m.may_withdraw) return;
+  const what = m.kind === "chat" ? (m.depth ? "comment" : "chat line") : "post";
+  formDialog({ label: "Withdraw " + what, title: "Withdraw “" + subjectOf(m) + "”", focus: ".dialog .btn.primary", button: "Withdraw",
     note: "Every node is asked to delete it. People who read it already keep their copy, and nodes or programs that ignore withdrawals can keep it.",
-    fields: () => [h("p", { style: "margin:0", text: m.mine ? "Your post." : "A post by " + m.who + "." })],
+    fields: () => [h("p", { style: "margin:0", text: m.mine ? `Your ${what}.` : `A ${what} by ${m.who}.` })],
     submit: async () => {
-      await api("POST", `/api/groups/${encodeURIComponent(g.id)}/withdraw`, { id: m.id });
+      await api("POST", `/api/groups/${encodeURIComponent(gid)}/withdraw`, { id: m.id });
       closeDialog(); S.post = null; await loadGroup(); render(); toast("Withdrawn.");
     } });
 }
@@ -3679,7 +3721,8 @@ function commands() {
     { name: "Banned from this group", key: "", when: g && g.owner, run: () => openBanned() },
     { name: "Remove this group from the network", key: "", when: g && g.owner, run: openRemoveGroup },
     { name: "Unsubscribe from this group", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type), run: () => leaveGroup(g) },
-    { name: "Withdraw the selected post", key: "D", when: selectedPost() && selectedPost().may_withdraw, run: () => openWithdraw(selectedPost()) },
+    { name: "Withdraw (delete) the selected post", key: "D", also: "delete remove slet fjern tilbagetræk",
+      when: selectedPost() && selectedPost().may_withdraw, run: () => openWithdraw(selectedPost()) },
     { name: "Pin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && !selectedPost().pinned, run: () => openPin(selectedPost()) },
     { name: "Unpin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && selectedPost().pinned, run: () => openPin(selectedPost()) },
     { name: "Pinned posts in this group", key: "", when: pinsOf(S.data).length > 0, run: () => openPinList() },
@@ -3731,6 +3774,7 @@ function commands() {
 function openPalette() {
   let q = "", sel = 0;
   const shown = () => commands().filter(c => !q || c.name.toLowerCase().includes(q) ||
+    (c.also && c.also.includes(q)) ||
     (c.group && (c.group.title || "").toLowerCase().includes(q)));
   const run = (c) => { S.dialog = null; render(); c.run(); };
   S.dialog = { focus: "#palette", render: () => {
@@ -3989,7 +4033,9 @@ window.addEventListener("keydown", (e) => {
 }, true);
 
 // ---- keys -----------------------------------------------------------------
+document.addEventListener("click", () => { if (S.menuFor) { S.menuFor = null; render(); } });
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && S.menuFor) { S.menuFor = null; render(); e.preventDefault(); return; }
   if (e.key === "F1" && TOKEN && S.state) { e.preventDefault(); if (!S.dialog) openAbout(); return; }   // as the TUI
   if (!S.state || !S.state.unlocked || S.state.setup) return;
   const ctrl = e.ctrlKey || e.metaKey;
