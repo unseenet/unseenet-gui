@@ -109,6 +109,14 @@ browser, strict CSP) could become a UN-RFC. Then other front ends - a native
 app, an Android client, a screen reader client - could talk to the same local
 runtime without reimplementing Tor, the vault or postage.
 
+## 10. Write permission, the passphrase and profiles in the local API
+
+**Status:** done. The core's local API has them (unseenet#320): `write` on a
+group's head and `reply` on each of its rows, `POST /api/passphrase`, and
+`GET`/`POST /api/profile` and `POST /api/profile/hide`, with the warning before
+a first profile. This client's copies under `/x/gui/` are gone (#59); this needs
+unseenet 0.5.
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

@@ -20,6 +20,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   the order of suggestions are the core's (`GET /api/emoji`, unseenet#362), so
   this needs unseenet 0.5; with an older core the button stays away (#21).
 
+### Changed
+
+- Write permission, changing the passphrase and profiles come from the core's
+  local API (unseenet#320) instead of this client's own copies under `/x/gui/`,
+  so every front end says the same. This needs unseenet 0.5 (#59).
+
 ## [0.1.2] - 2026-10-23
 
 Fixes, from the new `release/0.1` branch; the builds are made with unseenet

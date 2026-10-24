@@ -532,18 +532,25 @@ async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
   try {
-    const [data, write] = await Promise.all([
-      api("GET", "/api/groups/" + encodeURIComponent(gid)),
-      api("GET", "/x/gui/write/" + encodeURIComponent(gid)).catch(() => ({}))]);
-    if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: write || {} };
+    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid));
+    if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: writeOf(data) };
   } catch (err) { S.status = err.message; }
 }
 
 // ---- may you write here? (#13) -------------------------------------------------
 // Said before you write, as the terminal client does: the core's write_permission
 // (the kinds a group takes, bans, blocks, posters, closed-group members, comments in
-// channels and when they close), from /x/gui/write. Buttons you may not use are
+// channels and when they close). Buttons you may not use are
 // shown greyed out with the reason, rather than hidden, so people learn why.
+// The core says it with the group (unseenet#320): ``write`` on its head, ``reply``
+// on each row; contacts, For you and your inbox have neither.
+function writeOf(data) {
+  const w = data.group && data.group.write;
+  if (!w) return {};
+  const replies = {};
+  for (const r of data.rows) if (r.reply && r.message && r.message.id) replies[r.message.id] = r.reply;
+  return { post: w.post, chat: w.chat, replies };
+}
 const NOT_HERE = "Only chosen people can write here.";
 function mayWrite(d, what) {                      // what: "post" or "chat"
   const p = d && d.write && d.write[what];
@@ -2225,7 +2232,7 @@ function openPassphrase() {
       if ((v.pw || "").length < 4) throw new Error("The new passphrase is too short.");
       if (v.pw === v.old) throw new Error("The new passphrase is the same as the current one.");
       toast("Encrypting the vault with the new passphrase …");
-      await api("POST", "/x/gui/passphrase", { old: v.old || "", new: v.pw });
+      await api("POST", "/api/passphrase", { old: v.old || "", new: v.pw });
       closeDialog();
       toast("Passphrase changed. Copies of the vault elsewhere still open with the old one - replace or delete them.");
     } });
@@ -2259,13 +2266,13 @@ async function openProfile(key, who = "") {
     h("div", { class: "df btns" },
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
-        try { await api("POST", "/x/gui/profile/hide", { key, hidden: !p.hidden }); }
+        try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
         catch (x) { toast(x.message); return; }
         toast(p.hidden ? "Profile shown." : "Profile hidden."); openProfile(key, who); } }, p.hidden ? "Show" : "Hide") : null,
       h("button", { class: "btn primary", onclick: closeDialog }, "Close")));
   S.dialog = { focus: ".dialog .btn.primary", render: draw };
   render();
-  try { p = await api("GET", "/x/gui/profile?key=" + encodeURIComponent(key)); }
+  try { p = await api("GET", "/api/profile?key=" + encodeURIComponent(key)); }
   catch (x) { err = x.message; }
   if (S.dialog && S.dialog.render === draw) render();
 }
@@ -2298,7 +2305,7 @@ function parseLinks(text) {
 
 async function openMyProfile() {
   let p;
-  try { p = await api("GET", "/x/gui/profile"); } catch (x) { toast(x.message); return; }
+  try { p = await api("GET", "/api/profile"); } catch (x) { toast(x.message); return; }
   if (!p.published) {               // the warning before the first, as in the TUI
     confirmDialog({ title: "Before you publish a profile", text: p.warning, button: "I understand", ok: () => editProfile(p) });
     return;
@@ -2310,7 +2317,7 @@ function editProfile(p) {
   const cur = p.profile || {};
   const md = cur.about ? /markdown/i.test(cur.about_type || "") : !(S.sidebar && S.sidebar.markdown === false);
   const publish = async (body) => {
-    await api("POST", "/x/gui/profile", body);
+    await api("POST", "/api/profile", body.remove ? null : { edit: body });
     closeDialog(); toast(body.remove ? "Your profile is removed." : "Your profile is published.");
   };
   formDialog({ label: "Your profile", title: "Your public profile - anybody can read it", focus: "#pabout", button: "Publish",
