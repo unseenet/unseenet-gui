@@ -161,6 +161,16 @@ has `feed` and `following` (UN-RFC 0046 section 4.14, unseenet#468). This
 client shows and writes them (#60). The terminal client gets them in its
 own PR (unseenet#470).
 
+## 16. Sites and pages
+
+**Status:** done. `GET /api/groups/{id}/site` (the pages in force, home page
+first, whether you write the site), `GET /api/groups/{id}/page?path=` (a page
+whose links within the site come resolved to `unseenet:` addresses),
+`POST /api/groups/{id}/page` (write, preview, restore the previous version,
+remove - as a job) and `GET/POST /api/site` (UN-RFC 0046 section 4.15,
+unseenet#480). This client shows and writes them (#61). The terminal
+client shows a site as its pages since unseenet#473.
+
 ## 9. Starting Tor without a console window on Windows
 
 **Today:** `TorProcess.start()` uses `asyncio.create_subprocess_exec` without

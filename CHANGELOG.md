@@ -65,6 +65,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   Whom you follow, and Your feed to start your own after the warning, all in
   the commands. V switches a feed between feed, threads and chat. The feeds
   and the timeline are the core's (unseenet#468).
+- Sites and pages (#61, UN-RFC 0035): a site is shown as its home page with a
+  list of its pages, the home page first; links to other pages of the site and
+  to other sites open them, with Back and Forward. The site's writers edit a
+  page, or write a new one, in Markdown with a preview rendered by the core as
+  readers will see it, pictures as on posts, and can go back to the previous
+  version or remove a page. Your site starts from the commands, after the
+  warning. V switches a site between its pages and threads. An `unseenet:`
+  link no longer shows its address beside its text; a web link still does.
+  The pages are the core's (unseenet#480).
 
 ### Changed
 
