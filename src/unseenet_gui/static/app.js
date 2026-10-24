@@ -977,13 +977,21 @@ function siteView(d) {
           onclick: () => pageAction(g, page, "restore") }, "Previous version") : null,
         page && site.may_write && !page.home ? h("button", { class: "btn", onclick: () => pageAction(g, page, "remove") }, "Remove") : null),
       h("div", { class: "scroll", "data-scroll": "page:" + g.id + ":" + (site.path || "") },
-        page ? [h("h2", { text: page.title }),
-          h("p", { class: "hint", text: [row.who, when(row.date), page.previous ? "edited" : ""].filter(Boolean).join(" · ") }),
-          h("div", { class: "pbody" }, messageBody(row))] :
+        page ? [
+          // a page that begins with its own heading is not given a second one (its title
+          // is in the list and the bar above); who wrote it and when goes below the page
+          pageOwnTitle(row) ? null : h("h2", { text: page.title }),
+          h("div", { class: "pbody" + (pageOwnTitle(row) ? " titled" : "") }, messageBody(row)),
+          h("p", { class: "hint pmeta", text: [row.who, when(row.date), page.previous ? "edited" : ""].filter(Boolean).join(" · ") })] :
           h("div", { class: "empty" }, h("h2", { text: site.pages.length ? "Not here" : "No pages yet" }),
             h("p", { text: site.err || "" }),
             site.may_write && !site.pages.length ? h("button", { class: "btn primary", onclick: () => openPageEditor(g, site, null, site.home) }, "Write the home page") : null),
         pendingPages(g))));
+}
+
+function pageOwnTitle(row) {
+  const first = row && row.markdown && (row.tree || [])[0];
+  return !!(first && first.t === "h" && first.n === 1);
 }
 
 function pendingPages(g) {
