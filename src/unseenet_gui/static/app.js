@@ -2614,12 +2614,14 @@ function openWithdraw(m) {
 function openReport(m) {
   const g = S.data && S.data.group;
   if (!g || !m) return;
-  let targets = null, err = "";
+  let targets = null, err = "", dialog = null;
   const chosen = new Set();
+  // the form is kept on screen (#85): it is built again when the list arrives
   api("GET", `/api/groups/${encodeURIComponent(g.id)}/report?id=${encodeURIComponent(m.id)}`)
-    .then(r => { const t = r.targets; targets = t; t.forEach(x => chosen.add(x.i)); if (S.dialog) render(); })
-    .catch(e => { err = e.message; if (S.dialog) render(); });
-  formDialog({ label: "Report post", title: "Report “" + subjectOf(m) + "”", focus: "#rnote", button: "Report",
+    .then(r => { const t = r.targets; targets = t; t.forEach(x => chosen.add(x.i)); })
+    .catch(e => { err = e.message; })
+    .then(() => { if (dialog) dialog.refresh(); });
+  dialog = formDialog({ label: "Report post", title: "Report “" + subjectOf(m) + "”", focus: "#rnote", button: "Report",
     note: "For posts that break the group's rules or the law. In an emergency, contact the police: nobody on Unseenet can see who anyone is.",
     fields: (vals) => [
       targets === null ? h("p", { class: "muted", text: err || "Finding who can act on it …" }) :
@@ -2679,24 +2681,48 @@ function openBrowse() {
   render();
 }
 
+// A form in a dialog. Built once and kept on screen while the page behind it redraws
+// (#85), as the compose window is (#47): rebuilding it on every redraw lost a resized
+// text area, the scroll and undo in a field, and text typed in between. The dialog is
+// built again only when it says so - ``refresh()`` on what this returns, for fields that
+// change (a list that arrives, a choice that shows more) - and an error is written into
+// it, not drawn anew.
 function formDialog({ label, title, focus, fields, submit, button, note, values }) {
   let err = "";
-  const vals = { ...(values || {}) };       // kept across re-renders (choices re-render the dialog)
+  const vals = { ...(values || {}) };       // what you entered, also across a refresh()
   const keep = (e) => { if (e.target.name) vals[e.target.name] = e.target.type === "checkbox" ? e.target.checked : e.target.value; };
+  const dialog = { focus };
+  const showError = (msg) => {
+    err = msg || "";
+    const el = dialog.node && dialog.node.querySelector(".error");
+    if (el) el.textContent = err;
+  };
   const go = async (e) => {
     e && e.preventDefault();
-    const f = document.querySelector(".dialog form");
+    const f = dialog.node.querySelector("form");
     f.querySelectorAll("[name]").forEach(el => keep({ target: el }));
+    showError("");
     try { await submit(vals, f); }
-    catch (x) { err = x.message; render(); }
+    catch (x) { showError(x.message); }
   };
-  S.dialog = { focus, render: () => dialogShell({ label },
+  const build = () => dialogShell({ label },
     h("div", { class: "dh" }, h("h2", {}, title), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("form", { class: "db", onsubmit: go, oninput: keep, onchange: keep }, fields(vals), note ? h("p", { class: "hint", style: "margin:0", text: note }) : null,
       h("div", { class: "error", role: "alert", text: err })),
     h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
-      h("button", { class: "btn primary", onclick: go }, button))) };
+      h("button", { class: "btn primary", onclick: go }, button)));
+  dialog.refresh = () => {
+    if (S.dialog !== dialog) return;          // closed, or another dialog came instead
+    const old = dialog.node;
+    old.querySelectorAll("form [name]").forEach(el => keep({ target: el }));
+    dialog.node = build();
+    if (old.parentNode) old.replaceWith(dialog.node);
+  };
+  dialog.node = build();
+  dialog.render = () => dialog.node;
+  S.dialog = dialog;
   render();
+  return dialog;
 }
 
 function openAddContact(key, name) {
