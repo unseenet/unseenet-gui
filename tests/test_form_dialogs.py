@@ -18,14 +18,35 @@ class FormAPI(LocalAPI):
     def __init__(self):
         super().__init__()
         self.contacts = []
+        self.profile_posts = []          # (path, body) in the order they came
 
     async def handle(self, request):
-        if request.path == "/api/settings" and request.method == "GET":
+        path = request.path
+        if path == "/api/settings" and request.method == "GET":
             return web.json_response({"signature": "-- \n{name}"})
-        if request.path == "/api/contacts" and request.method == "POST":
+        if path == "/api/contacts" and request.method == "POST":
             self.contacts.append(await request.json())
             return web.json_response({"error": "that is not a key"}, status=400)
+        if path == "/api/profile" and request.method == "GET":
+            return web.json_response({
+                "key": "ed25519:me", "published": True, "picture": None,
+                "picture_warning": "A picture can make you easier to find.",
+                "profile": {"about": "Hello", "about_type": "text/markdown", "lang": ["da"], "links": []},
+                "link_kinds": ["web", "github"]})
+        if path == "/api/profile" and request.method == "POST":
+            self.profile_posts.append((path, await request.json()))
+            return web.json_response({})
+        if path == "/api/profile/picture":
+            body = await request.json()
+            if body.get("preview"):
+                return web.json_response({"picture": {"data": PIXEL, "alt": body.get("alt", "")}})
+            self.profile_posts.append((path, body))
+            return web.json_response({})
         return await super().handle(request)
+
+
+PIXEL = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4"
+         "nGNgYPj/HwADAgH/Pk9b2QAAAABJRU5ErkJggg==")
 
 
 @pytest.fixture
@@ -85,3 +106,37 @@ async def test_an_error_is_shown_in_the_same_dialog(form_page):
     await api.emit(event="status", text="Connected: after the error")
     await expect(page.locator(".statusbar")).to_contain_text("after the error")
     await expect(page.locator(".dialog .error")).to_have_text("that is not a key")
+
+
+# --- your picture in your profile (#82), and your own picture opens it (#83) -------------
+
+async def test_your_own_picture_opens_your_profile(form_page):
+    page, _api = form_page
+    await page.locator(".me").get_by_role("button", name="Your profile").first.click()
+    await expect(page.locator("#pabout")).to_have_value("Hello")
+    await page.get_by_role("button", name="Cancel").click()
+    await page.locator(".me .me-name").click()
+    await expect(page.locator("#pabout")).to_be_visible()
+
+
+async def test_a_picture_is_chosen_and_published_with_the_profile(form_page, tmp_path):
+    page, api = form_page
+    await run_command(page, "Your profile")
+    about = page.locator("#pabout")
+    await expect(about).to_have_value("Hello")
+    await about.fill("Hello, written before the picture")
+    png = tmp_path / "me.png"
+    png.write_bytes(bytes.fromhex("89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
+                                  "890000000d4944415478da6360f8ffbf1e00050201fe4f2b4d850000000049454e44ae426082"))
+    await page.locator("#picfile").set_input_files(str(png))
+    await expect(page.locator(".dialog img.av.big")).to_have_attribute("src", PIXEL)
+    await expect(page.locator(".dialog")).to_contain_text("exactly as it will be published")
+    await expect(page.locator(".dialog")).to_contain_text("easier to find")     # the first picture's warning
+    await expect(about).to_have_value("Hello, written before the picture")      # kept across refresh()
+    await page.locator("#picalt").fill("Me at the sea")
+    await page.get_by_role("button", name="Publish", exact=True).click()
+    await expect(page.locator(".toast")).to_contain_text("profile and picture are published")
+    assert [p for p, _ in api.profile_posts] == ["/api/profile", "/api/profile/picture"]
+    assert api.profile_posts[0][1]["edit"]["about"] == "Hello, written before the picture"
+    picture = api.profile_posts[1][1]
+    assert picture["alt"] == "Me at the sea" and picture["data"]

@@ -711,8 +711,11 @@ function sidebar() {
       h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
       h("button", { class: "btn", onclick: openBrowse }, "Find groups", h("kbd", { text: "G" }))) : null,
     h("div", { class: "me" },
-      h("span", { class: "av s c4", "aria-hidden": "true", text: initials(me.display) }),
-      h("div", { class: "who" }, h("div", { text: me.label || me.display || "" }),
+      // your picture and name open your profile (#83), as in most apps
+      h("button", { class: "me-open", title: "Your profile", "aria-label": "Your profile", onclick: openMyProfile },
+        avatar({ key: me.key, who: me.display, colour: 4 }, true)),
+      h("div", { class: "who" }, h("div", {}, h("button", { class: "me-name", title: "Your profile", onclick: openMyProfile,
+          text: me.label || me.display || "" })),
         h("div", { class: "hint" }, h("span", { class: "dot" + (S.state.connected ? " ok" : "") }), " ",
           S.state.connected ? (S.state.web ? "Entrance and Tor · " : "Tor · ") + shortNode(S.state.node) : "Not connected"),
         ripeLine()),
@@ -2944,7 +2947,6 @@ async function openProfile(key, who = "") {
         p.following ? "Unfollow" : "Follow") : null,
       p && p.address ? h("button", { class: "btn", title: "An unseenet: address for this person (UN-RFC 0031)",
         onclick: () => copy(p.address, "The address is copied.") }, "Copy address") : null,
-      p && p.mine ? h("button", { class: "btn", onclick: () => openMyPicture() }, "Picture") : null,
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
         try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
@@ -2963,58 +2965,6 @@ function bigAvatar(key) {
   if (p && p.picture) return h("img", { class: "av big pic", src: p.picture.data, alt: p.picture.alt || "", title: p.picture.alt || "" });
   if (p && p.identicon) return identiconEl(p.identicon, "av big");
   return null;
-}
-
-// Your picture (UN-RFC 0022 section 8.5): shown exactly as it will be published before
-// it is, with the warning before the first; a drawing or no picture keeps you harder to find.
-async function openMyPicture() {
-  let p;
-  try { p = await api("GET", "/api/profile"); } catch (x) { toast(x.message); return; }
-  const st = { preview: null, file: null, alt: (p.picture && p.picture.alt) || "", err: "", busy: false };
-  const me = p.key;
-  const choose = async (e) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    st.err = ""; st.busy = true; render();
-    try {
-      st.file = await new Promise((ok, bad) => { const r = new FileReader();
-        r.onload = () => ok(String(r.result).split(",", 2)[1] || ""); r.onerror = bad; r.readAsDataURL(file); });
-      st.preview = (await api("POST", "/api/profile/picture", { data: st.file, alt: st.alt, preview: true })).picture;
-    } catch (x) { st.err = x.message; }
-    st.busy = false; render();
-  };
-  const publish = async () => {
-    try {
-      const r = await api("POST", "/api/profile/picture", { data: st.file, alt: st.alt });
-      PEOPLE.delete(me); closeDialog(); toast("Your picture is published."); render();
-      return r;
-    } catch (x) { st.err = x.message; render(); }
-  };
-  const remove = () => confirmDialog({ title: "Remove your picture?", danger: true, button: "Remove",
-    text: "Nodes stop showing it, and your identicon is shown instead. Copies others already kept cannot be taken back.",
-    ok: async () => { try { await api("POST", "/api/profile/picture", { remove: true }); PEOPLE.delete(me); closeDialog(); toast("Your picture is removed."); }
-      catch (x) { toast(x.message); } } });
-  const shown = st => st.preview || p.picture;
-  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Your picture" },
-    h("div", { class: "dh" }, h("h2", { text: "Your picture - anybody can see it" }),
-      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-    h("div", { class: "db" },
-      h("div", { class: "prof-head" },
-        shown(st) ? h("img", { class: "av big pic", src: shown(st).data, alt: st.alt || "" }) : bigAvatar(me),
-        h("p", { class: "hint", style: "margin:0", text: st.preview ? "This is exactly what will be published: a square, at most 128 pixels, without where or when it was taken." :
-          p.picture ? "Your published picture." : "You have no picture: your identicon is shown, made from your key." })),
-      h("label", { for: "picfile", class: "btn" }, st.busy ? "Making it …" : "Choose a picture"),
-      h("input", { id: "picfile", type: "file", accept: "image/*", class: "sr", onchange: choose }),
-      h("label", { for: "picalt", text: "A short description, for people who cannot see it" }),
-      h("input", { id: "picalt", class: "in", maxlength: 128, value: st.alt, oninput: (e) => { st.alt = e.target.value; } }),
-      !p.picture ? h("p", { class: "hint warn-line", style: "margin:0;white-space:pre-line", text: p.picture_warning || "" }) : null,
-      st.err ? h("p", { class: "error", text: st.err }) : null),
-    h("div", { class: "df btns" },
-      p.picture ? h("button", { class: "btn", onclick: remove }, "Remove") : null,
-      h("span", { class: "grow" }),
-      h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
-      h("button", { class: "btn primary", disabled: !st.preview || st.busy, onclick: publish }, "Publish"))) };
-  render();
 }
 
 function confirmDialog({ title, text, button, danger, ok }) {
@@ -3056,14 +3006,56 @@ async function openMyProfile() {
 function editProfile(p) {
   const cur = p.profile || {};
   const md = cur.about ? /markdown/i.test(cur.about_type || "") : !(S.sidebar && S.sidebar.markdown === false);
+  // Your picture is set here too (#82, UN-RFC 0022 section 8.5): shown exactly as it will
+  // be published before it is, with the warning before the first.
+  const pic = { file: null, preview: null, alt: (p.picture && p.picture.alt) || "", remove: false, err: "", busy: false };
+  let dialog = null;
+  const choose = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    Object.assign(pic, { err: "", busy: true, remove: false }); dialog.refresh();
+    try {
+      pic.file = await new Promise((ok, bad) => { const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(",", 2)[1] || ""); r.onerror = bad; r.readAsDataURL(file); });
+      pic.preview = (await api("POST", "/api/profile/picture", { data: pic.file, alt: pic.alt, preview: true })).picture;
+    } catch (x) { pic.err = x.message; pic.file = pic.preview = null; }
+    pic.busy = false; dialog.refresh();
+  };
+  const shown = () => pic.remove ? null : (pic.preview || p.picture);
+  const picturePart = () => [
+    h("div", { class: "prof-head" },
+      shown() ? h("img", { class: "av big pic", src: shown().data, alt: pic.alt || "" }) : bigAvatar(p.key),
+      h("div", { class: "pic-side" },
+        h("p", { class: "hint", style: "margin:0", text: pic.preview ? "Your new picture, exactly as it will be published: a square, at most 128 pixels, without where or when it was taken." :
+          pic.remove ? "Your picture will be removed: your identicon is shown instead." :
+          p.picture ? "Your picture - anybody can see it." : "No picture: your identicon is shown, made from your key." }),
+        h("div", { class: "pic-btns" },
+          h("label", { for: "picfile", class: "btn" }, pic.busy ? "Making it …" : p.picture || pic.preview ? "Choose another" : "Choose a picture"),
+          h("input", { id: "picfile", type: "file", accept: "image/*", class: "sr", onchange: choose }),
+          (p.picture || pic.preview) && !pic.remove ? h("button", { type: "button", class: "link", onclick: () => {
+            Object.assign(pic, { file: null, preview: null, remove: !!p.picture }); dialog.refresh(); } }, "Remove picture") : null))),
+    shown() || pic.file ? [h("label", { for: "picalt", text: "Picture description, for people who cannot see it" }),
+      h("input", { id: "picalt", class: "in", maxlength: 128, "data-k": "picalt", value: pic.alt, oninput: (e) => { pic.alt = e.target.value; } })] : null,
+    !p.picture && pic.preview ? h("p", { class: "hint warn-line", style: "margin:0;white-space:pre-line", text: p.picture_warning || "" }) : null,
+    pic.err ? h("p", { class: "error", text: pic.err }) : null];
+  const publishPicture = async () => {
+    if (pic.file) await api("POST", "/api/profile/picture", { data: pic.file, alt: pic.alt });
+    else if (pic.remove) await api("POST", "/api/profile/picture", { remove: true });
+    else return false;
+    PEOPLE.delete(p.key);
+    return true;
+  };
   const publish = async (body) => {
     await api("POST", "/api/profile", body.remove ? null : { edit: body });
-    closeDialog(); toast(body.remove ? "Your profile is removed." : "Your profile is published.");
+    const picture = body.remove ? false : await publishPicture();
+    closeDialog(); render();
+    toast(body.remove ? "Your profile is removed." : picture ? "Your profile and picture are published." : "Your profile is published.");
   };
-  formDialog({ label: "Your profile", title: "Your public profile - anybody can read it", focus: "#pabout", button: "Publish",
+  dialog = formDialog({ label: "Your profile", title: "Your public profile - anybody can read it", focus: "#pabout", button: "Publish",
     values: { about: cur.about || "", markdown: md, lang: (cur.lang || []).join(", "), links: linksText(cur.links) },
     note: "Kinds of links: " + (p.link_kinds || []).join(", ") + ", or x-something. Links are shown as written; nobody checks them.",
     fields: (vals) => [
+      ...picturePart(),
       h("label", { for: "pabout", text: "About you - a few lines, or a small home page" }),
       h("textarea", { id: "pabout", name: "about", class: "in", "data-k": "pabout", value: vals.about, style: "min-height:120px" }),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
@@ -3120,7 +3112,7 @@ function commands() {
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     { name: S.sidebar && S.sidebar.hide_bots ? "Show bots" : "Hide bots: posts by keys that say they post automatically", key: "", run: toggleBots },
     { name: S.sidebar && S.sidebar.pictures === false ? "Show people's pictures" : "Identicons only: do not show people's pictures", key: "", run: togglePictures },
-    { name: "Your picture", key: "", run: openMyPicture },
+    { name: "Your picture: in your profile", key: "", run: openMyProfile },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
     { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
     { name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },

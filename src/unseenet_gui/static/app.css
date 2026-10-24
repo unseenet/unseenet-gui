@@ -161,6 +161,12 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .me .who { flex: 1; min-width: 0; }
 .me .who div:first-child { font-family: var(--mono); font-size: 13px; font-weight: 700;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-open, .me-name { border: none; background: none; padding: 0; color: inherit; font: inherit;
+  cursor: pointer; border-radius: 99px; }
+.me-open { display: flex; flex: none; }
+.me-name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 4px; }
+.me-name:hover, .me-name:focus-visible { text-decoration: underline; }
+.me-open:hover .av { box-shadow: 0 0 0 2px var(--green); }
 .dot { display: inline-block; width: 7px; height: 7px; border-radius: 99px; background: var(--muted); }
 .dot.ok { background: var(--green); }
 .main { flex: 1 1 auto; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
@@ -197,6 +203,8 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 .av.big { width: 96px; height: 96px; border-radius: 12px; }
 .prof-head { display: flex; gap: 14px; align-items: center; }
 .prof-head .keybox { flex: 1; min-width: 0; }
+.prof-head .pic-side { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.pic-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .c0 { background: #7cc4f0; } .c1 { background: #f5c26b; } .c2 { background: #c7b3f5; }
 .c3 { background: #f0a3c4; } .c4 { background: #34d399; } .c5 { background: #9cc3b6; }
 

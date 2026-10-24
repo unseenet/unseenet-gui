@@ -68,6 +68,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ### Changed
 
+- Your picture is set in Your profile (#82): choose, preview exactly as it will be
+  published, describe or remove it in the same dialog, published with Publish; the
+  separate Your picture dialog is gone (its palette entry opens your profile).
+- Your own picture at the bottom of the sidebar, instead of your initials, and it
+  and your name open Your profile (#83).
 - Write permission, changing the passphrase and profiles come from the core's
   local API (unseenet#320) instead of this client's own copies under `/x/gui/`,
   so every front end says the same. This needs unseenet 0.5 (#59).
