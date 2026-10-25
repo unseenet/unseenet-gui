@@ -180,7 +180,17 @@ const ICON = {
   x: "M18 6L6 18M6 6l12 12",
   people: "M16 20v-2a4 4 0 0 0-8 0v2M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8z",
   smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 14s1.5 2 4 2 4-2 4-2M9 9.5h.01M15 9.5h.01",
+  bubble: "M21 11.5a8.4 8.4 0 0 1-12.2 7.5L3 21l2-5.4A8.4 8.4 0 1 1 21 11.5z",
+  mail: "M3 6h18v12H3zM3 7l9 6 9-6",
 };
+
+// A small icon button with a tooltip (#120): Comment, Answer, Reply with a post. The
+// label is also its aria-label, so screen readers and the keyboard lose nothing.
+function iconAction(icon, label, onclick, extra = {}, count = null) {
+  return h("button", { type: "button", class: "iconlink" + (extra.cls ? " " + extra.cls : ""),
+    "aria-label": count ? `${label} (${count})` : label, title: label, onclick },
+    svg(icon, 16, 2), count ? h("span", { text: String(count) }) : null);
+}
 
 async function api(method, path, body) {
   const res = await fetch(path, {
@@ -1342,14 +1352,14 @@ function entryCard(d, e) {
     m.kind !== "chat" ? h("h3", { class: "etitle", text: subjectOf(m) }) : null,
     h("div", { class: "ebody" }, m.kind === "chat" && m.readable ? [m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false)] : messageBody(m)),
     reactionBar(m),
+    // Comment (with the count) and Reply with a post as icons with tooltips; Pin and Copy
+    // address are in the ⋯ menu (#120)
     h("div", { class: "eact" },
-      cp.allowed ? h("button", { class: "link", onclick: () => focusLater(`[data-k="c:${m.id}"]`) }, "Comment") : null,
+      cp.allowed ? iconAction(ICON.bubble, "Comment", () => focusLater(`[data-k="c:${m.id}"]`), {}, e.comments.length || null) :
+        e.comments.length ? h("span", { class: "hint ccount", "aria-label": `${e.comments.length} comments` },
+          svg(ICON.bubble, 16, 2), String(e.comments.length)) : null,
       m.replyPerm && m.replyPerm.allowed && (own.kinds || ["post"]).includes("post") ?
-        h("button", { class: "link", onclick: () => openReply(m, own) }, "Reply with a post") : null,
-      m.address ? h("button", { class: "link", onclick: () => copy(m.address, "The entry's address is copied.") }, "Copy address") : null,
-      g.may_pin && m.readable ? h("button", { class: "link", onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
-      h("span", { class: "grow" }),
-      e.comments.length ? h("span", { class: "hint", text: `${e.comments.length} comment${e.comments.length === 1 ? "" : "s"}` }) : null),
+        iconAction(ICON.mail, "Reply with a post", () => openReply(m, own)) : null),
     h("div", { class: "comments" },
       hidden > 0 ? h("button", { class: "link more", onclick: () => { S.feedOpen[m.id] = true; render(); } },
         `Show all ${e.comments.length} comments`) :
@@ -1383,9 +1393,11 @@ function commentEl(c, entry, byId) {
         moreMenu(c)),
       h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
         [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
-      reactionBar(c),
-      entry.comment && entry.comment.allowed ? h("button", { class: "link", onclick: () => {
-        S.answering = S.answering || {}; S.answering[entry.id] = c.id; render(); focusLater(`[data-k="c:${entry.id}"]`); } }, "Answer") : null));
+      // the reactions given stay; adding one and Answer show on hover or focus (#120)
+      h("div", { class: "crow" }, reactionBar(c),
+        entry.comment && entry.comment.allowed ? iconAction(ICON.bubble, "Answer", () => {
+          S.answering = S.answering || {}; S.answering[entry.id] = c.id; render(); focusLater(`[data-k="c:${entry.id}"]`); },
+          { cls: "cans" }) : null)));
 }
 
 // --- reactions (UN-RFC 0048, unseenet-gui#107) -----------------------------------
@@ -1393,7 +1405,9 @@ function commentEl(c, entry, byId) {
 // click gives that one (or takes yours back), right-click says who, and + offers the
 // group's set. Never shown as comments, never used to order anything (section 7.2).
 function reactionBar(m) {
-  const may = !!(m.react && m.react.allowed);
+  // never on your own post, comment or chat line (#119, unseenet#524): the core says so
+  // in react, and m.mine keeps it so against an older core
+  const may = !!(m.react && m.react.allowed) && !m.mine;
   const list = m.reactions || [];
   if (!m.readable || (!list.length && !may)) return null;
   return h("div", { class: "reacts", role: "group", "aria-label": "Reactions" },
@@ -2636,9 +2650,9 @@ function chatView(d) {
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },
           commenting(d) ? "Comment with a quote" : "Reply with a quote")) : null,
-      (g.may_pin && m.readable) || (m.address && !m.private) ? h("div", { class: "lact pinact" },
-        g.may_pin && m.readable ? h("button", { class: "link", onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
-        m.address && !m.private ? h("button", { class: "link", onclick: () => copy(m.address, "The line's address is copied.") }, "Copy address") : null) : null));
+      // Copy address is in the ⋯ menu (#120)
+      g.may_pin && m.readable ? h("div", { class: "lact pinact" },
+        h("button", { class: "link", onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin")) : null));
     if (m.mine) grp.lastMine = m;
   }
   flush();
@@ -3506,16 +3520,56 @@ function recipient(typed) {
 }
 
 // The address book (C), as the TUI's c: chat, write a post, rename, remove.
+// Type to find someone (#118, unseenet#523): any part of the name you gave them, their
+// key or a name they hold (sonia@lorensen). Up/Down choose, Enter chats, Esc clears the
+// filter first and closes on the second press.
+function contactMatches(c, q) {
+  if (!q) return true;
+  const words = [c.label, c.key, (c.key || "").replace(/^ed25519:/, ""), ...(c.names || [])];
+  return words.some(w => (w || "").toLowerCase().includes(q));
+}
+
 function openContacts() {
   let removing = null;                         // Remove asks once more, on the button itself
-  S.dialog = { focus: ".dialog .btn.primary", render: () => {
-    const list = contactList();
+  let query = "", at = 0;
+  const shownList = () => {
+    const q = query.trim().toLowerCase();
+    return contactList().filter(c => contactMatches(c, q))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  };
+  const looksLikeKey = (t) => /^ed25519:[a-z2-7]{20,}$/i.test(t.trim());
+  S.dialog = { focus: "#cfind", render: () => {
+    const all = contactList(), list = shownList();
+    if (at >= list.length) at = Math.max(0, list.length - 1);
+    const count = !all.length ? "" : list.length === all.length ? `${all.length} contacts` :
+      `${list.length} of ${all.length} contacts`;
     return dialogShell({ label: "Contacts", wide: true },
       h("div", { class: "dh" }, h("h2", { text: "Contacts" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-      h("div", { class: "db list" },
-        list.length ? list.map(c => h("div", { class: "cmd" },
+      all.length ? h("div", { class: "side-filter cfind" }, svg(ICON.search, 16),
+        h("label", { for: "cfind", class: "sr", text: "Find a contact" }),
+        h("input", { id: "cfind", type: "search", "data-k": "cfind", autocomplete: "off", value: query,
+          placeholder: "Find: a name, a key or sonia@lorensen",
+          "aria-controls": "clist", "aria-activedescendant": list.length ? "c-" + at : null,
+          oninput: (e) => { query = e.target.value; at = 0; removing = null; render(); },
+          onkeydown: (e) => {
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault();
+              at = Math.max(0, Math.min(list.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)));
+              render();
+              const row = document.getElementById("c-" + at);
+              if (row) row.scrollIntoView({ block: "nearest" });
+            } else if (e.key === "Enter" && list[at]) {
+              e.preventDefault(); closeDialog(); openGroup(list[at].id);
+            } else if (e.key === "Escape" && query) {
+              e.preventDefault(); e.stopPropagation(); query = ""; at = 0; render();
+            }
+          } })) : null,
+      h("div", { class: "db list", id: "clist", role: "listbox", "aria-label": "Contacts" },
+        list.length ? list.map((c, i) => h("div", { class: "cmd" + (i === at ? " on" : ""), id: "c-" + i,
+            role: "option", "aria-selected": String(i === at), onmouseenter: () => { if (at !== i) { at = i; render(); } } },
           h("span", { class: `av xs c${c.colour}`, "aria-hidden": "true", text: initials(c.label) }),
-          h("span", { class: "nm", text: c.label }),
+          h("span", { class: "nm" }, h("span", { text: c.label }),
+            c.names && c.names.length ? h("span", { class: "hint", text: " " + c.names.join(", ") }) : null),
           h("button", { class: "btn primary", onclick: () => { closeDialog(); openGroup(c.id); } }, "Chat"),
           h("button", { class: "btn", onclick: () => { closeDialog(); openPost(c.key, c.label); } }, "Write a post"),
           h("button", { class: "btn", onclick: () => openAddContact(c.key, c.label) }, "Rename"),
@@ -3527,8 +3581,13 @@ function openContacts() {
               await api("POST", "/api/contacts", { key: c.key, remove: true });
               toast(c.label + " is no longer a contact."); await loadSidebar(); } },
             removing === c.key ? "Really remove?" : "Remove"))) :
+        all.length ? h("div", { style: "padding:12px" },
+          h("p", { class: "muted", style: "margin:0 0 8px", text: "No contacts match." }),
+          looksLikeKey(query) ? h("div", { class: "row" },
+            h("button", { class: "btn primary", onclick: () => { closeDialog(); openGroup("contact:" + query.trim()); } }, "Chat with this key"),
+            h("button", { class: "btn", onclick: () => openAddContact(query.trim(), "") }, "Add as contact")) : null) :
         h("p", { class: "muted", style: "padding:12px", text: "No contacts yet. Open a post and choose Add contact to give its author a name of your own." })),
-      h("div", { class: "df" }, h("span", { text: list.length + " contacts" }), h("span", { text: "Esc close" })));
+      h("div", { class: "df" }, h("span", { text: count }), h("span", { text: all.length ? "↑↓ choose · Enter chat · Esc " + (query ? "clear" : "close") : "Esc close" })));
   } };
   render();
 }
