@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Development builds** are made each night when this repo's `main` or the
+  core's `main` changed, by hand, and on release tags - no longer after every
+  merge (#128).
+
 ## [0.2.0] - 2026-10-25
 
 **For unseenet 0.5** (`unseenet[api]>=0.5,<0.6`): update the nodes first. Feeds and a Timeline, **My feed** and **My site**, sites and pages, pictures and files (also in chats and private posts), profile pictures, pins, reactions, tables, private profiles, `unseenet:` and web addresses, and *Your nodes* to change node while the client is open.
