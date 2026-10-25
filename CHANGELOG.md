@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The portable and bootable builds are made in unseenet-portable and
+  unseenet-bootable** (#129), nightly, by hand and for releases; this
+  repository no longer builds them.
+
 - The bootable image's *text only* takes the terminal client from
   [unseenet-tui](https://github.com/unseenet/unseenet-tui), where it has moved
   (unseenet#548).

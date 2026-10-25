@@ -82,12 +82,12 @@ between them without learning anything new: the same keys, the same icons
 
 ## Download
 
-Releases have the builds attached. The newest code on `main` is built and
-self-tested each night when it or the core changed: the
-[development pre-release](https://github.com/unseenet/unseenet-gui/releases/tag/dev).
-The builds move to [unseenet-portable](https://github.com/unseenet/unseenet-portable)
+The builds are made in [unseenet-portable](https://github.com/unseenet/unseenet-portable)
 and [unseenet-bootable](https://github.com/unseenet/unseenet-bootable) (#129),
-which make the terminal and graphical builds side by side.
+next to the terminal client's, each night when the core or a client changed:
+the newest are their `dev` pre-releases
+([portable](https://github.com/unseenet/unseenet-portable/releases/tag/dev),
+[bootable](https://github.com/unseenet/unseenet-bootable/releases/tag/dev)).
 
 - **Portable** - unzip and start, from a USB stick or a folder. Tor is included,
   and everything stays in `data/` beside the programs.
@@ -224,12 +224,12 @@ release needs is said in `pyproject.toml` and at the top of its release notes.
 
 To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
 new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
-`src/unseenet_gui/__init__.py`, the core release it needs (`unseenet[api]` in
-`pyproject.toml`) and the one the builds use (`CORE_RELEASE` in
-`.github/workflows/build.yml`); commit, then
+`src/unseenet_gui/__init__.py` and the core release it needs (`unseenet[api]` in
+`pyproject.toml`); commit, then
 `git tag -a vX.Y.Z -m "unseenet-gui X.Y.Z" && git push origin vX.Y.Z`.
 `release.yml` publishes to PyPI and makes the release with the changelog
-notes, `build.yml` adds the builds. Afterwards set `__version__` on main to
+notes; the portable and bootable builds of the release are made in
+unseenet-portable and unseenet-bootable (bump `gui` in their `versions.toml`). Afterwards set `__version__` on main to
 the next `.dev0`, so development builds are named after it.
 
 ## Built on the core
@@ -258,9 +258,8 @@ tests/            the server: the core's guards, the page, /x/gui/
 tools/
   dev.sh          a playground without Tor (seed_dev.py fills it)
   record_demo.py  the demo and screenshots in this README, from the playground
-  build_portable.py, portable/   the portable builds (with unseenet's Tor tooling) - moving to unseenet-portable
-  image/          the bootable image (adapted from unseenet's) - moving to unseenet-bootable
-.github/workflows/build.yml      nightly/by hand/tags: Tor, four portable builds, USB zip, image, releases
+  build_portable.py, portable/   the portable builds - run by unseenet-portable, moving there
+  image/          the bootable image - run by unseenet-bootable, moving there
 ```
 
 The front end is plain JavaScript with no dependencies and no build step, so
