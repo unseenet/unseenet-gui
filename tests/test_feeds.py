@@ -184,6 +184,10 @@ async def test_entries_whole_with_comments_under_them(feed_page):
     await expect(page.locator(".notebar")).to_have_count(0)            # a channel: only Bob writes
 
     box = note.locator('[data-k="c:<a@x>"]')
+    await box.fill("Godt")
+    await box.press("Shift+Enter")                                     # a new line (#122)
+    await expect(box).to_have_value("Godt\n")
+    assert not api.posted
     await box.fill("Godt sagt")
     await box.press("Enter")
     await expect(note.locator(".comment.pending")).to_contain_text("Godt sagt")

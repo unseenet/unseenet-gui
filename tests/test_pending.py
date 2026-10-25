@@ -187,3 +187,19 @@ async def test_no_gap_while_the_group_reloads_after_reached(chat_page):
     api.load_gate.set()
     await expect(page.locator(".bubble.pending")).to_have_count(0)
     await expect(page.locator(".bubble", has_text="my new line")).to_have_count(1)
+
+
+async def test_shift_enter_is_a_new_line(chat_page):
+    """#122: Enter sends, Shift+Enter breaks the line, Ctrl+Enter sends too."""
+    page, api = chat_page
+    chat = page.locator("#chat")
+    await chat.press_sequentially("first")
+    await chat.press("Shift+Enter")
+    await chat.press_sequentially("second")
+    await expect(chat).to_have_value("first\nsecond")
+    assert not api.posts                                             # nothing sent yet
+    await chat.press("Enter")
+    await asyncio.wait_for(api.post_waiting.wait(), 5)
+    assert "first\nsecond" in api.posts[-1]["body"]
+    await expect(chat).to_have_value("")
+    await expect(page.locator(".chatbar .hint")).to_contain_text("Shift+Enter new line")

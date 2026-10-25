@@ -158,6 +158,22 @@ function h(tag, props, ...kids) {
   return el;
 }
 
+// The chat and comment fields (#122): Enter sends, Shift+Enter starts a new line, as in
+// most chat apps; Ctrl/Cmd+Enter sends too. A suggestion that is up takes Enter first.
+// The field grows with its text up to a few lines.
+function sendOnEnter(e, send) {
+  if (e.key !== "Enter" || e.isComposing) return;
+  if (suggest && e.target.dataset && suggest.k === e.target.dataset.k) return;
+  if (e.shiftKey && !e.ctrlKey && !e.metaKey) return;          // a new line
+  e.preventDefault(); send(); growField(e.target);
+}
+
+function growField(el) {
+  if (!el || el.tagName !== "TEXTAREA") return;
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight + 2, 160) + "px";
+}
+
 function svg(path, size = 16, width = 2) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", "0 0 24 24");
@@ -1374,9 +1390,11 @@ function entryCard(d, e) {
         target ? h("div", { class: "hint answering" }, "Answering " + target.who + " ",
           h("button", { class: "link", type: "button", "aria-label": "Answer the entry instead", onclick: () => { delete S.answering[m.id]; render(); } }, "×")) : null,
         h("label", { for: "c-" + m.id, class: "sr", text: "Comment" }),
-        h("input", { id: "c-" + m.id, type: "text", "data-k": "c:" + m.id, autocomplete: "off",
+        h("textarea", { id: "c-" + m.id, rows: 1, class: "grow-in", "data-k": "c:" + m.id, autocomplete: "off", spellcheck: "true",
           placeholder: target ? "Your answer" : "Write a comment", value: S.drafts["c:" + m.id] || "",
-          oninput: (ev) => { S.drafts["c:" + m.id] = ev.target.value; } }),
+          title: "Enter sends · Shift+Enter new line",
+          oninput: (ev) => { S.drafts["c:" + m.id] = ev.target.value; growField(ev.target); },
+          onkeydown: (ev) => sendOnEnter(ev, send) }),
         h("button", { class: "send", type: "submit", "aria-label": "Send the comment" }, svg(ICON.send, 16, 2.5))) :
       cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
 }
@@ -2707,14 +2725,16 @@ function chatView(d) {
     cp.allowed ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); } },
       h("div", { class: "row" },
         h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
-        h("input", { id: "chat", type: "text", "data-k": "chat", autocomplete: "off",
+        h("textarea", { id: "chat", rows: 1, class: "grow-in", "data-k": "chat", autocomplete: "off", spellcheck: "true",
           placeholder: "Message " + (g.access || "") + (g.access ? " " : "") + g.label, value: S.drafts["chat:" + g.id] || "",
-          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; } }),
+          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; growField(e.target); },
+          onkeydown: (e) => sendOnEnter(e, send) }),
         ...attach,
         emojiButton("chat"),
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
       chips,
-      h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Esc" }), " for shortcuts",
+      h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Shift+Enter" }), " new line · ",
+        h("kbd", { text: "Esc" }), " for shortcuts",
         g.type === "contact" ? " · sealed to them" : g.encrypted ? " · encrypted for the members" : " · signed with your key")) :
       h("div", { class: "chatbar off" }, h("div", { class: "row" },
         h("label", { for: "chat", class: "sr", text: "You cannot write here" }),
