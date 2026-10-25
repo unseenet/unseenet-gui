@@ -213,8 +213,9 @@ async def test_open_an_address_from_the_palette_and_copy_a_line(addr_page):
     page, api = addr_page
     line = page.locator(".bubble", has_text="torsdag kl. 19")
     await line.hover()
-    await line.get_by_role("button", name="Copy address").click()
-    await expect(page.locator(".toast")).to_have_text("The line's address is copied.")
+    await line.get_by_role("button", name="More").click()             # in ⋯ (#120)
+    await line.get_by_role("menuitem", name="Copy address").click()
+    await expect(page.locator(".toast")).to_have_text("The address is copied.")
     assert await page.evaluate("window.COPIED") == ["unseenet:alt.adr@abcd?m=c@x"]
 
     async def open_address(text):

@@ -26,7 +26,8 @@ class ReactAPI:
 
     def __init__(self, view, takes=True):
         self.view, self.takes = view, takes
-        self.counts = {"<a@x>": [{"emoji": "❤️", "count": 2, "mine": False}], "<b@x>": []}
+        self.counts = {"<a@x>": [{"emoji": "❤️", "count": 2, "mine": False}], "<b@x>": [],
+                       "<c@x>": [{"emoji": "👍", "count": 1, "mine": False}]}
         self.requests = []
         self.settings = []
 
@@ -40,10 +41,11 @@ class ReactAPI:
                 "reactions": {"offered": offered, "any": False,
                               "setting": "default" if self.takes else "none"}}
 
-    def row(self, mid, depth, refs, kind, text):
+    def row(self, mid, depth, refs, kind, text, mine=False):
         perm = {"allowed": self.takes, "reason": "" if self.takes else "This group takes no reactions",
                 "code": "ok" if self.takes else "no_reactions"}
-        return {"who": "Someone", "who_key": "ed25519:other", "mine": False, "may_edit": False,
+        return {"who": "Me" if mine else "Someone", "who_key": "ed25519:me" if mine else "ed25519:other",
+                "mine": mine, "may_edit": False,
                 "may_withdraw": False, "read": True, "depth": depth, "pinned": False,
                 "reactions": self.counts.get(mid, []), "react": perm,
                 "react_offered": {"offered": SET if self.takes else [], "any": False},
@@ -56,7 +58,9 @@ class ReactAPI:
     def rows(self):
         kind = "chat" if self.view == "chat" else "post"
         return [self.row("<a@x>", 0, [], kind, "Første opslag"),
-                self.row("<b@x>", 1, ["<a@x>"], "chat", "En kommentar")]
+                self.row("<b@x>", 1, ["<a@x>"], "chat", "En kommentar"),
+                # your own, with react still allowed as an older core says (#119)
+                self.row("<c@x>", 1, ["<a@x>"], "chat", "Min egen", mine=True)]
 
     async def events(self, request):
         ws = web.WebSocketResponse(protocols=["unseenet"])
@@ -183,3 +187,35 @@ async def test_settings_choose_the_set(page_api):
     await dialog.get_by_role("button", name="Save").click()
     await expect(dialog).to_have_count(0)
     assert api.settings[-1]["reactions"] == ["🎉", "❤️"]
+
+
+@pytest.mark.parametrize("page_api", [("feed", True)], indirect=True)
+async def test_no_reacting_to_your_own(page_api):
+    """#119 (unseenet#524): others' reactions on yours are shown, but there is no +."""
+    page, api = page_api
+    mine = page.locator('.comment[data-id="<c@x>"]')
+    await expect(mine.get_by_role("button", name="👍 1")).to_be_visible()
+    await expect(mine.get_by_role("button", name="👍 1")).to_be_disabled()
+    await expect(mine.get_by_role("button", name="Add a reaction")).to_have_count(0)
+
+
+@pytest.mark.parametrize("page_api", [("feed", True)], indirect=True)
+async def test_calm_feed_actions(page_api):
+    """#120: icons with tooltips; on a comment + and Answer show on hover; Copy address
+    only in ⋯."""
+    page, api = page_api
+    entry = page.locator(".entry").first
+    act = entry.locator(".eact")
+    await expect(act.get_by_role("button", name="Comment (2)")).to_have_attribute("title", "Comment")
+    await expect(act.get_by_role("button", name="Reply with a post")).to_be_visible()
+    await expect(act.get_by_role("button", name="Copy address")).to_have_count(0)
+
+    comment = page.locator('.comment[data-id="<b@x>"]')
+    add = comment.get_by_role("button", name="Add a reaction")
+    answer = comment.get_by_role("button", name="Answer")
+    await page.mouse.move(1, 1)
+    await expect(add).to_have_css("opacity", "0")
+    await expect(answer).to_have_css("opacity", "0")
+    await comment.locator(".ctext").hover()
+    await expect(add).to_have_css("opacity", "1")
+    await expect(answer).to_have_css("opacity", "1")

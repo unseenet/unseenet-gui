@@ -825,3 +825,19 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
   .item, .fold-t, .fold-chats { min-height: 40px; }
 }
 .dot.bad { background: var(--red); }
+
+/* calmer feed actions (#120): icons with tooltips; on comments, adding a reaction and
+   Answer show on hover or keyboard focus (always on a touch screen). Opacity, not
+   display, so nothing moves under the pointer. */
+.iconlink { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent;
+  color: var(--muted); padding: 4px 6px; border-radius: 6px; font: inherit; font-size: 13px; cursor: pointer; }
+.iconlink:hover, .iconlink:focus-visible { color: var(--paper); background: var(--ink-2); }
+.ccount { display: inline-flex; align-items: center; gap: 4px; padding: 4px 6px; }
+.comment .crow { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.comment .crow .reacts { margin: 4px 0 0; }
+.comment .iconlink { padding: 2px 4px; }
+.comment .react.add, .comment .cans { opacity: 0; transition: opacity .12s; }
+.comment .cb:hover .react.add, .comment .cb:focus-within .react.add,
+.comment .cb:hover .cans, .comment .cb:focus-within .cans { opacity: 1; }
+@media (hover: none) { .comment .react.add, .comment .cans { opacity: 1; } }
+.dialog .cfind { margin: 12px 16px 4px; }
