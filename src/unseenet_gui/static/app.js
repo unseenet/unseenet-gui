@@ -6,6 +6,15 @@
  */
 "use strict";
 
+// ---- an address to open ------------------------------------------------------
+// A web+unseenet: link the browser handed to us (registerProtocolHandler, below):
+// #open=<the address>. Opened once the vault is unlocked (#98, UN-RFC 0031 3.4.1).
+let OPEN_AT = (() => {
+  const m = location.hash.match(/[#&]open=([^&]+)/);
+  if (!m) return null;
+  try { return decodeURIComponent(m[1]); } catch (_) { return null; }
+})();
+
 // ---- token --------------------------------------------------------------
 // The address we are opened with carries a one-time key (#t=...). Keep it for
 // this tab only, and take it out of the address bar and history.
@@ -16,7 +25,7 @@ const TOKEN = (() => {
     if (t) sessionStorage.setItem("unseenet-token", t);
     else t = sessionStorage.getItem("unseenet-token");
   } catch (_) { /* storage may be off; the hash still works this time */ }
-  if (m) history.replaceState(null, "", location.pathname);
+  if (m || OPEN_AT) history.replaceState(null, "", location.pathname);
   return t;
 })();
 
@@ -598,6 +607,16 @@ async function afterUnlock() {
   if (S.state.setup) return;
   connectEvents();
   await Promise.all([loadSidebar(), loadTheme()]);
+  offerProtocolHandler();
+  if (OPEN_AT) { const a = OPEN_AT; OPEN_AT = null; openAddress(a); }
+}
+
+// In a browser (the web client), web+unseenet: links open here (UN-RFC 0031 section
+// 3.4.1): the browser asks the reader once. Never in the local GUI, whose port changes.
+function offerProtocolHandler() {
+  if (!(GUI && GUI.web) || !navigator.registerProtocolHandler || !window.isSecureContext) return;
+  try { navigator.registerProtocolHandler("web+unseenet", location.origin + location.pathname + "#open=%s"); }
+  catch (_) { /* the browser said no, or asked and was told no: nothing to do */ }
 }
 
 // ---- app --------------------------------------------------------------
@@ -1102,6 +1121,8 @@ function siteView(d) {
         h("span", { class: "mono muted crumb", text: (site.title || site.label || "") + "  /" + (site.path || "") }),
         h("span", { class: "grow" }),
         page ? h("button", { class: "btn", onclick: () => copy(page.address, "The page's address is copied.") }, "Copy address") : null,
+        page ? h("button", { class: "btn", title: "The same address as https://… on a web entrance",
+          onclick: () => copyWeb(page.address, "page") }, "Copy web address") : null,
         page && site.may_write ? h("button", { class: "btn", onclick: () => openPageEditor(g, site, page) }, "Edit") : null,
         page && site.may_write && page.previous ? h("button", { class: "btn", title: "Publish the version before this one again (UN-RFC 0035 section 10.4)",
           onclick: () => pageAction(g, page, "restore") }, "Previous version") : null,
@@ -2167,11 +2188,11 @@ async function openAddress(text) {
 
 function openAddressDialog() {
   formDialog({ label: "Address", title: "Open an address", focus: "#addr", button: "Open",
-    note: "An unseenet: address of a group, a post, a page or a person - copied from a post, a chat or a profile.",
+    note: "An address of a group, a post, a page or a person - unseenet:…, or its web form https://…/a/… or web+unseenet:…",
     fields: (vals) => [h("input", { id: "addr", name: "a", class: "in mono", value: vals.a || "", "data-k": "addr",
-      placeholder: "unseenet:…", autocomplete: "off", spellcheck: "false" })],
+      placeholder: "unseenet:… or https://…/a/…", autocomplete: "off", spellcheck: "false" })],
     submit: async (v) => {
-      if (!(v.a || "").trim()) throw new Error("Paste an unseenet: address.");
+      if (!(v.a || "").trim()) throw new Error("Paste an address: unseenet:… or https://…/a/….");
       closeDialog(); await openAddress(v.a);
     } });
 }
@@ -2270,6 +2291,8 @@ function readerPane(g, m, msgs) {
         onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
       m.address && !m.private ? h("button", { class: "btn", title: "An unseenet: address others can open (UN-RFC 0031)",
         onclick: () => copy(m.address, "The post's address is copied.") }, "Copy address") : null,
+      m.address && !m.private ? h("button", { class: "btn", title: "The same address as https://… on a web entrance, for the web and mail",
+        onclick: () => copyWeb(m.address, "post") }, "Copy web address") : null,
       !m.mine && !m.private && g.id !== FOR_YOU ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
@@ -2385,6 +2408,7 @@ function moreMenu(m) {
     m.may_withdraw ? ["Withdraw (delete)", () => openWithdraw(m)] : null,
     pinHere ? [m.pinned ? "Unpin" : "Pin", () => openPin(m)] : null,
     m.address && !m.private ? ["Copy address", () => copy(m.address, "The address is copied.")] : null,
+    m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
   ].filter(Boolean);
   if (!items.length) return null;
   const open = S.menuFor === m.id;
@@ -2828,6 +2852,17 @@ async function copy(text, done) {
   catch (_) { toast("Could not copy - select it and press Ctrl C."); }
 }
 
+// The same address on the web, https://<entrance>/a/... (UN-RFC 0031 section 3.4.1,
+// #98): for sharing where unseenet: links do not work - the web, chats, mail. The core
+// writes it on a known web entrance, without n= hints.
+async function copyWeb(address, what = "address") {
+  let a;
+  try { a = await api("GET", "/api/address?a=" + encodeURIComponent(address)); }
+  catch (x) { toast(x.message); return; }
+  if (!a.web) { toast("No web entrance is known to write it on - copy the unseenet: address instead."); return; }
+  copy(a.web, `The ${what}'s web address is copied - anyone can open it in a browser.`);
+}
+
 // ---- dialogs ------------------------------------------------------------
 function closeDialog() { S.dialog = null; render(); }
 
@@ -2919,6 +2954,8 @@ function openInfo() {
       g.owner ? h("button", { class: "btn danger", onclick: openRemoveGroup }, "Remove group") : null,
       h("span", { class: "grow" }),
       g.address ? h("button", { class: "btn", onclick: () => copy(g.address, "The group's address is copied.") }, "Copy address") : null,
+      g.address ? h("button", { class: "btn", title: "The same address as https://… on a web entrance",
+        onclick: () => copyWeb(g.address, "group") }, "Copy web address") : null,
       g.type === "contact" ? [
         g.contact ? h("button", { class: "btn", onclick: () => { closeDialog(); removeContact(g.key, g.label.replace(/ √$/, "")); } }, "Remove contact") : null,
         h("button", { class: "btn", onclick: () => closeChat(g.key, g.label.replace(/ √$/, "")) }, "Close chat")] :
@@ -2941,9 +2978,12 @@ function openEditGroup() {
   // reactions (UN-RFC 0048 section 4): the view's default, none, any, or your own set
   const rset = (g.reactions && g.reactions.setting) || "default";
   let reacts = Array.isArray(rset) ? "own" : rset;
+  // a site: whether search engines may index it through its web form (UN-RFC 0035 section 3)
+  const site = S.data && S.data.site;
+  let index = site ? (site.index || "no") : null;
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
     onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value;
-      else if (name === "reactions") reacts = value; else view = value; redrawDialog(); } },
+      else if (name === "reactions") reacts = value; else if (name === "index") index = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
     values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
@@ -2974,6 +3014,12 @@ function openEditGroup() {
         pick("reactions", "own", reacts, "Your own", "up to 12, below")),
       reacts === "own" ? h("input", { id: "ereacts", name: "reaction_set", class: "in", "data-k": "ereacts",
         "aria-label": "Your own reactions", placeholder: "e.g. 🎉 ❤️ 👏", value: vals.reaction_set }) : null,
+      site ? h("label", { text: "Search engines" }) : null,
+      site ? h("div", { class: "choices row" },
+        pick("index", "no", index, "Not indexed", "found by its address only"),
+        pick("index", "yes", index, "May be indexed", "search engines may list its pages")) : null,
+      site && index === "yes" ? h("p", { class: "hint", style: "margin:0",
+        text: "Copies in search engines are outside Unseenet: they can outlive the pages here, even after they expire or you withdraw them." }) : null,
       h("label", { for: "erules", text: "Rules - shown to people before they post" }),
       h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules }),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
@@ -2984,7 +3030,7 @@ function openEditGroup() {
         { title: v.title.trim(), description: v.description.trim(), rules,
           rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds,
           reactions: reacts === "own" ? [...new Set((v.reaction_set || "").split(/[\s,]+/).filter(Boolean))] : reacts,
-          ...(files !== "custom" ? { files } : {}) });
+          ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
 }
@@ -3812,6 +3858,8 @@ async function openProfile(key, who = "", context = S.gid) {
         p.following ? "Unfollow" : "Follow") : null,
       p && p.address ? h("button", { class: "btn", title: "An unseenet: address for this person (UN-RFC 0031)",
         onclick: () => copy(p.address, "The address is copied.") }, "Copy address") : null,
+      p && p.address ? h("button", { class: "btn", title: "The same address as https://… on a web entrance",
+        onclick: () => copyWeb(p.address, "person") }, "Copy web address") : null,
       p && !p.mine ? h("button", { class: "btn", title: "A profile only they can read, shown only to them (UN-RFC 0022 section 6)",
         onclick: () => openShareProfile(key, p.label || who) }, "Share yours") : null,
       p && !p.mine ? (contactList().some(c => c.key === key)
@@ -4043,6 +4091,9 @@ function commands() {
     { name: "Copy the address of this group", key: "", when: g && g.address, run: () => copy(g.address, "The group's address is copied.") },
     { name: "Copy the address of the selected post", key: "", when: selectedPost() && selectedPost().address && !selectedPost().private,
       run: () => copy(selectedPost().address, "The post's address is copied.") },
+    { name: "Copy the web address of this group (https://…)", key: "", when: g && g.address, run: () => copyWeb(g.address, "group") },
+    { name: "Copy the web address of the selected post (https://…)", key: "", when: selectedPost() && selectedPost().address && !selectedPost().private,
+      run: () => copyWeb(selectedPost().address, "post") },
     { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
     { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },

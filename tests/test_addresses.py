@@ -8,6 +8,7 @@ python -m pytest -q tests/test_addresses.py
 """
 
 import pytest
+from urllib.parse import quote
 from aiohttp import web
 from aiohttp.test_utils import TestServer
 
@@ -61,6 +62,14 @@ class AddressAPI:
 
     def address(self, a):
         self.asked.append(a)
+        if a.startswith("web+unseenet:"):                       # the core reads both forms
+            a = a[len("web+"):]
+        out = self._address(a)
+        if out is not None:                                      # its web form (#98)
+            out["web"] = "https://unseenet.net/a/" + out["address"][len("unseenet:"):].split("&n=")[0]
+        return out
+
+    def _address(self, a):
         if a == "unseenet:" + FP:
             return {"kind": "identity", "address": a, "nodes": [], "fingerprint": FP,
                     "key": KEY, "label": "Bo", "mine": False}
@@ -69,6 +78,11 @@ class AddressAPI:
                     "group_id": OTHER, "followed": OTHER in self.followed, "available": True,
                     "group": {"id": OTHER, "label": "alt.andet", "title": "Et andet sted",
                               "type": "open", "view": "threads"}, "message": None, "page": None}
+        if a == "unseenet:" + GROUP:
+            return {"kind": "group", "address": a, "nodes": [], "group_id": GROUP,
+                    "followed": True, "available": True,
+                    "group": {"id": GROUP, "label": "alt.adr", "title": "", "type": "open",
+                              "view": self.view}, "message": None, "page": None}
         if a.startswith("unseenet:" + GROUP + "?m="):
             return {"kind": "post", "address": a, "nodes": [], "group_id": GROUP,
                     "followed": True, "available": True,
@@ -230,3 +244,31 @@ async def test_open_an_address_from_the_palette_and_copy_a_line(addr_page):
     await expect(page.locator(".dialog")).to_have_count(0)
     await open_address("unseenet:alt.adr@abcd?m=c@x")
     await expect(page.locator(".bubble.flash")).to_have_count(1)
+
+
+@pytest.mark.parametrize("addr_page", ["chat"], indirect=True)
+async def test_copy_the_web_address(addr_page):
+    """#98: the same address on a web entrance, from ⋯ and from the group's info."""
+    page, api = addr_page
+    line = page.locator(".bubble", has_text="torsdag kl. 19")
+    await line.hover()
+    await line.get_by_role("button", name="More").click()
+    await line.get_by_role("menuitem", name="Copy web address").click()
+    await expect(page.locator(".toast")).to_contain_text("web address is copied")
+    await page.get_by_role("button", name="About this group").click()
+    await page.locator(".dialog").get_by_role("button", name="Copy web address").click()
+    await expect(page.locator(".toast")).to_contain_text("group's web address is copied")
+    assert await page.evaluate("window.COPIED") == ["https://unseenet.net/a/alt.adr@abcd?m=c@x",
+                                                     "https://unseenet.net/a/alt.adr@abcd"]
+
+
+@pytest.mark.parametrize("addr_page", ["threads"], indirect=True)
+async def test_a_web_unseenet_link_opens_the_post(addr_page):
+    """#98: a web+unseenet: link the browser hands over as #open=... opens after unlock."""
+    page, api = addr_page
+    link = "web+unseenet:alt.adr@abcd?m=c@x"
+    await page.goto(page.url.split("#")[0] + "#t=" + TOKEN + "&open=" + quote(link, safe=""))
+    await page.reload()                                           # as when the browser opens it
+    await expect(page.locator(".prow.on")).to_contain_text("Husk mødet")
+    assert link in api.asked
+    assert "open=" not in page.url                                # taken out of the address bar
