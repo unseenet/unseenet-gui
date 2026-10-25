@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-25
+
+**For unseenet 0.5** (`unseenet[api]>=0.5,<0.6`): update the nodes first. Feeds and a Timeline, **My feed** and **My site**, sites and pages, pictures and files (also in chats and private posts), profile pictures, pins, reactions, tables, private profiles, `unseenet:` and web addresses, and *Your nodes* to change node while the client is open.
+
 ### Added
 
 - **Your nodes** (#111, unseenet#518): change node while the client is open.
@@ -275,7 +279,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/unseenet/unseenet-gui/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/unseenet/unseenet-gui/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/unseenet/unseenet-gui/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/unseenet/unseenet-gui/releases/tag/v0.1.0
