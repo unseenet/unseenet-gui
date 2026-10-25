@@ -4,14 +4,33 @@ name: build
 # portable workflow, and using its Tor handling: Tor is downloaded and its
 # OpenPGP signature checked by unseenet's tools/build_portable.py.
 #
-# On version tags the files are attached to the release; on pushes to main they
-# replace the "dev" pre-release.
+# On version tags the files are attached to the release. Not on every merge
+# (#128, like unseenet#544): each night the "dev" pre-release is rebuilt, but
+# only when this repo's main or the core's main changed since the last one; by
+# hand, publish to "dev" (main only) or as workflow artifacts, and "force".
 on:
   push:
     tags: ["v*"]
-    branches: [main]
+  schedule:
+    - cron: "37 3 * * *"          # after the core's nightly build (03:17)
   pull_request:
+    paths:
+      - "tools/**"
+      - "src/unseenet_gui/boot.py"
+      - "src/unseenet_gui/selftest.py"
+      - "src/unseenet_gui/winfix.py"
+      - ".github/workflows/build.yml"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "dev = replace the dev pre-release (main only); artifact = workflow artifacts only"
+        type: choice
+        options: [dev, artifact]
+        default: dev
+      force:
+        description: "Build even if nothing changed since the current dev build"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -24,17 +43,58 @@ env:
   # The unseenet core these builds are made with: a release (vX.Y.Z) is built with
   # the core release named here (keep it within the range pyproject.toml asks for);
   # main, pull requests and dev builds with the core's main, to find breakage early.
-  CORE_REF: ${{ startsWith(github.ref, 'refs/tags/v') && 'v0.5.0' || 'main' }}
+  CORE_RELEASE: v0.5.0
 
 jobs:
+  gate:
+    # Which core to build with (a fixed commit, so every job uses the same one),
+    # and - nightly and by hand on main - whether anything changed since the
+    # dev build: this repo's main or the core's main. Everything waits for this.
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.check.outputs.build }}
+      core_ref: ${{ steps.check.outputs.core_ref }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          if [ "${GITHUB_REF#refs/tags/v}" != "$GITHUB_REF" ]; then
+            echo "core_ref=$CORE_RELEASE" >> "$GITHUB_OUTPUT"
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          CORE=$(git ls-remote https://github.com/unseenet/unseenet refs/heads/main | cut -f1)
+          echo "core_ref=$CORE" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT" != schedule ] && [ "$EVENT" != workflow_dispatch ] || [ "$FORCE" = true ] \
+             || [ "$GITHUB_REF" != refs/heads/main ]; then
+            echo "build=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          DEV=$(git ls-remote origin refs/tags/dev | cut -f1)
+          LAST_CORE=$(gh release view dev --json body -q .body 2>/dev/null | sed -n 's/.*core \([0-9a-f]\{40\}\).*/\1/p' | head -1)
+          if [ -n "$DEV" ] && git cat-file -e "$DEV^{commit}" 2>/dev/null \
+             && git diff --quiet "$DEV" HEAD -- src tools pyproject.toml .github/workflows/build.yml \
+             && [ "$LAST_CORE" = "$CORE" ]; then
+            echo "Nothing changed since the dev build (gui $DEV, core $CORE): skipping."
+            echo "build=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          fi
+
   tor:
+    needs: gate
+    if: needs.gate.outputs.build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: unseenet/unseenet
-          ref: ${{ env.CORE_REF }}
+          ref: ${{ needs.gate.outputs.core_ref }}
           path: core
       - uses: actions/setup-python@v5
         with:
@@ -49,7 +109,7 @@ jobs:
           path: tor/
 
   portable:
-    needs: tor
+    needs: [gate, tor]
     strategy:
       fail-fast: false
       matrix:
@@ -64,7 +124,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           repository: unseenet/unseenet
-          ref: ${{ env.CORE_REF }}
+          ref: ${{ needs.gate.outputs.core_ref }}
           path: core
       - uses: actions/setup-python@v5
         with:
@@ -138,14 +198,14 @@ jobs:
           compression-level: 0
 
   usb:
-    needs: portable
+    needs: [gate, portable]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: unseenet/unseenet
-          ref: ${{ env.CORE_REF }}
+          ref: ${{ needs.gate.outputs.core_ref }}
           path: core
       - uses: actions/setup-python@v5
         with:
@@ -168,14 +228,14 @@ jobs:
   image:
     # Alpine from RAM with the client full screen; booted in QEMU (BIOS and
     # UEFI), where its self-test must pass: the page loads in the kiosk, Tor connects.
-    needs: usb
+    needs: [gate, usb]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/checkout@v4
         with:
           repository: unseenet/unseenet
-          ref: ${{ env.CORE_REF }}
+          ref: ${{ needs.gate.outputs.core_ref }}
           path: core
       - uses: actions/download-artifact@v4
         with:
@@ -215,8 +275,12 @@ jobs:
           compression-level: 0
 
   release:
-    needs: [usb, image]
-    if: github.event_name == 'push'
+    needs: [gate, usb, image]
+    if: >-
+      startsWith(github.ref, 'refs/tags/v') ||
+      (github.ref == 'refs/heads/main' &&
+       (github.event_name == 'schedule' ||
+        (github.event_name == 'workflow_dispatch' && inputs.publish == 'dev')))
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -246,5 +310,5 @@ jobs:
             gh release delete dev --yes --cleanup-tag 2>/dev/null || true
             gh release create dev files/* --prerelease --latest=false --target "$GITHUB_SHA" \
               --title "Development build" \
-              --notes "The newest code on main, built and self-tested automatically ($GITHUB_SHA). Not a release. Pre-alpha: not security reviewed."
+              --notes "The newest code on main, built and self-tested automatically each night when something changed. Built from gui $GITHUB_SHA, core ${{ needs.gate.outputs.core_ref }}. Not a release. Pre-alpha: not security reviewed."
           fi
