@@ -1,28 +1,37 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/logo-dark.svg">
-    <img src="docs/img/logo-light.svg" alt="Unseenet" width="320">
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/unseenet/unseenet/main/assets/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/unseenet/unseenet/main/assets/logo-light.svg" alt="Unseenet" width="360">
   </picture>
 </p>
 
-<p align="center"><b>Usenet, unseen - now in a window.</b><br>
+<h1 align="center">unseenet-gui</h1>
+
+<p align="center"><b>Usenet, unseen - in a window.</b><br>
 Discussions you read and answer, chats you chat in, over Tor. Portable on Windows, macOS and Linux, booted from a USB stick - or in any browser, on a phone too, through a web entrance.</p>
+
+<p align="center">
+  <a href="https://pypi.org/project/unseenet-gui/"><img src="https://img.shields.io/pypi/v/unseenet-gui?label=PyPI" alt="PyPI"></a>
+  <a href="https://github.com/unseenet/unseenet-gui/actions/workflows/tests.yml"><img src="https://github.com/unseenet/unseenet-gui/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue" alt="Apache-2.0"></a>
+</p>
 
 <p align="center">
   <img src="docs/img/demo.gif" alt="Unlocking the vault, reading down a thread post by post, replying with a quote, chatting, the command palette and the light theme" width="880">
 </p>
+
+> **Pre-alpha.** Nothing is stable yet, and Unseenet has not had a security
+> review. Do not rely on it to protect anyone yet.
+
+## What it is
 
 A modern client for [Unseenet](https://unseenet.org), the decentralised,
 encrypted discussion network over Tor onion services, built on the
 [unseenet](https://github.com/unseenet/unseenet) core with the look of
 [unseenet.org](https://unseenet.org).
 
-> **Pre-alpha prototype.** Neither this client nor the unseenet core has had a
-> security review. Play with it, pick it apart - do not rely on it to protect
-> anyone yet.
-
 A discussion is not a chat. Discussion groups work like a newsreader - the
-same way as unseenet's terminal client: the posts as a tree, the selected one
+same way as the [terminal client](https://github.com/unseenet/unseenet-tui): the posts as a tree, the selected one
 below to read, `↑` `↓` through the thread and `Space` to the next unread, and
 `R` to answer in a compose window with the post quoted and your signature
 below. Chat groups are chats. The group's owner decides which a group is, and
@@ -62,25 +71,7 @@ On a narrow screen - a phone - the client shows one thing at a time: your
 groups, then a group, then a post or the chat. **⋯** holds what does not fit,
 and the compose window has its Send button at the top, above the keyboard.
 
-## How it works
-
-```
- browser window ──HTTP/WebSocket──▶ unseenet-gui ──▶ unseenet core ──Tor──▶ nodes
- (127.0.0.1 only)                   (local server)   vault, keys, postage
-```
-
-`unseenet-gui` is a small local server around the core's `Session` - the same
-one the TUI uses. (On the web the same server code runs inside the browser
-instead, see above; nothing in this repository is different for it.) It opens the same encrypted vault, starts the same bundled
-Tor and talks to the same nodes. The browser only draws what you would see on
-screen: **keys, signing, encryption and postage never leave Python**, and the
-passphrase is only sent once, to unlock.
-
-The client follows the terminal client's way of working, so you can switch
-between them without learning anything new: the same keys, the same icons
-(`≡` discussion, `»` chat, `∩` closed), the same compose window.
-
-## Download
+## Get it
 
 The builds are made in [unseenet-portable](https://github.com/unseenet/unseenet-portable)
 and [unseenet-bootable](https://github.com/unseenet/unseenet-bootable) (#129),
@@ -103,12 +94,12 @@ the newest are their `dev` pre-releases
   screen. The same stick also starts the portable client on a running
   computer, with the same `data/`. It needs 4 GB of memory; "safe graphics" in
   the boot menu helps if the screen stays black, and "text only" starts
-  unseenet's terminal client instead.
+  the terminal client instead.
 
-Both use the same `Unseenet/` folder and `data/` as unseenet's own portable
+Both use the same `Unseenet/` folder and `data/` as the terminal client's portable
 build, so the terminal client and this one can share a stick and a vault.
 
-## From source
+### With Python
 
 You need Python 3.11+.
 
@@ -118,7 +109,7 @@ unseenet-gui                        # opens your browser
 unseenet-gui --vault /path/to/unseenet.vault
 ```
 
-It uses the same vault as the TUI (`unseenet.vault` in the current folder, or
+It uses the same vault as the terminal client (`unseenet.vault` in the current folder, or
 the portable build's `data/`), so your identity, groups and read marks are the
 same in both. Do not run both on the same vault at the same time.
 
@@ -134,17 +125,7 @@ This uses [pywebview](https://pywebview.flowrl.com/): the system's web view
 ends up in your browser's history or cache. On Linux it needs the GTK WebKit
 libraries.
 
-### A playground without Tor
-
-```sh
-git clone https://github.com/unseenet/unseenet-gui && cd unseenet-gui
-pip install -e .
-tools/dev.sh            # a local node, three people, groups and a closed chat
-```
-
-Passphrase `test`. Everything is in `./dev`; `tools/dev.sh clean` deletes it.
-
-## Keys
+### Keys
 
 | Key | |
 |---|---|
@@ -162,7 +143,34 @@ Passphrase `test`. Everything is in `./dev`; `tools/dev.sh clean` deletes it.
 | `Ctrl S` | Send, in the compose window |
 | `Esc` | Leave the text box, close a dialog |
 
-## Security
+## How it works
+
+```
+ browser window ──HTTP/WebSocket──▶ unseenet-gui ──▶ unseenet core ──Tor──▶ nodes
+ (127.0.0.1 only)                   (local server)   vault, keys, postage
+```
+
+`unseenet-gui` is a small local server around the core's `Session` - the same
+one the terminal client uses. (On the web the same server code runs inside the browser
+instead, see above; nothing in this repository is different for it.) It opens the same encrypted vault, starts the same bundled
+Tor and talks to the same nodes. The browser only draws what you would see on
+screen: **keys, signing, encryption and postage never leave Python**, and the
+passphrase is only sent once, to unlock.
+
+The client follows the terminal client's way of working, so you can switch
+between them without learning anything new: the same keys, the same icons
+(`≡` discussion, `»` chat, `∩` closed), the same compose window.
+
+### Built on the core
+
+Everything but the page is the core's: this client is unseenet's local
+client API (UN-RFC 0046, `unseenet.client.localapi`) with its page and a few
+routes of its own under `/x/gui/` - the bootable image's network, keyboard and
+power, updating, and what the page shows about this machine. The same runtime,
+threads, names and safe Markdown tree serve every front end, so this client
+shows what the terminal client shows. [CORE-NEEDS.md](CORE-NEEDS.md) records how it got there.
+
+### Security
 
 The local server is reachable from your own computer, so it guards itself.
 These are the rules of UN-RFC 0046, kept by the core's local API:
@@ -187,7 +195,7 @@ programs as you or read your memory. When you run it in your normal browser,
 the window title and address can end up in its history - `--window` avoids
 that.
 
-## What the prototype can and cannot do
+### What it can do yet
 
 It can: unlock or create a vault, choose a name and node, follow and leave
 groups, read threads and chats (closed groups decrypted), post, reply, chat,
@@ -199,7 +207,7 @@ a light and a dark theme, the command palette, and phones and other narrow
 screens. On the bootable image also: network and Wi-Fi, keyboard layout,
 restart and shut down. In a browser: everything above, through a web entrance.
 
-Not yet - use the TUI: Tor bridges and several identities. **Updating**
+Not yet - use the terminal client: Tor bridges and several identities. **Updating**
 a stick or portable folder of this client is not there yet either: its builds
 are not signed yet, and unseenet's own updater does not touch them (it would
 remove the graphical client). Download the new build from the
@@ -207,41 +215,17 @@ remove the graphical client). Download the new build from the
 builds, a notice and an Update button (already in the code, switched off)
 are coming (unseenet#264).
 
-## Versions and releases
+## Develop
 
-Versions follow [semantic versioning](https://semver.org/) on the same
-principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/development.md#versioning):
-tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and
-releases on [PyPI](https://pypi.org/p/unseenet-gui) and here with the
-portable builds and the image. Each release names the minor version of
-unseenet it works with (`unseenet[api]>=0.5,<0.6`).
+A playground without Tor:
 
-The version numbers are this client's own and do not follow the core's: a
-client can gain features, or get fixes, while the core stays where it is, and
-that must not have to wait for a core release. So unseenet-gui 0.2.0 may need
-unseenet 0.5, and a later 0.2.x or 0.3.0 may need the same core. Which core a
-release needs is said in `pyproject.toml` and at the top of its release notes.
+```sh
+git clone https://github.com/unseenet/unseenet-gui && cd unseenet-gui
+pip install -e .
+tools/dev.sh            # a local node, three people, groups and a closed chat
+```
 
-To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
-new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
-`src/unseenet_gui/__init__.py` and the core release it needs (`unseenet[api]` in
-`pyproject.toml`); commit, then
-`git tag -a vX.Y.Z -m "unseenet-gui X.Y.Z" && git push origin vX.Y.Z`.
-`release.yml` publishes to PyPI and makes the release with the changelog
-notes; the portable and bootable builds of the release are made in
-unseenet-portable and unseenet-bootable (bump `gui` in their `versions.toml`). Afterwards set `__version__` on main to
-the next `.dev0`, so development builds are named after it.
-
-## Built on the core
-
-Everything but the page is the core's: this client is unseenet's local
-client API (UN-RFC 0046, `unseenet.client.localapi`) with its page and a few
-routes of its own under `/x/gui/` - the bootable image's network, keyboard and
-power, updating, and what the page shows about this machine. The same runtime,
-threads, names and safe Markdown tree serve every front end, so this client
-shows what the TUI shows. [CORE-NEEDS.md](CORE-NEEDS.md) records how it got there.
-
-## Layout
+Passphrase `test`. Everything is in `./dev`; `tools/dev.sh clean` deletes it.
 
 ```
 src/unseenet_gui/
@@ -265,18 +249,42 @@ tools/
 The front end is plain JavaScript with no dependencies and no build step, so
 the client is easy to read and audit.
 
-## Part of Unseenet
+## Versions and releases
 
-Unseenet is made in several repositories, each released on its own:
+Versions follow [semantic versioning](https://semver.org/) on the same
+principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/development.md#versioning):
+tags `vX.Y.Z` on `main`, the changes in [CHANGELOG.md](CHANGELOG.md), and
+releases on [PyPI](https://pypi.org/p/unseenet-gui) and here; the portable
+builds and the image of a release are made in unseenet-portable and
+unseenet-bootable. Each release names the minor version of
+unseenet it works with (`unseenet[api]>=0.5,<0.6`).
+
+The version numbers are this client's own and do not follow the core's: a
+client can gain features, or get fixes, while the core stays where it is, and
+that must not have to wait for a core release. So unseenet-gui 0.2.0 may need
+unseenet 0.5, and a later 0.2.x or 0.3.0 may need the same core. Which core a
+release needs is said in `pyproject.toml` and at the top of its release notes.
+
+To release: move the entries under `## [Unreleased]` in `CHANGELOG.md` to a
+new `## [X.Y.Z] - YYYY-MM-DD` section, set `__version__` in
+`src/unseenet_gui/__init__.py` and the core release it needs (`unseenet[api]` in
+`pyproject.toml`); commit, then
+`git tag -a vX.Y.Z -m "unseenet-gui X.Y.Z" && git push origin vX.Y.Z`.
+`release.yml` publishes to PyPI and makes the release with the changelog
+notes; the portable and bootable builds of the release are made in
+unseenet-portable and unseenet-bootable (bump `gui` in their `versions.toml`). Afterwards set `__version__` on main to
+the next `.dev0`, so development builds are named after it.
+
+## Part of Unseenet
 
 | Repository | What it is |
 |---|---|
 | [unseenet](https://github.com/unseenet/unseenet) | The protocol (UN-RFCs), the core library, the node and the command-line client |
-| [unseenet-tui](https://github.com/unseenet/unseenet-tui) | The terminal client (moving here from unseenet, unseenet#548) |
+| [unseenet-tui](https://github.com/unseenet/unseenet-tui) | The terminal client |
 | [unseenet-gui](https://github.com/unseenet/unseenet-gui) | The graphical client - in a window, booted, or in a browser |
-| [unseenet-portable](https://github.com/unseenet/unseenet-portable) | Builds the portable clients, Terminal and Graphical, with Tor inside (unseenet#549) |
-| [unseenet-bootable](https://github.com/unseenet/unseenet-bootable) | Builds the bootable images, Terminal and Graphical, and later a node image (unseenet#550) |
-| [unseenet-docs](https://github.com/unseenet/unseenet-docs) | The site [unseenet.org](https://unseenet.org), gathering the docs of every repository (unseenet#547) |
+| [unseenet-portable](https://github.com/unseenet/unseenet-portable) | Builds the portable clients, Terminal and Graphical, with Tor inside |
+| [unseenet-bootable](https://github.com/unseenet/unseenet-bootable) | Builds the bootable images, Terminal and Graphical |
+| [unseenet-docs](https://github.com/unseenet/unseenet-docs) | The site [unseenet.org](https://unseenet.org) |
 | [unseenet-entrance](https://github.com/unseenet/unseenet-entrance) | Web entrances: the graphical client in an ordinary browser |
 | [unseenet-gateway](https://github.com/unseenet/unseenet-gateway) | Gateways to other networks: Usenet, Nostr, Matrix |
 | [unseenet-bots](https://github.com/unseenet/unseenet-bots) | Bots that keep channels filled with current content |
@@ -285,4 +293,6 @@ Unseenet is made in several repositories, each released on its own:
 | [unseenet-mcp](https://github.com/unseenet/unseenet-mcp) | An MCP server, so a language model can read and post as you (planning) |
 | [unseenet-demo](https://github.com/unseenet/unseenet-demo) | Demo people, feeds and sites, made with the command-line client |
 
-Code Apache-2.0. Logo CC BY 4.0, from the Unseenet project.
+## License
+
+[Apache License 2.0](LICENSE). The Unseenet logo: CC BY 4.0.
