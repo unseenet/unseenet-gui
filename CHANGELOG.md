@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- The bootable image's *text only* takes the terminal client from
+  [unseenet-tui](https://github.com/unseenet/unseenet-tui), where it has moved
+  (unseenet#548).
+
 - **Development builds** are made each night when this repo's `main` or the
   core's `main` changed, by hand, and on release tags - no longer after every
   merge (#128).
