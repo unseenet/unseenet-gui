@@ -39,14 +39,16 @@ class SiteAPI:
     """Synthetic answers only: no vault, Tor or outgoing messages."""
 
     def __init__(self, may_write):
-        self.may_write = may_write
+        self.owner = may_write == "owner"                # the site's owner (#98)
+        self.may_write = bool(may_write)
+        self.settings = []
         self.posted = []
         self.heading = False              # pages that begin with their own # heading
 
     def group(self):
         return {"id": SITE, "label": "Min side", "type": "channel", "view": "pages",
                 "owner_view": "pages", "hierarchy": "site", "may_post": self.may_write,
-                "unread": 0, "kinds": ["post"], "subscribed": True,
+                "unread": 0, "kinds": ["post"], "subscribed": True, "owner": self.owner,
                 "write": {"post": {"allowed": self.may_write, "reason": "", "code": "ok"},
                           "chat": {"allowed": False, "reason": "", "code": "kind"}}}
 
@@ -102,6 +104,9 @@ class SiteAPI:
             else:
                 self.posted.append(body)
                 data = {"job": f"j{len(self.posted)}"}
+        elif path == f"/api/groups/{SITE}/settings":
+            self.settings.append(await request.json())
+            data = {"ok": True}
         elif path == "/api/address":
             p = request.query.get("a", "").split("p=")[-1]
             data = {"kind": "page", "address": request.query.get("a"), "nodes": [],
@@ -261,3 +266,21 @@ async def test_a_table_on_a_page(site_page):
     await expect(table.locator("td strong")).to_have_text("Marsvin")
     await expect(table.locator("td.al-right")).to_have_text("2")
     assert await reader.locator(".mdtable").evaluate("e => getComputedStyle(e).overflowX") == "auto"
+
+
+@pytest.mark.parametrize("site_page", ["owner"], indirect=True)
+async def test_a_site_may_say_search_engines_may_index_it(site_page):
+    """#98 (UN-RFC 0035 section 3): the owner chooses; yes comes with the warning."""
+    page, api = site_page
+    await page.keyboard.press("Control+k")
+    await page.keyboard.type("Edit this group")
+    await page.keyboard.press("Enter")
+    dialog = page.locator(".dialog")
+    no = dialog.get_by_role("button", name="Not indexed")
+    await expect(no).to_have_attribute("aria-pressed", "true")
+    await expect(dialog).not_to_contain_text("outlive")
+    await dialog.get_by_role("button", name="May be indexed").click()
+    await expect(dialog).to_contain_text("outlive the pages here")
+    await dialog.get_by_role("button", name="Save").click()
+    await expect(dialog).to_have_count(0)
+    assert api.settings[-1]["index"] == "yes"
