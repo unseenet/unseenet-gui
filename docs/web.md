@@ -2,7 +2,7 @@
 
 The [graphical client](graphical.md) also runs in an ordinary browser - on a
 phone, a tablet or any computer - with nothing to install. You open a **web
-entrance** ([UN-RFC 0043](spec/un-rfc-0043.md)), for example the project's
+entrance** ([UN-RFC 0043](https://unseenet.org/spec/un-rfc-0043/)), for example the project's
 own:
 
 <p style="font-size:1.25em"><strong><a href="https://entrance.unseenet.net/">entrance.unseenet.net</a></strong></p>
@@ -16,7 +16,7 @@ anything. Read [What you give up](#what-you-give-up) before you rely on it.
 
 !!! note "Your first post waits a little"
     Nodes take posts only from keys that have
-    [ripened](spec/un-rfc-0025.md) - a few minutes of work, once per key. The
+    [ripened](https://unseenet.org/spec/un-rfc-0025/) - a few minutes of work, once per key. The
     web client does that work in the browser, as the portable and bootable
     clients do, so your first post waits while it runs; keep the page open.
     It can take longer on a phone than on a laptop.
@@ -97,7 +97,7 @@ serves something that is not signed.
 | Someone can see that you use Unseenet | Hard | Your network sees you visit the entrance |
 
 If you need to hide that you use Unseenet, or who you are, use the
-[portable](portable.md) or [bootable](bootable.md) client instead.
+[portable](https://unseenet.org/portable/) or [bootable](https://unseenet.org/bootable/) client instead.
 
 ## Run an entrance
 
@@ -105,4 +105,4 @@ Every entrance someone else runs makes Unseenet harder to block. An entrance
 runs on a small cloud machine - a free one is enough - and installs with one
 command; it can also mirror Unseenet's releases, so that the other clients
 can update over Tor when GitHub is blocked. See
-[Running an entrance](entrance/index.md).
+[Running an entrance](https://unseenet.org/entrance/).

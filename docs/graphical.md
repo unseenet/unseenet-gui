@@ -42,7 +42,7 @@ included, and everything stays in `data/` beside the programs.
 Write `unseenet-gui-…-x86_64.img.xz` to a USB stick (for example with
 Raspberry Pi Imager or balenaEtcher), boot from it, and the client starts
 full screen and runs from memory, touching nothing on the computer's disks,
-as with the terminal client's [bootable image](bootable.md). The first screen
+as with the terminal client's [bootable image](https://unseenet.org/bootable/). The first screen
 sets up Wi-Fi and the keyboard. It needs 4 GB of memory. In the boot menu,
 *safe graphics* helps if the screen stays black, and *text only* starts the
 terminal client instead. The same stick also starts the portable client on a
@@ -56,7 +56,7 @@ It is the same client, running in the browser, and the less hidden way in.
 Read [In your browser](web.md) first.
 
 The graphical client uses the same `Unseenet/` folder and `data/` as the
-terminal client's [portable build](portable.md), so the two can share a stick
+terminal client's [portable build](https://unseenet.org/portable/), so the two can share a stick
 and a vault. Do not run both on the same vault at the same time.
 
 ## First start
@@ -75,7 +75,7 @@ feed `unseenet.demo.site` and `unseenet.demo.feed` - so there is something to
 read. The
 first connection takes 10-30 seconds while Tor builds its circuits. Your
 first post waits a few minutes more, once, while your new key
-[ripens](spec/un-rfc-0025.md); the client shows how far it is. Stuck? Ask in
+[ripens](https://unseenet.org/spec/un-rfc-0025/); the client shows how far it is. Stuck? Ask in
 `unseenet.help` - see [Getting help](https://unseenet.org/help/).
 
 ## What it can do
@@ -122,7 +122,7 @@ runs inside the browser instead; see [In your browser](web.md).)
  (127.0.0.1 only)           (UN-RFC 0046)                 vault, keys, postage
 ```
 
-The window talks to the core's [local client API](spec/un-rfc-0046.md), the
+The window talks to the core's [local client API](https://unseenet.org/spec/un-rfc-0046/), the
 same `Session` the terminal client uses: the same encrypted vault, the same
 Tor and the same nodes. The window only draws what you see: **keys, signing,
 encryption and postage never leave the core**, and the passphrase is sent
