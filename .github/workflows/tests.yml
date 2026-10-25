@@ -9,14 +9,14 @@ jobs:
   tests:
     runs-on: ubuntu-latest
     steps:
- (build.yml); a release names the core release it needs in pyproject.toml- uses: actions/checkout@v4
- (build.yml); a release names the core release it needs in pyproject.toml- uses: actions/setup-python@v5
- (build.yml); a release names the core release it needs in pyproject.toml  with:
- (build.yml); a release names the core release it needs in pyproject.toml    python-version: "3.13"
- (build.yml); a release names the core release it needs in pyproject.toml# main is built against the core's main, as the development builds are
- (build.yml); a release names the core release it needs in pyproject.toml# (build.yml); a release names the core release it needs in pyproject.toml
- (build.yml); a release names the core release it needs in pyproject.toml- run: pip install "unseenet[api] @ git+https://github.com/unseenet/unseenet@main"
- (build.yml); a release names the core release it needs in pyproject.toml- run: pip install . pytest pytest-asyncio playwright
- (build.yml); a release names the core release it needs in pyproject.toml- run: python -m playwright install --with-deps chromium
- (build.yml); a release names the core release it needs in pyproject.toml- run: python -m pytest -q
- (build.yml); a release names the core release it needs in pyproject.toml- run: node --check src/unseenet_gui/static/app.js
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # main is built against the core's main, as the development builds are
+      # (unseenet-portable); a release names the core release it needs in pyproject.toml
+      - run: pip install "unseenet[api] @ git+https://github.com/unseenet/unseenet@main"
+      - run: pip install . pytest pytest-asyncio playwright
+      - run: python -m playwright install --with-deps chromium
+      - run: python -m pytest -q
+      - run: node --check src/unseenet_gui/static/app.js
