@@ -7,6 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Notifications** (#126): a system notification when something lands in
+  For you - private messages, replies, mentions - from the core's
+  `/api/notifications`, only while the window is open (no push). Asked once
+  (Yes / Not now / Never); it says only "N new in For you" unless you choose to
+  show the sender and text (menu); one for a burst; none for what is on screen;
+  clicking opens For you. Never on the bootable image. The choice is kept with
+  your settings, the same in the terminal client.
+
 - **The bootable image's tools have moved to unseenet-bootable**
   (unseenet-bootable#5), with their history, as `tools/image-graphical/`.
 

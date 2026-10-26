@@ -630,6 +630,7 @@ async function afterUnlock() {
   connectEvents();
   await Promise.all([loadSidebar(), loadTheme()]);
   if (!S.firstWords) wordsReminder();          // UN-RFC 0050 4.2 (identity.js)
+  refreshNotifySettings().then(notifySoon);     // #126 (notify.js)
   offerProtocolHandler();
   if (OPEN_AT) { const a = OPEN_AT; OPEN_AT = null; openAddress(a); }
 }
@@ -4137,6 +4138,7 @@ function commands() {
       when: !!shareTarget(), run: () => openShareProfile(shareTarget().to, shareTarget().who) },
     { name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
+    ...notifyCommands(),                                      // #126 (notify.js)
     { name: "Show recovery words" + (S.state.identity && !S.state.identity.words_written ? " (not written down yet)" : ""),
       key: "", also: "backup recovery seed words gendannelse", run: () => openShowWords(false) },
     { name: "Restore from recovery words", key: "", also: "recover backup words", run: openRestore },
@@ -4528,9 +4530,11 @@ function connectEvents() {
     } else if (type === "x-gui-update") {
       updateProgress(e.text);
     } else if (type === "groups-changed" || type === "refreshed" || type === "inbox-ready") {
+      if (type !== "groups-changed") notifySoon();             // #126 (notify.js)
       if (type === "refreshed") { S.state.connected = !e.error; redrawNodeLink(); }
       sidebarSoon();
     } else if (type === "group-updated") {
+      if (e.new) notifySoon();                                 // #126 (notify.js)
       if (e.new) sidebarSoon();                                // counts in the sidebar
       if (e.group_id === S.gid || S.gid === FOR_YOU ||
           (S.gid && S.gid.startsWith("contact:") && S.sidebar && e.group_id === S.sidebar.inbox.id)) {
