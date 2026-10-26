@@ -74,7 +74,12 @@ async def state(request):
            "web": sys.platform == "emscripten",
            "bootable": system.enabled(),
            "update": request.app[UPDATER].info(s),
-           "fp": s.identity().fingerprint[:4] if s is not None and s.has_identity() else None}
+           "fp": s.identity().fingerprint[:4] if s is not None and s.has_identity() else None,
+           # the vault's identities, to choose which to copy to another device (UN-RFC 0050 3.6)
+           "identities": [{"name": n, "display": e.get("display", n),
+                           "default": n == s.default_identity_name()}
+                          for n, e in s.data["identities"].items()]
+           if s is not None and s.has_identity() else []}
     if out["bootable"]:
         out["keyboard"] = system.keyboard()
     return web.json_response(out)
@@ -139,6 +144,71 @@ def save_name(folder: Path, name: str) -> Path:
     return path
 
 
+CLOUD_HINTS = ("dropbox", "onedrive", "icloud", "google drive", "googledrive", "mega",
+               "nextcloud", "owncloud", "pcloud", "box sync")
+
+
+async def qr(request):
+    """A QR code as SVG, for the code of a copy to another device (UN-RFC 0050 section
+    3.2). Made here, on this machine: the text is a one-time secret."""
+    import segno
+    import io
+    data = await _body(request)
+    text = str(data.get("text", ""))
+    if not text or len(text) > 512:
+        return web.json_response({"error": "nothing to show"}, status=400)
+    out = io.BytesIO()
+    segno.make(text, error="m", boost_error=False).save(out, kind="svg", scale=6, border=4,
+                                                      dark="#000", light="#fff", xmldecl=False,
+                                                      svgns=True, title="QR code")
+    return web.json_response({"svg": out.getvalue().decode()})
+
+
+def _same_medium(a: Path, b: Path) -> bool:
+    try:
+        return os.stat(a).st_dev == os.stat(b).st_dev
+    except OSError:
+        return False
+
+
+async def save_words(request):
+    """Save as file (UN-RFC 0050 section 4.3), a deliberate choice behind the page's
+    warning: the words are made here from the passphrase - the page never holds them
+    for this - and saved in Downloads, but never on the vault's own disk or stick, never
+    in a folder that looks synchronised to a cloud, and not on the bootable image."""
+    from unseenet.client.session import SessionError
+    from unseenet.core import recovery as rc
+    api = _api(request)
+    s = api.session
+    if s is None or not s.has_identity():
+        raise web.HTTPConflict(text="locked")
+    if system.enabled() or sys.platform == "emscripten":
+        return web.json_response({"error": "Not here: write the words on paper."}, status=400)
+    data = await _body(request)
+    try:
+        words = await asyncio.to_thread(s.recovery_words, str(data.get("passphrase", "")))
+    except SessionError as exc:
+        return web.json_response({"error": str(exc)}, status=400)
+    folder = Path.home() / "Downloads"
+    folder = folder if folder.is_dir() else Path.home()
+    if api.vault_path is not None and _same_medium(folder, api.vault_path.resolve().parent):
+        return web.json_response({"error": "Your Downloads folder is on the same disk as the "
+                                  "vault: whoever takes it would have both. Write the words on "
+                                  "paper, or copy them to another stick by hand."}, status=400)
+    if any(h in str(folder).lower() for h in CLOUD_HINTS):
+        return web.json_response({"error": "Your Downloads folder looks synchronised to a cloud "
+                                  "service. Write the words on paper instead."}, status=400)
+    path = save_name(folder, "unseenet-recovery-words.txt")
+    text = rc.text_page(s.display_name(), s.identity().fingerprint, words)
+
+    def write():
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+    await asyncio.to_thread(write)
+    return web.json_response({"path": str(path)})
+
+
 async def save_file(request):
     """Save a file a post carries in Downloads (else your home folder), as the node sent
     it and checked against its blob ID (UN-RFC 0027 section 9.2). Never opened: the page
@@ -166,6 +236,8 @@ def gui_routes(sub: web.Application, api: LocalAPI) -> None:
     sub.router.add_get("/state", state)
     sub.router.add_post("/update", run_update)
     sub.router.add_post("/save", save_file)
+    sub.router.add_post("/qr", qr)                         # UN-RFC 0050: copying
+    sub.router.add_post("/save-words", save_words)         # UN-RFC 0050 4.3
     sub.router.add_get("/system", system_status)
     sub.router.add_post("/system/wifi", system_wifi)
     sub.router.add_post("/system/keyboard", system_keyboard)

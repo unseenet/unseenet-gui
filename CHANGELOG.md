@@ -7,6 +7,22 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Recovery words and copying to another device** (#142, UN-RFC 0050, on the
+  core's local API sections 4.18 and 4.19): at first start *Create a new
+  identity*, *Restore from recovery words* or *Get it from another device*;
+  the words shown after a new identity and with *Show recovery words* behind
+  the passphrase, three asked back, a weekly reminder until written down;
+  *Print* and *Save as file* behind a warning, neither on the bootable image,
+  saving refused on the vault's own disk or in a cloud-looking folder;
+  restoring with the words checked as typed, then the closed groups that did
+  not come back and asking their owners. *Copy to another device* with a
+  choice of identities and closed groups' keys, the QR code (`/x/gui/qr`) and
+  the code with a countdown, then the check words; *Get identity from another
+  device* by code, or by camera where the browser has `BarcodeDetector`. A
+  browser through an entrance can only receive. `/x/gui/state` lists the
+  vault's identities. New dependency: `segno` (QR, pure Python). A PIN backed
+  by the device's secure hardware (section 5) comes later (#145).
+
 - **The portable and bootable builds are made in unseenet-portable and
   unseenet-bootable** (#129), nightly, by hand and for releases; this
   repository no longer builds them.
