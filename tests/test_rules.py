@@ -78,7 +78,8 @@ class RulesAPI:
         elif request.method == "GET" and path == f"/api/groups/{GROUP}":
             data = {"group": self.group(), "rows": self.rows()}
         elif path == "/api/rules" and request.method == "GET":
-            data = {"text": self.text, "on": self.on, "rules": 0, "problems": [], "suggestion": SUGGESTION}
+            data = {"text": self.text, "on": self.on, "rules": 0, "problems": [], "suggestion": SUGGESTION,
+                    "help": "YOUR RULES - IN SHORT\nOne rule a line."}
         elif path == "/api/rules/check":
             bad = "autor" in body.get("text", "")
             data = {"rules": 0 if bad else 1, "problems": [{"line": 1, "message": "'autor' is not a condition - did you mean 'author'?"}] if bad else []}
@@ -160,6 +161,12 @@ async def test_the_editor(rules_page):
     box = page.locator("#rules-text")
     await expect(box).to_have_value(SUGGESTION)                      # offered, not taken
     await expect(page.locator(".dialog")).to_contain_text("suggestion")
+    await expect(page.locator("#rules-help")).to_be_hidden()
+    await page.get_by_role("button", name="Help").click()               # the language in short, beside
+    await expect(page.locator("#rules-help")).to_contain_text("IN SHORT")
+    await expect(box).to_have_value(SUGGESTION)                         # the editor left alone
+    await page.get_by_role("button", name="Hide help").click()
+    await expect(page.locator("#rules-help")).to_be_hidden()
     await box.fill("+10 if autor in following")
     await expect(page.locator("#rules-check")).to_contain_text("did you mean 'author'")
     await expect(page.locator(".rules-ed .gutter .bad")).to_have_text("1\n")   # the line marked

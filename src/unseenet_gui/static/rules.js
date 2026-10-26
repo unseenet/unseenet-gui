@@ -19,7 +19,7 @@ async function openRules() {
   let r;
   try { r = await api("GET", "/api/rules"); } catch (x) { toast(x.message); return; }
   const st = { text: r.text || r.suggestion || "", on: r.on, problems: r.problems, count: r.rules,
-               suggested: !r.text, busy: false, error: "" };
+               suggested: !r.text, busy: false, error: "", help: r.help || "" };
   const check = () => {
     clearTimeout(rulesCheckTimer);
     rulesCheckTimer = setTimeout(async () => {
@@ -29,19 +29,27 @@ async function openRules() {
     }, 300);
   };
   check();
-  S.dialog = { focus: "#rules-text", render: () => dialogShell({ label: "Your rules", wide: true },
+  S.dialog = { focus: "#rules-text", render: () => dialogShell({ label: "Your rules", wide: true,
+                                                                  cls: "rules-dlg" + (S.rulesHelp ? " helping" : "") },
     dialogHead("Your rules"),
     h("div", { class: "db" },
       h("p", { class: "hint", style: "margin:0", text: "For your feed and your groups. Only you see them: " +
         "they run here, and go with your identity to your other devices." }),
       st.suggested ? h("p", { class: "note suggestion", text: "This is a suggestion, so you can see what rules " +
         "look like. It is yours only if you save it." }) : null,
+      h("div", { class: "rules-top" },
+        h("span", { class: "hint", text: "Ctrl+Enter saves." }),
+        st.help ? h("button", { class: "btn small", type: "button", "aria-expanded": S.rulesHelp ? "true" : "false",
+          "aria-controls": "rules-help", onclick: toggleRulesHelp }, S.rulesHelp ? "Hide help" : "Help") : null),
+      h("div", { class: "rules-main" },
       h("div", { class: "rules-ed" },
         h("pre", { class: "gutter", "aria-hidden": "true" }, gutterLines(st)),
         h("textarea", { id: "rules-text", "data-k": "rules-text", spellcheck: "false", wrap: "off",
           "aria-label": "Your rules", value: st.text,
           oninput: (e) => { st.text = e.target.value; redrawGutter(st); check(); },
+          onkeydown: (e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); document.querySelector(".rules-dlg .btn.primary").click(); } },
           onscroll: (e) => { const g = document.querySelector(".rules-ed .gutter"); if (g) g.scrollTop = e.target.scrollTop; } })),
+      st.help ? h("pre", { id: "rules-help", class: "rules-help mono", "aria-label": "The rules in short", text: st.help }) : null),
       h("div", { id: "rules-check", role: "status" }, rulesCheck(st)),
       h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.on, onchange: (e) => { st.on = e.target.checked; } }),
         " Use my rules - off keeps them, to turn on again"),
@@ -60,6 +68,17 @@ async function openRules() {
         } catch (x) { st.busy = false; st.error = x.message; render(); }
       } }, "Save"))) };
   render();
+}
+
+// Show or hide the language in short beside the editor (the core's help, the same in every
+// client), without drawing the editor again - the text and caret stay. Remembered while
+// the page is open.
+function toggleRulesHelp(e) {
+  S.rulesHelp = !S.rulesHelp;
+  const dlg = document.querySelector(".rules-dlg");
+  if (dlg) dlg.classList.toggle("helping", S.rulesHelp);
+  e.currentTarget.textContent = S.rulesHelp ? "Hide help" : "Help";
+  e.currentTarget.setAttribute("aria-expanded", S.rulesHelp ? "true" : "false");
 }
 
 // The line numbers beside the editor, one per line of the text; lines not understood marked.

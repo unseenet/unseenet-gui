@@ -16,7 +16,8 @@ let downOnScrim = false;
 function dialogShell(props, ...kids) {
   return h("div", { class: "scrim", onmousedown: (e) => { downOnScrim = e.target === e.currentTarget; },
     onclick: (e) => { if (downOnScrim && e.target === e.currentTarget) closeDialog(); downOnScrim = false; } },
-    h("div", { class: "dialog" + (props.wide ? " wide" : ""), role: "dialog", "aria-modal": "true", "aria-label": props.label }, kids));
+    h("div", { class: "dialog" + (props.wide ? " wide" : "") + (props.cls ? " " + props.cls : ""), role: "dialog",
+      "aria-modal": "true", "aria-label": props.label }, kids));
 }
 
 // Your key: the fingerprint and key to give people, with its identicon.

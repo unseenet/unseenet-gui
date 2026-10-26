@@ -895,9 +895,26 @@ ul.notes { font-size: 12px; max-height: 180px; overflow: auto; }
   padding: 10px 12px; font: 13px/1.6 var(--mono); white-space: pre; overflow: auto; resize: none;
   background: transparent; color: inherit; tab-size: 4; box-sizing: border-box; }
 .note.suggestion { border-top: none; padding-top: 0; }
+.rules-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.rules-main { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.rules-help { display: none; margin: 0; padding: 10px 12px; font: 12px/1.5 var(--mono); white-space: pre;
+  overflow: auto; height: 50vh; min-height: 240px; box-sizing: border-box; color: var(--muted);
+  border: 1px solid var(--line-2); border-radius: 10px; }
+.dialog.rules-dlg.helping { max-width: 1240px; }
+.rules-dlg.helping .rules-help { display: block; }
+.rules-dlg.helping .rules-main { grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); }
+.rules-dlg.helping .rules-ed textarea, .rules-dlg.helping .rules-ed .gutter,
+.rules-dlg.helping .rules-help { height: 42vh; }          /* the choice and buttons stay in view */
 .rules-ok { margin: 0; font-size: 12px; color: var(--muted); }
 .rules-problems { display: flex; flex-direction: column; gap: 4px; }
 .rules-problems button { text-align: left; background: none; border: none; padding: 2px 0; cursor: pointer;
   font: 12px/1.45 var(--mono); color: var(--red); }
 .rules-problems button:hover { text-decoration: underline; }
 pre.why { white-space: pre-wrap; margin: 0; padding: .75rem; background: var(--ink-deep); border: 1px solid var(--line-2); border-radius: 10px; }
+
+/* a narrow screen: the help under the editor, not beside it */
+@media (max-width: 760px) {
+  .rules-dlg.helping .rules-main { grid-template-columns: 1fr; }
+  .rules-dlg.helping .rules-ed textarea, .rules-dlg.helping .rules-ed .gutter { height: 40vh; }
+  .rules-dlg.helping .rules-help { height: auto; max-height: 50vh; }
+}
