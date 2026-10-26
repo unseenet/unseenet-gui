@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Imported posts say where they were first published** (#137, UN-RFC 0049):
+  "Imported from Facebook · originally 3 August 2026" on feed entries and in
+  the reader, with the time of posting beside it - the origin date is the
+  poster's claim; a mark in the threads list and the chat tooltip. The order
+  by origin date, and posts old on arrival being neither new nor in For you,
+  come from the core.
+
 - **The graphical portable's build script has moved to unseenet-portable**
   (unseenet-portable#6), with its history, as `tools/build_graphical.py`, with
   its launchers. `tools/image/` stays until unseenet-bootable#5.
