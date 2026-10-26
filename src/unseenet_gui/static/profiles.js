@@ -395,7 +395,10 @@ function openPalette() {
           onkeydown: (e) => {
             if (e.key === "ArrowDown") { e.preventDefault(); sel++; render(); }
             else if (e.key === "ArrowUp") { e.preventDefault(); sel--; render(); }
-            else if (e.key === "Enter") { e.preventDefault(); const c = shown()[sel]; if (c) run(c); }
+            // the Enter that runs a command is the palette's: it must not reach the page too,
+            // where it would open the post shown - a command that fetches first leaves the
+            // page without a dialog for a moment
+            else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); const c = shown()[sel]; if (c) run(c); }
           } }),
         h("kbd", { text: "Esc" }),
         h("button", { class: "btn icon pal-close", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),   // phones: no Esc key

@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Enter in the palette stays in the palette**: a command that fetches first
+  (such as *Your rules*) left the page without a dialog for a moment, and the same
+  Enter opened the post shown in full screen. The palette stops it, and the page's
+  keys leave alone a key something else has taken.
 - **Help beside the rules editor** (unseenet#615): *Help* shows the language in
   short - the core's, the same in every client - beside the rules (under them on
   a narrow screen), without touching what you wrote; Ctrl+Enter saves.
