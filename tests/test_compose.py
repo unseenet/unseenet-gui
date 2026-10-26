@@ -81,6 +81,8 @@ class LocalAPI:
             data = {"signature_preview": "Test signature", "notices": {"send": True}}
         elif path == "/api/settings/clients/gui":
             data = {"client": "gui", "settings": {}}
+        elif path == "/api/notifications":          # #126: nothing new to tell
+            data = {"settings": {"on": False, "content": False}, "count": 0, "items": []}
         elif path == "/api/groups":
             if self.sidebar_release is not None:
                 self.sidebar_waiting.set()
