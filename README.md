@@ -242,7 +242,6 @@ tests/            the server: the core's guards, the page, /x/gui/
 tools/
   dev.sh          a playground without Tor (seed_dev.py fills it)
   record_demo.py  the demo and screenshots in this README, from the playground
-  image/          the bootable image - run by unseenet-bootable, moving there
 ```
 
 The front end is plain JavaScript with no dependencies and no build step, so
