@@ -61,6 +61,7 @@ function openNodes() {
     return h("div", { class: "node-info" },
       i.description ? h("p", { style: "margin:0 0 6px", text: i.description }) : null,
       h("dl", { class: "kv" },
+        row("Carries", i.carries === undefined ? null : `${i.carries} ${i.carries === 1 ? "group" : "groups"}`),
         row("Its own name", i.name), row("Software", i.software), row("Node key", i.node_key),
         row("Operator", i.operator), row("Contact", i.contact),
         row("New groups", p.new_groups), row("Keeps posts", p.retention_days ? p.retention_days + " days" : null),
@@ -72,7 +73,9 @@ function openNodes() {
       h("span", { class: "ic", title: n.default ? "Default: new groups and your inbox go here" : "", text: n.default ? "♦" : "" }),
       h("span", { class: "nm" }, h("strong", { text: n.name || shortNode(n.address) }), " ", nodeSource(n)),
       state(n),
-      h("span", { class: "muted", text: `${n.groups} ${n.groups === 1 ? "group" : "groups"}` })),
+      // how many of YOUR groups are read from it - not what it carries, which Details says (#153)
+      h("span", { class: "muted", title: "Followed groups you read from this node. If it stops answering, they move to another of your nodes.",
+        text: n.groups ? `${n.groups} ${n.groups === 1 ? "group" : "groups"} read here` : "none read here" })),
     n.description ? h("div", { class: "hint", text: n.description }) : null,
     h("div", { class: "node-addr" },
       h("code", { class: "mono", text: n.address }),

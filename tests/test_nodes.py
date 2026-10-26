@@ -89,7 +89,7 @@ class NodesAPI:
                 for n in nodes:
                     up = n["address"] != TWO
                     n["reachable"], n["info"] = up, ({"name": n["name"], "software": "unseenet 0.5.0",
-                                                     "policy": {"retention_days": 90}} if up else None)
+                                                     "policy": {"retention_days": 90}, "carries": 42} if up else None)
             data = {"nodes": nodes, "known": self.known}
         else:
             data = {}
@@ -142,7 +142,8 @@ async def test_your_nodes_by_name_with_their_addresses(page_api):
     await expect(first).to_contain_text("listed")
     await expect(first).to_contain_text(ONE)
     await expect(first).to_contain_text("Project test node 1")
-    await expect(first).to_contain_text("4 groups")
+    await expect(first).to_contain_text("4 groups read here")        # yours read there (#153)
+    assert "move to another" in (await first.locator("[title*='Followed groups']").get_attribute("title"))
     await expect(second).to_contain_text("unlisted")                 # the same name, but its own
     await expect(second).to_contain_text(TWO)
     await expect(second).to_contain_text("does not answer")
@@ -150,6 +151,7 @@ async def test_your_nodes_by_name_with_their_addresses(page_api):
     await first.get_by_role("button", name="Details").click()
     await expect(first).to_contain_text("unseenet 0.5.0")
     await expect(first).to_contain_text("90 days")
+    await expect(first).to_contain_text("42 groups")                 # what it carries (#153)
 
 
 async def test_add_make_default_and_remove(page_api):
@@ -158,6 +160,7 @@ async def test_add_make_default_and_remove(page_api):
     dialog = page.get_by_role("dialog", name="Your nodes")
     await dialog.locator(f"[data-k='add:{THREE}']").click()
     await expect(dialog.locator(f"[data-k='node:{THREE}']")).to_contain_text("unseenet-node3")
+    await expect(dialog.locator(f"[data-k='node:{THREE}']")).to_contain_text("none read here")
     assert api.changes[-1] == {"action": "add", "address": THREE}
 
     await dialog.locator(f"[data-k='node:{THREE}']").get_by_role("button", name="Make default").click()

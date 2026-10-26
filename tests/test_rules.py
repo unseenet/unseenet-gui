@@ -218,3 +218,15 @@ async def test_the_palette_while_not_connected(rules_page):
     await expect(row).not_to_have_class(re.compile("waiting"))
     await page.locator("#palette").fill("your rules")
     await expect(page.locator(".cmd", has_text="Your rules")).not_to_have_class(re.compile("waiting"))
+
+
+@pytest.mark.parametrize("rules_page", [False], indirect=True)
+async def test_the_sidebar_top_stays_while_the_groups_scroll(rules_page):
+    """#144: the logo, the filter and For you stay put; only the groups and chats scroll."""
+    page, _ = rules_page
+    top = page.locator("nav.side .side-top")
+    await expect(top.locator(".brand")).to_be_visible()
+    await expect(top.locator("#sidefilter")).to_be_visible()
+    await expect(top).to_contain_text("For you")
+    await page.locator("nav.side .side-scroll").evaluate("e => e.scrollTop = 99999")
+    assert (await top.locator(".brand").bounding_box())["y"] < 60

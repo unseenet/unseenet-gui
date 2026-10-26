@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The sidebar's top stays put** (#144): the logo, the filter and For you,
+  Timeline, your feed and site, Private posts stay while the groups and chats
+  scroll - as the account box at the bottom.
+- **Your nodes says what the number is** (#153): *13 groups read here* (or *none
+  read here*), with what it means on hover; *Details* says how many the node
+  carries - so a node you read none of yours from no longer looks empty.
+
 - **Feeds you can live in** (#143, for 0.6.0):
   - **times say how long ago** - now, 5 min, 2 h, Yesterday 14:20, 3 days, then
     the date - with the exact time on hover, kept fresh every minute; in feeds,
