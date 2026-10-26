@@ -86,7 +86,7 @@ function feedView(d) {
   const pendNew = Object.entries(S.pending).filter(([, p]) => p.thread === "new:" + g.id);
   return h("div", { class: "content" }, h("section", { class: "feed", "aria-label": timeline ? "Timeline" : "Feed",
     "data-scroll": "feed:" + g.id },
-    timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} feed${g.feeds === 1 ? "" : "s"} you follow, in the order they were written. Nobody is told whom you follow.` }) : null,
+    timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} feed${g.feeds === 1 ? "" : "s"} you follow, ${d.messages.some(x => x.score !== undefined) ? "in the order your rules give (⋯ on an entry says why)" : "in the order they were written"}. Nobody is told whom you follow.` }) : null,
     note ? h("form", { class: "chatbar notebar", onsubmit: (e) => { e.preventDefault(); send(); } },
       h("div", { class: "row" },
         h("label", { for: "note", class: "sr", text: "A note in " + g.label }),

@@ -126,12 +126,17 @@ function rulesCheck(st) {
     onclick: () => goToRuleLine(p.line) }, h("b", { text: `Line ${p.line}` }), " " + p.message)));
 }
 
-// Why is this post here: which of your rules gave which points (UN-RFC 0051 section 10).
+// Why is this post here: your rules put it there - which lines gave which points (UN-RFC
+// 0051 section 10).
 function openWhy(m) {
-  S.dialog = { focus: ".dialog .btn", render: () => dialogShell({ label: "Why is this here?" },
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Why is this here?" },
     dialogHead("Why is this here?"),
-    h("pre", { class: "mono why", text: m.why || "You have no rules (or they are off): the feed is newest first and threads are as they are." }),
-    h("div", { class: "buttons" },
+    h("div", { class: "db" },
+      h("p", { class: "hint", style: "margin:0", text: m.why
+        ? "Your rules put it here. These lines gave it its score:"
+        : "You have no rules (or they are off): the feed is newest first and threads are as they are." }),
+      m.why ? h("pre", { class: "mono why", text: m.why }) : null),
+    h("div", { class: "df btns" },
       h("button", { class: "btn", type: "button", onclick: () => { closeDialog(); openRules(); } }, "Your rules"),
       h("button", { class: "btn primary", type: "button", onclick: closeDialog }, "Close"))) };
   render();
@@ -158,11 +163,6 @@ function ruleItems(m) {
     mark !== "ignored" ? ["Ignore this thread", () => markThread(m, "ignored")] : null,
     mark ? ["Neither watch nor ignore", () => markThread(m, "")] : null,
   ];
-}
-
-// The same as buttons, for the reader's "more" tools under a post in a threaded group.
-function ruleButtons(m) {
-  return ruleItems(m).filter(Boolean).map(([label, run]) => h("button", { class: "btn", onclick: run }, label));
 }
 
 // The mark of the thread a post is in, from its first row ("" when neither).
