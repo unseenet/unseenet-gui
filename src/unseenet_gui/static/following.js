@@ -272,8 +272,8 @@ function readerPane(g, m, msgs) {
   else if (m.contact) marks.push(h("span", { class: "sm", text: "contact" }));
   if (m.origin) {                                     // UN-RFC 0049 5.1: the claim, and when posted
     marks.push(h("span", { class: "sm origin", text: originText(m) }));
-    marks.push(h("span", { class: "sm", text: "posted " + when(m.date) }));
-  } else marks.push(h("span", { class: "sm", text: when(m.date) }));
+    marks.push(h("span", { class: "sm" }, "posted ", timeEl(m.date, "")));
+  } else marks.push(timeEl(m.date, "sm"));
   if (m.for_me === "reply") marks.push(h("span", { class: "sm you", text: "◄ reply to you" }));
   if (m.for_me === "mention") marks.push(h("span", { class: "sm you", text: "♦ names you" }));
   if (m.encrypted) marks.push(h("span", { class: "sm lock" }, svg(ICON.lock, 12, 2.5), " encrypted"));

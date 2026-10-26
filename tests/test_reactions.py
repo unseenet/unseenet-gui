@@ -147,7 +147,8 @@ async def test_feed_counts_react_and_take_back(page_api):
     assert api.requests[-1] == {"id": "<a@x>", "emoji": "👍"}
     await expect(entry.locator(".react.mine")).to_contain_text("👍")
 
-    comment = page.locator(".comment").first                          # comments too
+    await page.get_by_role("button", name="View 1 more comment").click()   # the newest is yours (#143)
+    comment = page.locator('.comment[data-id="<b@x>"]')               # comments too
     await expect(comment.get_by_role("button", name="Add a reaction")).to_be_visible()
 
 
@@ -210,6 +211,7 @@ async def test_calm_feed_actions(page_api):
     await expect(act.get_by_role("button", name="Reply with a post")).to_be_visible()
     await expect(act.get_by_role("button", name="Copy address")).to_have_count(0)
 
+    await page.get_by_role("button", name="View 1 more comment").click()   # the newest is yours (#143)
     comment = page.locator('.comment[data-id="<b@x>"]')
     add = comment.get_by_role("button", name="Add a reaction")
     answer = comment.get_by_role("button", name="Answer")

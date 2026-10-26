@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Feeds you can live in** (#143, for 0.6.0):
+  - **times say how long ago** - now, 5 min, 2 h, Yesterday 14:20, 3 days, then
+    the date - with the exact time on hover, kept fresh every minute; in feeds,
+    the timeline, comments, the reader and the thread list (chats keep the time);
+  - **long entries are cut** after 6 lines (10 wide) with *… more*, opened in place
+    with *Show less*; only where something is really hidden; pictures never cut;
+  - **comments folded**: the newest and your own talks, *View 20 of N more* at a
+    time, and *Newest*, *Where you wrote*, *Mentions you* - never chosen by how many
+    answer or react (UN-RFC 0034 4.4).
 - **A ⋯ menu at a post's head** in threaded groups, from the maintainer: the
   thirteen buttons under a post become a menu beside *signed*, grouped - *This
   post* (edit, withdraw, pin, copy its addresses, why is this here, report), *This

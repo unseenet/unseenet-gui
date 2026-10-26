@@ -57,8 +57,8 @@ class FeedAPI:
         first = row("<a@x>", "En kort note", group=group)
         if self.entry_mine:
             first.update(mine=True, may_withdraw=True, may_edit=True)
-        second = row("<b@x>", "Lang tekst her", kind="post", subject="En overskrift", comment=CLOSED,
-                     group=group)
+        second = row("<b@x>", getattr(self, "long_text", "Lang tekst her"), kind="post",
+                     subject="En overskrift", comment=CLOSED, group=group)
         if self.imported:                 # UN-RFC 0049: an import of the author's own
             second["message"].update(origin={"network": "facebook", "date": "2025-08-03T14:20:00Z",
                                              "id": None, "from": None}, old_on_arrival=True)
@@ -179,8 +179,8 @@ async def test_entries_whole_with_comments_under_them(feed_page):
     await expect(note).to_contain_text("En kort note")
     await expect(note.locator(".etitle")).to_have_count(0)              # a note has no headline
     await expect(post.locator(".etitle")).to_have_text("En overskrift")
-    await expect(note.locator(".comment")).to_have_count(2)             # the newest two
-    await note.get_by_role("button", name="Show all 6 comments").click()
+    await expect(note.locator(".comment")).to_have_count(1)             # the newest one (#143)
+    await note.get_by_role("button", name="View 5 more comments").click()
     await expect(note.locator(".comment")).to_have_count(6)
     await expect(note.locator(".comment.answer").last).to_contain_text("in answer to Dybt")
     await expect(post).to_contain_text("Comments are closed.")
@@ -263,7 +263,7 @@ async def test_a_feed_switches_to_threads_and_back(feed_page):
 
 async def test_folded_comments_keep_your_conversations(feed_page):
     # a comment naming you is shown with what it answers and the answers under it,
-    # besides the newest two; the rest stay folded
+    # besides the newest one; the rest stay folded (unseenet-gui#143)
     page, api = feed_page
     api.comments[0]["for_me"] = "mention"                    # Læser 0 names you
     api.comments.insert(1, row("<f@x>", "Svar til Læser 0", 2, refs=["<a@x>", "<c0@x>"],
@@ -271,14 +271,14 @@ async def test_folded_comments_keep_your_conversations(feed_page):
     await open_feed(page)
     note = page.locator(".entry").first
     shown = note.locator(".comment")
-    await expect(shown).to_have_count(4)                     # c0, its answer, and the newest two
+    await expect(shown).to_have_count(3)                     # c0, its answer, and the newest one
     await expect(note.locator('.comment[data-id="<c0@x>"]')).to_be_visible()
     await expect(note.locator('.comment[data-id="<f@x>"]')).to_be_visible()
     await expect(note.locator('.comment[data-id="<c2@x>"]')).to_have_count(0)
-    await note.get_by_role("button", name="Show all 7 comments").click()
+    await note.get_by_role("button", name="View 4 more comments").click()
     await expect(shown).to_have_count(7)
     await note.get_by_role("button", name="Show fewer").click()
-    await expect(shown).to_have_count(4)
+    await expect(shown).to_have_count(3)
 
 
 async def test_a_long_feed_scrolls_by_itself_not_the_page(feed_page):
@@ -388,3 +388,59 @@ async def test_an_imported_entry_says_where_it_was_first_published(feed_page):
     await expect(origin).to_contain_text("Imported from Facebook")
     await expect(origin).to_contain_text("2025")
     assert "Posted" in (await origin.get_attribute("title"))
+
+
+
+async def test_a_long_entry_is_cut_with_more_and_a_short_one_is_not(feed_page):
+    """#143: a long entry shows a few lines and "… more", opened in place; a short one whole."""
+    page, api = feed_page
+    api.long_text = "\n\n".join(f"Afsnit {i}: " + "ord " * 40 for i in range(12))
+    await open_feed(page)
+    long = page.locator('.entry[data-id="<b@x>"]')
+    short = page.locator('.entry[data-id="<a@x>"]')
+    await expect(long.locator(".emore")).to_be_visible()
+    await expect(short.locator(".emore")).to_be_hidden()
+    box = await long.locator(".etext").bounding_box()
+    assert box["height"] < 400
+    await long.locator(".emore").click()
+    await expect(long.get_by_role("button", name="Show less")).to_be_visible()
+    assert (await long.locator(".etext").bounding_box())["height"] > box["height"] * 2
+    await long.get_by_role("button", name="Show less").click()
+    await expect(long.locator(".emore")).to_be_visible()
+
+
+async def test_many_comments_twenty_at_a_time_and_which(feed_page):
+    """Hundreds of comments: the newest and your own talks, then 20 at a time; or only
+    those where you wrote, or that name you."""
+    page, api = feed_page
+    api.comments = [row(f"<k{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
+                        key=f"ed25519:k{i}") for i in range(47)]
+    api.comments[5].update(mine=True)
+    api.comments[9]["for_me"] = "mention"
+    await open_feed(page)
+    note = page.locator(".entry").first
+    shown = note.locator(".comment")
+    await expect(shown).to_have_count(3)                     # yours, the one naming you, the newest
+    await note.get_by_role("button", name="View 20 of 44 more comments").click()
+    await expect(shown).to_have_count(23)
+    await note.get_by_role("button", name="Where you wrote").click()
+    await expect(shown).to_have_count(1)
+    await note.get_by_role("button", name="Mentions you").click()
+    await expect(note.locator(".comment")).to_contain_text(["Kommentar 9"])
+    await note.get_by_role("button", name="Newest").click()
+    await expect(shown).to_have_count(23)
+
+
+async def test_times_say_how_long_ago(feed_page):
+    page, _ = feed_page
+    await open_feed(page)
+    got = await page.evaluate("""() => {
+      const now = new Date("2026-10-26T20:00:00");
+      const at = (s) => ago(new Date(now - s * 1000).toISOString(), now);
+      return [at(10), at(300), at(2 * 3600), at(22 * 3600), at(3 * 86400), at(40 * 86400),
+              ago(new Date("2024-03-05T10:00:00").toISOString(), now)];
+    }""")
+    assert got[:4] == ["now", "5 min", "2 h", got[3]] and got[3].startswith("Yesterday")
+    assert got[4] == "3 days" and "2024" in got[6] and "2026" not in got[5]
+    t = page.locator(".entry time.ago").first
+    assert await t.get_attribute("datetime") and await t.get_attribute("title")
