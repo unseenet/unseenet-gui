@@ -13,6 +13,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from unseenet_gui.server import STATIC
+from conftest import post_menu  # noqa: E402
 
 playwright = pytest.importorskip("playwright.async_api")
 expect = playwright.expect
@@ -214,7 +215,7 @@ async def test_copy_the_address_of_a_post_and_a_group(addr_page):
     more = page.locator(".more-btn")
     if await more.is_visible():
         await more.click()
-    await page.locator(".reader").get_by_role("button", name="Copy address").click()
+    await post_menu(page, "Copy address")
     await page.get_by_role("button", name="About this group").click()
     await expect(page.locator(".dialog")).to_contain_text("unseenet:alt.adr@abcd")
     await page.locator(".dialog").get_by_role("button", name="Copy address").click()

@@ -17,3 +17,9 @@ def fast_ripening():
     ripening.scale_for_tests(16, rules=False)
     yield
     ripening.scale_for_tests(0)
+
+
+async def post_menu(page, item: str):
+    """Open the ⋯ menu at the head of the post shown and choose ``item`` (#post-menu)."""
+    await page.locator(".reader .post-more .morebtn").click()
+    await page.get_by_role("menuitem", name=item, exact=True).click()

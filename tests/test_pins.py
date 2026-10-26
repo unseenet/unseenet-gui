@@ -11,6 +11,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from unseenet_gui.server import STATIC
+from conftest import post_menu  # noqa: E402
 
 playwright = pytest.importorskip("playwright.async_api")
 expect = playwright.expect
@@ -139,7 +140,7 @@ async def test_pinned_section_above_the_threads(pins_page):
 async def test_pin_and_unpin_from_the_post(pins_page):
     page, api = pins_page
     await page.locator(".prow", has_text="Regler").click()
-    await page.get_by_role("button", name="Pin", exact=True).click()
+    await post_menu(page, "Pin")
     await page.fill("#pnote", "Husk dem")
     await page.locator(".dialog .btn.primary").click()
     await expect(page.locator(".pins .pin")).to_have_count(2)
@@ -148,7 +149,7 @@ async def test_pin_and_unpin_from_the_post(pins_page):
     api.beyond.add("<b@x>")                                           # older than the window
     await page.evaluate("loadGroup().then(render)")
     await page.locator(".prow", has_text="Regler").click()
-    await page.get_by_role("button", name="Unpin", exact=True).click()
+    await post_menu(page, "Unpin")
     await expect(page.locator(".dialog")).to_contain_text("delete it as soon as it is unpinned")
     await page.locator(".dialog .btn.primary").click()
     await expect(page.locator(".pins .pin")).to_have_count(1)
@@ -161,7 +162,7 @@ async def test_a_full_group_says_which_pin_stops_counting(pins_page):
     api.max_pins = 1
     await page.evaluate("loadGroup().then(render)")
     await page.locator(".prow", has_text="Regler").click()
-    await page.get_by_role("button", name="Pin", exact=True).click()
+    await post_menu(page, "Pin")
     await expect(page.locator(".dialog .warnbox")).to_contain_text("“Velkommen” stops counting")
 
 
@@ -170,7 +171,8 @@ async def test_no_pinning_for_others(pins_page):
     page, _ = pins_page
     await expect(page.get_by_role("region", name="Pinned posts")).to_be_visible()   # but you see them
     await page.locator(".prow", has_text="Regler").click()
-    await expect(page.get_by_role("button", name="Pin", exact=True)).to_have_count(0)
+    await page.locator(".reader .post-more .morebtn").click()
+    await expect(page.get_by_role("menuitem", name="Pin", exact=True)).to_have_count(0)
 
 
 @pytest.mark.parametrize("pins_page", [("chat", True)], indirect=True)

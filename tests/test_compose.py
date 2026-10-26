@@ -13,6 +13,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from unseenet_gui.server import STATIC
+from conftest import post_menu  # noqa: E402
 
 playwright = pytest.importorskip("playwright.async_api")
 expect = playwright.expect
@@ -164,9 +165,9 @@ async def open_compose(page, mode="new"):
         await page.get_by_role("button", name=re.compile("New post")).click()
     elif mode == "edit":
         await page.locator('.prow[data-id="mine"]').click()
-        await page.get_by_role("button", name="Edit", exact=True).click()
+        await post_menu(page, "Edit")
     elif mode == "private":
-        await page.get_by_role("button", name="Write a post", exact=True).click()
+        await post_menu(page, "Write a private post")
     else:
         await page.get_by_role("button", name=re.compile("^Reply")).click()
     await expect(page.locator("#body")).to_be_visible()

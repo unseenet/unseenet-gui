@@ -7,6 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A ⋯ menu at a post's head** in threaded groups, from the maintainer: the
+  thirteen buttons under a post become a menu beside *signed*, grouped - *This
+  post* (edit, withdraw, pin, copy its addresses, why is this here, report), *This
+  thread* (watch, ignore), *The author* (chat, private post, add contact, profile,
+  ban, block, ignore). The bar keeps Reply and moving. The keys and the palette are
+  as before. *Why is this here?* says first that your rules put it there; the
+  timeline says when your rules order it.
+
 - **The palette says what waits for the network**: while Unseenet is not
   connected yet, what needs it (finding groups, opening an address, following,
   creating or editing groups, names, sharing your profile, copying to another

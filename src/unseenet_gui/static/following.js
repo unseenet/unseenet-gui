@@ -205,6 +205,64 @@ function openLink(href) {
   window.open(href, "_blank", "noopener,noreferrer");
 }
 
+// The ⋯ menu at a post's head in a threaded group: what is about this post, its thread and
+// its author, grouped - the tools that used to fill the bar under it (the bar keeps Reply
+// and moving). The keys still do the same (D withdraw, M private post ...), and the
+// palette has them all.
+function postMenu(m, g) {
+  if (!m || !m.readable) return null;
+  const other = !m.mine && m.key;
+  const groups = [
+    ["This post", [
+      m.may_edit && m.kind !== "chat" ? ["Edit", () => openEdit(m, g)] : null,
+      m.may_withdraw ? ["Withdraw (delete)", () => openWithdraw(m)] : null,
+      g.may_pin ? [m.pinned ? "Unpin" : "Pin", () => openPin(m)] : null,
+      m.address && !m.private ? ["Copy address", () => copy(m.address, "The post's address is copied.")] : null,
+      m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
+      m.why ? ["Why is this here?", () => openWhy(m)] : null,
+      !m.mine && !m.private && g.id !== FOR_YOU ? ["Report", () => openReport(m)] : null]],
+    ["This thread", ruleItems(m).filter(i => i && i[0] !== "Why is this here?")],
+    ["The author", [
+      other && !(m.private && m.kind === "chat") ? ["Chat", () => openGroup("contact:" + m.key)] : null,
+      other && !g.private_reply ? ["Write a private post", () => openPost(m.key, m.who.replace(/ √$/, ""))] : null,
+      other && !m.contact ? ["Add contact", () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, ""))] : null,
+      other ? ["Profile", () => openProfile(m.key, m.who, m.private ? "me" : S.gid)] : null,
+      g.owner && other && !m.private ? ["Ban from this group", () => openBanned(m.key)] : null,
+      g.maintainer && other && !m.private ? ["Block in your hierarchy", () => openBlock(m)] : null,
+      other ? ["Ignore this person", () => ignorePerson(m.key, m.who)] : null]],
+  ].map(([title, items]) => [title, items.filter(Boolean)]).filter(([, items]) => items.length);
+  if (!groups.length) return null;
+  const open = S.menuFor === "post:" + m.id;
+  if (open) requestAnimationFrame(placePostMenu);
+  return h("div", { class: "more post-more" + (open ? " open" : "") },
+    h("button", { class: "morebtn", type: "button", "aria-label": "More", title: "More for this post", "aria-haspopup": "menu",
+      "aria-expanded": String(open), onclick: (e) => { e.stopPropagation(); S.menuFor = open ? null : "post:" + m.id; render(); } }, "⋯"),
+    open ? h("div", { class: "menu", role: "menu" }, groups.map(([title, items]) => [
+      h("div", { class: "msect", role: "presentation", text: title }),
+      items.map(([label, run]) => h("button", { class: "mi", type: "button", role: "menuitem",
+        onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))])) : null);
+}
+
+// Put an open post menu where the window has room for it - under its button, or above it
+// when the button is low - outside the reader's scrolling, which would cut it off; long,
+// it scrolls itself.
+function placePostMenu() {
+  const btn = document.querySelector(".post-more.open .morebtn");
+  const menu = document.querySelector(".post-more.open .menu");
+  if (!btn || !menu) return;
+  const r = btn.getBoundingClientRect(), gap = 6, edge = 12;
+  const below = window.innerHeight - r.bottom - gap - edge, above = r.top - gap - edge;
+  const need = menu.scrollHeight;                     // its own height, all items shown
+  const up = need > below && above > below;           // above when it fits better there
+  menu.style.position = "fixed";
+  menu.style.right = Math.max(edge, window.innerWidth - r.right) + "px";
+  menu.style.left = "auto";
+  menu.style.maxHeight = Math.max(160, up ? above : below) + "px";
+  menu.style.overflowY = "auto";
+  if (up) { menu.style.bottom = (window.innerHeight - r.top + gap) + "px"; menu.style.top = "auto"; }
+  else { menu.style.top = (r.bottom + gap) + "px"; menu.style.bottom = "auto"; }
+}
+
 // The reader below the threads list: the selected post with who, when, files, reactions and
 // what you may do.
 function readerPane(g, m, msgs) {
@@ -231,7 +289,7 @@ function readerPane(g, m, msgs) {
     h("div", { class: "scroll", "data-scroll": "post:" + m.id },
       h("h2", { text: subjectOf(m) }),
       h("div", { class: "post" }, avatar(m),
-        h("div", { class: "pb" }, h("div", { class: "ph" }, whoEl(m), marks),
+        h("div", { class: "pb" }, h("div", { class: "ph" }, whoEl(m), marks, postMenu(m, g)),
           parent ? h("button", { class: "inreply", onclick: () => { S.post = parent.id; render(); } },
             "In reply to ", h("span", { class: "mono", text: parent.who })) : null)),
       h("div", { class: "pbody" },
@@ -245,29 +303,6 @@ function readerPane(g, m, msgs) {
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === FOR_YOU ? h("button", { class: "btn", onclick: async () => {
         await openGroup(m.group); S.post = m.id; render(); } }, "Open in " + labelOf(m.group)) : null,
-      h("button", { class: "btn icon more-btn", "aria-label": "More", "aria-expanded": S.moreTools ? "true" : "false",
-        onclick: () => { S.moreTools = !S.moreTools; render(); } }, "⋯"),
-      h("span", { class: "sec-tools" + (S.moreTools ? " open" : "") },
-      !m.mine && m.key && !(m.private && m.kind === "chat") ? h("button", { class: "btn", title: "A private chat with them",
-        onclick: () => openGroup("contact:" + m.key) }, "Chat") : null,
-      !m.mine && m.key && !g.private_reply ? h("button", { class: "btn", title: "A private post with a subject",
-        onclick: () => openPost(m.key, m.who.replace(/ √$/, "")) }, "Write a post") : null,
-      !m.mine && m.key && !m.contact ? h("button", { class: "btn", onclick: () => openAddContact(m.key, m.who.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact") : null,
-      // the post's tools, as in the TUI: withdraw (D), report, ban its author (owner)
-      m.may_edit && m.kind !== "chat" ? h("button", { class: "btn", title: "Post a new version: everyone sees the newest (UN-RFC 0042)",
-        onclick: () => openEdit(m, g) }, "Edit") : null,
-      m.may_withdraw ? h("button", { class: "btn", title: "Withdraw the post from the network (D)", onclick: () => openWithdraw(m) }, "Withdraw", h("kbd", { text: "D" })) : null,
-      g.may_pin && m.readable ? h("button", { class: "btn", title: m.pinned ? "Stop keeping it at the top" : "Keep it at the top of the group, for everyone",
-        onclick: () => openPin(m) }, m.pinned ? "Unpin" : "Pin") : null,
-      m.address && !m.private ? h("button", { class: "btn", title: "An unseenet: address others can open (UN-RFC 0031)",
-        onclick: () => copy(m.address, "The post's address is copied.") }, "Copy address") : null,
-      m.address && !m.private ? h("button", { class: "btn", title: "The same address as https://… on a web entrance, for the web and mail",
-        onclick: () => copyWeb(m.address, "post") }, "Copy web address") : null,
-      !m.mine && !m.private && g.id !== FOR_YOU ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
-      g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
-      g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
-      !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null,
-      ...ruleButtons(m)),                    // your own rules: why, and the thread's mark (#615)
       h("span", { class: "grow" }),
       h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
       h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),

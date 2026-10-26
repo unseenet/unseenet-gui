@@ -14,6 +14,7 @@ from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from unseenet_gui.server import STATIC
+from conftest import post_menu  # noqa: E402
 
 playwright = pytest.importorskip("playwright.async_api")
 expect = playwright.expect
@@ -148,10 +149,10 @@ async def test_a_list_as_the_rules_have_it(rules_page):
     assert any(p == f"/api/groups/{GROUP}/seen" and b["until"] == "2026-10-26T12:04:00Z"
                for p, b in api.requests)
     await page.locator(".prow", has_text="re: kage").click()
-    await page.get_by_role("button", name="Why is this here?").click()
+    await post_menu(page, "Why is this here?")
     await expect(page.locator("pre.why")).to_contain_text("score 0")
     await page.locator(".dialog .btn.primary").click()
-    await page.get_by_role("button", name="Watch this thread").click()
+    await post_menu(page, "Watch this thread")
     await page.wait_for_timeout(300)
     assert ("/api/threads", {"id": "<k@x>", "mark": "watched"}) in api.requests
 
