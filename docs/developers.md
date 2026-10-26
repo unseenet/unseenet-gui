@@ -44,7 +44,7 @@ builds, and - inlined into one file - the browser build (unseenet-entrance).
 | `keys.js` | keys and the command palette's shortcuts |
 | `events.js` | events from the server |
 | `start.js` | starting the page: kept last of these, so every function above exists |
-| `identity.js` | Recovery words and copying to another device (UN-RFC 0050, unseenet-gui#142) |
-| `notify.js` | Notifications when something new lands in For you (unseenet-gui#126). What is new |
-| `publish.js` | Publish a folder as a site (#125, on the core's site import, unseenet#538): pick a |
-| `export.js` | Export my data (#141, on the core's export, unseenet#577 / UN-RFC 0049 section 7): |
+| `identity.js` | recovery words and copying an identity to another device (UN-RFC 0050, #142) |
+| `notify.js` | notifications when something new lands in For you (#126), from the core's /api/notifications |
+| `publish.js` | publishing a folder as a site (#125, on the core's site import, unseenet#538) |
+| `export.js` | Export my data (#141, on the core's export, unseenet#577 and UN-RFC 0049 section 7) |
