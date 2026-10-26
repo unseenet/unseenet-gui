@@ -2,7 +2,7 @@
 
     python -m unseenet_gui.splash [PANEL]
 
-PANEL is a raw image made when the image is built (tools/image/make_splash.py):
+PANEL is a raw image made when the image is built (unseenet-bootable's tools/image-graphical/make_splash.py):
 an 8-byte header (width, height as little-endian uint32) and RGBA pixels. It is
 blended onto the ink colour of unseenet.org and drawn in the middle of the
 screen, with a small bar moving below it until the client's window takes over.

@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The bootable image's tools have moved to unseenet-bootable**
+  (unseenet-bootable#5), with their history, as `tools/image-graphical/`.
+
 - **Imported posts say where they were first published** (#137, UN-RFC 0049):
   "Imported from Facebook · originally 3 August 2026" on feed entries and in
   the reader, with the time of posting beside it - the origin date is the

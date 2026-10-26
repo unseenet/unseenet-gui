@@ -1,4 +1,4 @@
-"""The graphical session of the bootable image (tools/image).
+"""The graphical session of the bootable image (unseenet-bootable's tools/image-graphical).
 
     python -m unseenet_gui.boot              the session on tty1: cage (a kiosk
                                              Wayland compositor) showing the client full screen
