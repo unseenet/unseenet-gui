@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Export my data** (#141, on unseenet#577): in the menu - your posts, comments,
+  chat lines and pages as signed, their files, your profile and the groups you
+  follow, saved in Downloads; never your keys; says that it holds only what the
+  nodes still carry. Private posts and chats only when chosen, and then the file
+  is encrypted with a passphrase you type twice. Not in the browser build yet.
+
 - **Publish a folder as a site** (#125, on unseenet#538): on a site you write
   in, *Publish a folder…* (and the menu) - pick a folder of Markdown or HTML
   files, see what would be sent (new, changed, unchanged, removed pages, and
