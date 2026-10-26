@@ -177,9 +177,9 @@ function sidebar() {
       ...[[sb.my_feed, "☰", "feed", openMyFeed, "Your own feed - public, anyone can comment"],
           [sb.my_site, "▤", "site", openMySite, "Your own site of pages - public"]].map(([m, ic, kind, start, title]) =>
         !m ? null : m.started
-        ? item(m.id, ic, "My " + kind, m.unread ? h("span", { class: "count", text: m.unread }) : null, "", title)
+        ? item(m.id, ic, "Your " + kind, m.unread ? h("span", { class: "count", text: m.unread }) : null, "", title)
         : h("button", { class: "item start", onclick: start, title },
-            h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: "Start my " + kind }))),
+            h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: "Start your " + kind }))),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
@@ -221,5 +221,5 @@ function sidebar() {
           text: me.label || me.display || "" })),
         nodeLink(),
         ripeLine()),
-      h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
+      h("button", { class: "btn icon", "aria-label": "Show your key", title: "Show your key (K)", onclick: openKey, text: "K" })));
 }

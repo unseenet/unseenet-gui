@@ -48,3 +48,10 @@ builds, and - inlined into one file - the browser build (unseenet-entrance).
 | `notify.js` | notifications when something new lands in For you (#126), from the core's /api/notifications |
 | `publish.js` | publishing a folder as a site (#125, on the core's site import, unseenet#538) |
 | `export.js` | Export my data (#141, on the core's export, unseenet#577 and UN-RFC 0049 section 7) |
+
+## Words
+
+The client says **your** when it speaks to you (titles, navigation, the palette,
+messages: *Your feed*, *Your rules*, *Export your data*) and **my** only in your own
+words (a checkbox or a choice: *Use my rules*) - never both in one list. The rule for
+every client is in the core's *Write a client*, docs/developers/index.md.

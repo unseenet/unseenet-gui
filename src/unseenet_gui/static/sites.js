@@ -195,7 +195,7 @@ async function openMySite() {
         try { await api("POST", "/api/site", {}); }
         catch (x) { st.busy = false; st.err = x.message; render(); return; }
         closeDialog(); toast("Your site is started: write its home page.");
-        await loadSidebar(); S.full = false; openGroup(f.id); } }, st.busy ? "Starting …" : "Start my site")));
+        await loadSidebar(); S.full = false; openGroup(f.id); } }, st.busy ? "Starting …" : "Start your site")));
   S.dialog = { focus: ".dialog .btn", render: draw };
   render();
 }

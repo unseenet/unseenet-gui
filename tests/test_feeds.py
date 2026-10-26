@@ -236,21 +236,21 @@ async def test_starting_your_feed_warns_first(feed_page):
     await expect(dialog.locator(".warnbox")).to_contain_text("public and tied to this identity")
     assert api.started == []
     await dialog.get_by_label("No comments").check()
-    await dialog.get_by_role("button", name="Start my feed").click()
+    await dialog.get_by_role("button", name="Start your feed").click()
     await expect(page.locator(".toast")).to_contain_text("Your feed is started")
     assert api.started == [{"comments": "none"}]
 
 
 async def test_start_my_feed_at_the_top_of_the_sidebar(feed_page):
-    """gui#101: "Start my feed" under For you and Timeline, as in the terminal client."""
+    """gui#101: "Start your feed" under For you and Timeline, as in the terminal client."""
     page, api = feed_page
     start = page.locator("nav.side .item.start")
-    await expect(start).to_have_text("☰Start my feed")              # the site is started:
-    await expect(page.locator("nav.side .item", has_text="My site")).to_have_count(1)
+    await expect(start).to_have_text("☰Start your feed")              # the site is started:
+    await expect(page.locator("nav.side .item", has_text="Your site")).to_have_count(1)
     await start.click()
     dialog = page.locator(".dialog")
     await expect(dialog.locator(".warnbox")).to_contain_text("public and tied to this identity")
-    await dialog.get_by_role("button", name="Start my feed").click()
+    await dialog.get_by_role("button", name="Start your feed").click()
     await expect(page.locator(".toast")).to_contain_text("Your feed is started")
     assert api.started == [{"comments": "open"}]
 

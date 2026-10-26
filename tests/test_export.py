@@ -1,4 +1,4 @@
-"""#141: Export my data - what it holds, private messages only with a passphrase."""
+"""#141: Export your data - what it holds, private messages only with a passphrase."""
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
@@ -66,7 +66,7 @@ async def page_api():
 async def test_export_without_private_messages(page_api):
     page, api = page_api
     await page.evaluate("openExport()")
-    dialog = page.get_by_role("dialog", name="Export my data")
+    dialog = page.get_by_role("dialog", name="Export your data")
     await expect(dialog).to_contain_text("Never your keys")
     await expect(dialog).to_contain_text("not everything you ever wrote")
     await dialog.get_by_role("button", name="Export").click()
@@ -78,7 +78,7 @@ async def test_export_without_private_messages(page_api):
 async def test_private_messages_need_a_passphrase_twice(page_api):
     page, api = page_api
     await page.evaluate("openExport()")
-    dialog = page.get_by_role("dialog", name="Export my data")
+    dialog = page.get_by_role("dialog", name="Export your data")
     await dialog.get_by_label("Include private posts and chats").check()
     await dialog.get_by_label("Passphrase for the export").fill("lang sætning")
     await dialog.get_by_label("The passphrase again").fill("en anden")

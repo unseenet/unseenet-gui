@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **"Your", as the client speaks to you**: *Your feed*, *Your site*, *Start your
+  feed*, *Export your data*, *Show your key*, *Share your profile* - matching *For
+  you* beside them; "my" stays only in your own words (*Use my rules*). The rule is
+  in the core's *Write a client*.
+
 - **Enter in the palette stays in the palette**: a command that fetches first
   (such as *Your rules*) left the page without a dialog for a moment, and the same
   Enter opened the post shown in full screen. The palette stops it, and the page's
