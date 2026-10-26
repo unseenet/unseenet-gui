@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Help beside the rules editor** (unseenet#615): *Help* shows the language in
+  short - the core's, the same in every client - beside the rules (under them on
+  a narrow screen), without touching what you wrote; Ctrl+Enter saves.
+
 - **The rules editor, better** (unseenet#615): line numbers beside the rules,
   the lines not understood marked in red and listed below - a click goes to the
   line; laid out as the other dialogs (wide, the buttons at the bottom right),
