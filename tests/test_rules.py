@@ -179,3 +179,18 @@ async def test_the_editor(rules_page):
     await page.locator(".dialog .btn.primary").click()
     await page.wait_for_timeout(300)
     assert ("/api/rules", {"text": "+10 if author in following  # friends", "on": True}) in api.requests
+
+
+@pytest.mark.parametrize("rules_page", [True], indirect=True)
+async def test_your_rules_from_the_palette_does_not_open_the_post(rules_page):
+    """Found by the maintainer: Enter in the palette also reached the page, which opened
+    the post shown in full screen before the rules came."""
+    page, _ = rules_page
+    await page.evaluate("openPalette()")
+    await page.keyboard.type("rules")
+    while not (await page.locator(".cmd.on").first.inner_text()).startswith("Your rules"):
+        await page.keyboard.press("ArrowDown")                      # as the maintainer did
+    await page.keyboard.press("Enter")
+    await expect(page.locator("#rules-text")).to_be_visible()
+    assert await page.evaluate("S.full") is not True
+    await expect(page.locator(".content.full")).to_have_count(0)

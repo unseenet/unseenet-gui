@@ -9,6 +9,7 @@
 // ---- keys -----------------------------------------------------------------
 document.addEventListener("click", () => { if (S.menuFor) { S.menuFor = null; render(); } });
 document.addEventListener("keydown", (e) => {
+  if (e.defaultPrevented) return;            // already somebody's key: a dialog's, the palette's
   if (e.key === "Escape" && S.menuFor) { S.menuFor = null; render(); e.preventDefault(); return; }
   if (e.key === "F1" && TOKEN && S.state) { e.preventDefault(); if (!S.dialog) openAbout(); return; }   // as the TUI
   if (!S.state || !S.state.unlocked || S.state.setup) return;
