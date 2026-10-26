@@ -1136,7 +1136,9 @@ function siteView(d) {
       onclick: () => openPage(g.id, p.path) },
       h("span", { class: "ic", text: p.home ? "⌂" : "·" }),
       h("span", { class: "nm" }, p.title, h("small", { class: "mono muted", text: " /" + p.path })))),
-    site.may_write ? h("button", { class: "btn", onclick: () => openPageEditor(g, site, null) }, svg(ICON.plus, 16, 2.5), "New page") : null);
+    site.may_write ? h("button", { class: "btn", onclick: () => openPageEditor(g, site, null) }, svg(ICON.plus, 16, 2.5), "New page") : null,
+    publishPossible() ? h("button", { class: "btn", title: "Publish a folder of Markdown (and HTML) files as this site's pages",
+      onclick: openPublishFolder }, "Publish a folder…") : null);
   return h("div", { class: "content site" }, list,
     h("article", { class: "page", "aria-label": "Page" },
       h("div", { class: "pagebar" },
@@ -4116,6 +4118,8 @@ function commands() {
     { name: "Your site: start it, or go to it", key: "", run: openMySite },
     { name: "New page on this site", key: "", when: S.data && S.data.site && S.data.site.may_write,
       run: () => openPageEditor(S.data.group, S.data.site, null) },
+    { name: "Publish a folder as this site", key: "", also: "import upload markdown html folder site",
+      when: publishPossible(), run: openPublishFolder },                // #125 (publish.js)
     { name: "Show this group as a feed", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type) && g.view !== "feed",
       run: async () => { await api("POST", `/api/groups/${encodeURIComponent(g.id)}/view`, { view: "feed" }); await loadGroup(); await loadSidebar(); render(); } },
     { name: "Copy the address of this group", key: "", when: g && g.address, run: () => copy(g.address, "The group's address is copied.") },

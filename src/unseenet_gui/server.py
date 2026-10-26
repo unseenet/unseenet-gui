@@ -209,6 +209,59 @@ async def save_words(request):
     return web.json_response({"path": str(path)})
 
 
+SITE_SUFFIXES = {".md", ".markdown", ".html", ".htm", ".jpg", ".jpeg", ".png", ".gif", ".webp",
+                 ".avif", ".siteignore"}
+SITE_MAX = 50 * 1024 * 1024
+_SITE_FOLDERS: list = []               # the last folder made, removed when a new one comes
+
+
+async def site_folder(request):
+    """The files of a folder the reader chose to publish as a site (#125, the core's
+    site import, unseenet#538), into a fresh folder only this user can read: the
+    browser gives files, not a path. Only pages, pictures and .siteignore; nothing
+    outside the folder (``..``, absolute names); at most 50 MiB. The previous one is
+    removed. Not in the browser build, which has no folder here."""
+    import shutil
+    import tempfile
+    if sys.platform == "emscripten":
+        return web.json_response({"error": "Not in the browser."}, status=400)
+    reader = await request.multipart()
+    folder = Path(tempfile.mkdtemp(prefix="unseenet-site-"))
+    os.chmod(folder, 0o700)
+    total, kept = 0, 0
+    try:
+        while True:
+            part = await reader.next()
+            if part is None:
+                break
+            from urllib.parse import unquote
+            # the page sends the path relative to the folder as the field's name
+            # (browsers may cut folders off a file name); quoted or not
+            rel = Path(unquote(str(part.name or part.filename or "")).replace("\\", "/"))
+            parts = [p for p in rel.parts if p not in ("", ".")]
+            if not parts or ".." in parts or rel.is_absolute():
+                continue
+            name = parts[-1]
+            if Path(name).suffix.lower() not in SITE_SUFFIXES and name != ".siteignore":
+                continue
+            target = folder.joinpath(*parts)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with open(target, "wb") as f:
+                while chunk := await part.read_chunk():
+                    total += len(chunk)
+                    if total > SITE_MAX:
+                        raise ValueError("more than 50 MiB")
+                    f.write(chunk)
+            kept += 1
+    except ValueError as exc:
+        shutil.rmtree(folder, ignore_errors=True)
+        return web.json_response({"error": f"The folder is too large: {exc}."}, status=400)
+    for p in _SITE_FOLDERS:
+        shutil.rmtree(p, ignore_errors=True)
+    _SITE_FOLDERS[:] = [folder]
+    return web.json_response({"folder": str(folder), "files": kept})
+
+
 async def save_file(request):
     """Save a file a post carries in Downloads (else your home folder), as the node sent
     it and checked against its blob ID (UN-RFC 0027 section 9.2). Never opened: the page
@@ -238,6 +291,7 @@ def gui_routes(sub: web.Application, api: LocalAPI) -> None:
     sub.router.add_post("/save", save_file)
     sub.router.add_post("/qr", qr)                         # UN-RFC 0050: copying
     sub.router.add_post("/save-words", save_words)         # UN-RFC 0050 4.3
+    sub.router.add_post("/site-folder", site_folder)       # #125: publish a folder
     sub.router.add_get("/system", system_status)
     sub.router.add_post("/system/wifi", system_wifi)
     sub.router.add_post("/system/keyboard", system_keyboard)
