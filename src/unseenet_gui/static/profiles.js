@@ -275,6 +275,7 @@ function commands() {
     { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
     { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
     { name: "Find groups on your nodes", key: "G", run: openBrowse },
+    { name: "Your rules: what comes first, what is hidden or folded", key: "", also: "scorefile killfile score filter sort regler", run: openRules },
     { name: "Your nodes: add, remove, choose the default", key: "", also: "node server switch change onion noder skift", run: openNodes },
     { name: "Create a group", key: "", run: openCreateGroup },
     { name: "Write a private post", key: "M", run: () => openWrite("", "post") },

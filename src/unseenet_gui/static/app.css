@@ -876,3 +876,12 @@ table.publish td { padding: 3px 6px; border-bottom: 1px solid var(--line); verti
 table.publish tr.unchanged, table.publish tr.kept { opacity: .6; }
 table.publish tr.remove td:first-child, table.publish tr.remove td:nth-child(2) { color: var(--danger, #b42318); }
 ul.notes { font-size: 12px; max-height: 180px; overflow: auto; }
+
+/* your own rules (UN-RFC 0051): how a row shows what they say */
+.prow.dimmed { opacity: .55; }
+.prow.hl .sj { font-weight: 650; }
+.prow.hl { box-shadow: inset 3px 0 0 var(--green); }
+.prow .score { color: var(--muted); font-size: .85em; font-variant-numeric: tabular-nums; }
+.prow .folded { color: var(--muted); font-style: italic; cursor: pointer; }
+textarea.rules { width: 100%; min-height: 18rem; font-size: .9rem; line-height: 1.45; }
+pre.why { white-space: pre-wrap; margin: 0; padding: .75rem; background: var(--paper-2); border-radius: 6px; }

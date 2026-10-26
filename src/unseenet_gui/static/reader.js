@@ -172,16 +172,19 @@ function threadsView(d) {
         h("p", { text: g.id === FOR_YOU ? "Replies to your posts, and posts that name you, show up here." :
           mayWrite(d, "post").allowed ? "Be the first: press N to write a post." : mayWrite(d, "post").reason })));
   }
-  const cur = currentPost(msgs);
+  const ruled = ruledRows(msgs);                        // your own rules (UN-RFC 0051)
+  const shown = ruled.rows.length ? ruled.rows : msgs;
+  const cur = currentPost(shown);
   S.post = cur.id;
   markRead([cur]);
+  markSeen(g, shown);
   const pend = pendingIn(g, msgs, false);
   const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
     pinnedSection(d, msgs),
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
       h("span", { text: "From" }), h("span", { text: "Date" })),
-    msgs.map(m => h("button", {
-      class: `prow${m === cur ? " on" : ""}${m.read ? "" : " unread"}${m.depth === 0 ? " root" : ""}`,
+    shown.map(m => h("button", {
+      class: `prow${m === cur ? " on" : ""}${m.read ? "" : " unread"}${m.depth === 0 ? " root" : ""}${ruleClass(m)}`,
       "data-id": m.id, "aria-current": m === cur ? "true" : null,
       onclick: () => { S.post = m.id; S.mobileReading = true; render(); },
       ondblclick: () => { S.post = m.id; S.full = true; render(); } },
@@ -194,7 +197,12 @@ function threadsView(d) {
         // a reply with the thread's own subject: quieter, so new subjects stand out
         h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
         m.origin ? h("span", { class: "muted origin", title: originText(m), text: "  ⇲ " + networkName(m.origin.network) }) : null,
-        g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
+        g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null,
+        ruled.folded[m.id] ? h("span", { class: "folded", role: "button", tabindex: "0", title: "Show them",
+          onclick: (e) => { e.stopPropagation(); S.unfolded = { ...(S.unfolded || {}), [m.id]: true }; render(); },
+          text: `  ▸ ${ruled.folded[m.id]} folded` }) : null,
+        m.score !== undefined ? h("span", { class: "score", title: "Your rules' score - ⋯ says why",
+          text: `  ${m.score > 0 ? "+" : ""}${m.score}` }) : null),
       h("span", { class: "from mono" }, m.who, m.bot ? h("span", { class: "muted", text: " · bot" }) : null),
       h("span", { class: "date", text: when(m.date) }))),
     pend.map(([job, p]) => pendingRow(job, p)));

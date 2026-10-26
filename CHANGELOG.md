@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Your own rules** (unseenet#615, UN-RFC 0051): *Your rules* in the palette - an
+  editor checked as you type (each line not understood, and why), the core's
+  suggestion when you have none (yours only if you save it), and *Use my rules*
+  to turn them off and keep them. With rules a thread list comes as they say:
+  hidden posts left out, folded ones with *▸ N folded* to open, dimmed and
+  highlighted ones, each with its score; *Why is this here?*, and *Watch*,
+  *Ignore* or neither for a thread, under the post. While rules are on, what is
+  shown is marked seen. Without rules nothing changes, and nothing is sent.
+
 - **Every function says what it does** (#152, part 2): a comment above each of
   the page's 191 functions that had none, and `tests/test_scripts.py` fails on a
   new one without; a Developers page with the map of the scripts. Comments only.

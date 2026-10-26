@@ -266,7 +266,8 @@ function readerPane(g, m, msgs) {
       !m.mine && !m.private && g.id !== FOR_YOU ? h("button", { class: "btn", title: "Tell the people who can act on it", onclick: () => openReport(m) }, "Report") : null,
       g.owner && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Ban the author from this group", onclick: () => openBanned(m.key) }, "Ban") : null,
       g.maintainer && !m.mine && m.key && !m.private ? h("button", { class: "btn", title: "Block the author in your whole hierarchy", onclick: () => openBlock(m) }, "Block") : null,
-      !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null),
+      !m.mine && m.key ? h("button", { class: "btn", title: "Stop seeing their posts (only you know)", onclick: () => ignorePerson(m.key, m.who) }, "Ignore") : null,
+      ...ruleButtons(m)),                    // your own rules: why, and the thread's mark (#615)
       h("span", { class: "grow" }),
       h("span", { class: "hint", text: `${pos + 1} of ${msgs.length}` }),
       h("button", { class: "btn icon", "aria-label": "Previous post", title: "Previous (↑)", onclick: () => step(-1) }, "↑"),
@@ -384,6 +385,7 @@ function moreMenu(m) {
     pinHere ? [m.pinned ? "Unpin" : "Pin", () => openPin(m)] : null,
     m.address && !m.private ? ["Copy address", () => copy(m.address, "The address is copied.")] : null,
     m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
+    ...ruleItems(m),                        // your own rules: why, and the thread's mark
   ].filter(Boolean);
   if (!items.length) return null;
   const open = S.menuFor === m.id;

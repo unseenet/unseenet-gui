@@ -132,7 +132,10 @@ function fromRow(r) {
     reactions: r.reactions || [], react: r.react || null, react_offered: r.react_offered || null,
     comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "",
     // first published elsewhere (UN-RFC 0049): {network, date, id, from}, and old on arrival
-    origin: m.origin || null, old_on_arrival: !!m.old_on_arrival };
+    origin: m.origin || null, old_on_arrival: !!m.old_on_arrival,
+    // your own rules (UN-RFC 0051), only when you have some: score, actions, hidden, why
+    score: r.score, actions: r.actions || [], hidden: !!r.hidden, why: r.why || "",
+    thread_mark: r.thread_mark || "" };
 }
 
 // UN-RFC 0049 section 5.1: "Imported from Facebook · originally 3 August 2026" - the
