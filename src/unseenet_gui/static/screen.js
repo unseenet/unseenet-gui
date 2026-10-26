@@ -152,7 +152,8 @@ function sidebar() {
     typeof label === "string" ? h("span", { class: "nm", text: label }) : h("span", { class: "nm" }, label), extra);
   // the groups scroll; you stay at the bottom, however many groups there are
   return h("nav", { class: "side", "aria-label": "Groups" },
-    h("div", { class: "side-scroll", "data-scroll": "side" },
+    // the top stays put while the groups scroll, as the account box at the bottom (#144)
+    h("div", { class: "side-top" },
     h("div", { class: "brand" }, logo(30), h("span", { class: "grow", text: "Unseenet" }),
       h("button", { class: "mini cmd-btn", "aria-label": "Commands", title: "Commands and search (Ctrl P)",
         onclick: () => openPalette() }, svg(ICON.cmd, 16, 2.5))),
@@ -169,7 +170,6 @@ function sidebar() {
             if (first) { e.preventDefault(); first.click(); }
           }
         } })),
-    filtering() ? sideResults(sb, item) : null,
     filtering() ? null : sb ? h("div", { class: "nav" },
       item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
       sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
@@ -188,7 +188,9 @@ function sidebar() {
         h("span", { class: "count", text: sb.moderation })) : null,
       sb.name_requests ? h("button", { class: "item", onclick: openNames },
         h("span", { class: "ic", text: "@" }), h("span", { class: "nm", text: "Name requests" }),
-        h("span", { class: "count", text: sb.name_requests })) : null) : null,
+        h("span", { class: "count", text: sb.name_requests })) : null) : null),
+    h("div", { class: "side-scroll", "data-scroll": "side" },
+    filtering() ? sideResults(sb, item) : null,
     filtering() ? null : sb ? h("div", { class: "nav" },
       h("h3", { class: "row-h" },
         h("button", { class: "fold-chats", "aria-expanded": String(foldState().chats !== false),

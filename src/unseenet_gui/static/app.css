@@ -947,3 +947,7 @@ time.ago { white-space: nowrap; }
 .more .menu .msect { padding: 8px 12px 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
   color: var(--muted); }
 .more .menu .msect:first-child { padding-top: 4px; }
+
+/* the sidebar's top stays put; only the groups and chats scroll (#144) */
+.side-top { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 16px 12px 10px;
+  border-bottom: 1px solid var(--line); }
