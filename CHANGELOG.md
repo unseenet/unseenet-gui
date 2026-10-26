@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The graphical portable's build script has moved to unseenet-portable**
+  (unseenet-portable#6), with its history, as `tools/build_graphical.py`, with
+  its launchers. `tools/image/` stays until unseenet-bootable#5.
+
 - **Recovery words and copying to another device** (#142, UN-RFC 0050, on the
   core's local API sections 4.18 and 4.19): at first start *Create a new
   identity*, *Restore from recovery words* or *Get it from another device*;
