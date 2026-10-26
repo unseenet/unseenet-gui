@@ -11,6 +11,7 @@
 // the group out (Session.feed: every note its own entry) and says who may comment.
 // The timeline is the pseudo-group timeline:, every followed feed's entries.
 const FEED_SHOWN = 2;                              // comments shown before "Show all"
+// A feed's entries, each with its comments under it, newest first (UN-RFC 0034).
 function feedEntries(d) {
   const out = [];
   for (const m of d.messages) {
@@ -27,18 +28,21 @@ function feedCurrent() {
   const entries = S.data && S.data.group && S.data.group.view === "feed" ? feedEntries(S.data) : [];
   return entries.find(e => e.m.id === S.post) || null;
 }
+// Select an entry and scroll it into view.
 function feedGo(e) {
   if (!e) return;
   S.post = e.m.id; render();
   const el = document.querySelector(`.entry[data-id="${CSS.escape(e.m.id)}"]`);
   if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
 }
+// Move to the next or previous entry.
 function feedStep(delta) {
   const entries = feedEntries(S.data);
   if (!entries.length) return;
   const i = entries.findIndex(e => e.m.id === S.post);
   feedGo(entries[i < 0 ? 0 : Math.max(0, Math.min(entries.length - 1, i + delta))]);
 }
+// Move to the next unread entry, or the next feed with any.
 async function feedNextUnread() {
   const entries = feedEntries(S.data);
   const i = entries.findIndex(e => e.m.id === S.post);
@@ -47,6 +51,7 @@ async function feedNextUnread() {
   if (next) { feedGo(next); return; }
   S.post = null; await nextUnread();
 }
+// Put the cursor in the comment field of the selected entry.
 function feedComment() {
   const e = feedCurrent();
   const el = e && document.querySelector(`[data-k="c:${CSS.escape(e.m.id)}"]`);
@@ -63,6 +68,8 @@ function pageStep(delta) {
   if (next && next.path !== site.path) openPage(S.data.group.id, next.path);
 }
 
+// A feed or the timeline: entries with their pictures, the start of long ones, and their
+// comments.
 function feedView(d) {
   const g = d.group, timeline = g.id === TIMELINE, entries = feedEntries(d);
   S.feedOpen = S.feedOpen || {};
@@ -116,6 +123,7 @@ function visibleComments(e) {
   return e.comments.filter(c => shown.has(c.id));
 }
 
+// One entry of a feed: who, when, the text, pictures, reactions and its comments.
 function entryCard(d, e) {
   const m = e.m, g = d.group, timeline = g.id === TIMELINE;
   const shown = visibleComments(e), hidden = e.comments.length - shown.length;

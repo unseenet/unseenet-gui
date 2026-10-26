@@ -19,6 +19,7 @@ let emojiData = null, emojiLoading = null, picker = null, suggest = null, emojiM
 // plain text: no glyphs, no picker; a core before 0.5 has no /api/emoji: none either
 const emojiOn = () => !emojiMissing && !(S.sidebar && S.sidebar.markdown === false);
 
+// The core's emoji table (UN-RFC 0031 emoji), read once and kept.
 function loadEmoji() {
   if (emojiData) return Promise.resolve(emojiData);
   emojiLoading = emojiLoading || api("GET", "/api/emoji").then(d => {
@@ -32,11 +33,13 @@ function loadEmoji() {
   return emojiLoading;
 }
 
+// The emoji you used lately, newest first (this browser only).
 function recentEmoji() {
   try { const r = JSON.parse(localStorage.getItem(EMOJI_RECENT) || "[]"); return Array.isArray(r) ? r : []; }
   catch (_) { return []; }
 }
 
+// Keep an emoji first among the recent ones.
 function rememberEmoji(code) {
   const r = [code, ...recentEmoji().filter(c => c !== code)].slice(0, 24);
   try { localStorage.setItem(EMOJI_RECENT, JSON.stringify(r)); } catch (_) { }
@@ -92,12 +95,15 @@ function placePopover(node, r, width, left = false) {
   node.style.top = (r.top - hgt - 8 >= 8 ? r.top - hgt - 8 : Math.min(r.bottom + 8, innerHeight - hgt - 8)) + "px";
 }
 
+// The emoji button beside a text field, where emoji are on.
 function emojiButton(k) {
   if (!emojiOn()) return null;
   return h("button", { type: "button", class: "btn icon emoji-btn", "aria-label": "Emoji", "aria-haspopup": "dialog",
     title: "Emoji - or type : and a name", onclick: (e) => openEmojiPicker(k, e.currentTarget) }, svg(ICON.smile, 18));
 }
 
+// Open the emoji picker for a text field (or onPick for reactions); a second click closes
+// it.
 function openEmojiPicker(k, button, onPick = null) {
   if (picker && picker.k === k) { closeEmojiPicker(); return; }
   closeEmojiPicker(); closeSuggest();
@@ -111,6 +117,7 @@ function openEmojiPicker(k, button, onPick = null) {
     err => { node.replaceChildren(h("p", { class: "hint", text: "Emoji could not be loaded: " + err.message })); });
 }
 
+// Close the emoji picker, putting the focus back in its field if asked.
 function closeEmojiPicker(refocus) {
   if (!picker) return;
   const k = picker.k;
@@ -118,6 +125,7 @@ function closeEmojiPicker(refocus) {
   if (refocus) { const el = emojiField(k); if (el) el.focus(); }
 }
 
+// Draw the picker: a search, the recent ones, and the emoji by category.
 function drawPicker() {
   const d = emojiData, P = picker;
   const recent = recentEmoji().filter(c => d.table[c]);
@@ -161,6 +169,7 @@ function emojiQuery(el) {
   return m ? { from: before.length - m[2].length, q: m[3] } : null;
 }
 
+// While typing ":ta": the emoji whose names start so, under the field.
 async function updateSuggest(el) {
   const q = emojiQuery(el);
   if (!q) { closeSuggest(); return; }
@@ -179,6 +188,7 @@ async function updateSuggest(el) {
   placePopover(node, el.getBoundingClientRect(), 280, true);    // by the text, not the far edge
 }
 
+// Draw the :shortcode: suggestions with the chosen one marked.
 function drawSuggest() {
   const s = suggest;
   s.node.replaceChildren(...s.items.map((c, i) => h("div", { role: "option", class: "emo-opt" + (i === s.i ? " on" : ""),
@@ -187,12 +197,14 @@ function drawSuggest() {
     h("span", { class: "emo-glyph", text: emojiData.table[c] }), h("span", { class: "mono", text: ":" + c + ":" }))));
 }
 
+// Put the chosen suggestion in the text in place of its :shortcode:.
 function takeSuggest() {
   const s = suggest;
   closeSuggest();
   insertEmoji(s.k, s.items[s.i], s.from);
 }
 
+// Close the :shortcode: suggestions.
 function closeSuggest() {
   if (!suggest) return;
   suggest.node.remove(); suggest = null;

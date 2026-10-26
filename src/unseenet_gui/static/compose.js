@@ -15,6 +15,8 @@ function doPost(gid, body, local) {
 // local id *before* the request, and moves to the core's job id when the answer comes.
 // Job events that beat the HTTP answer over the WebSocket wait in S.early meanwhile.
 let localSeq = 0;
+// Send a post or chat line through the core as a job, showing it on its way until the node
+// has it.
 async function doSend(path, gid, body, local) {
   const sent = { ...body, kind: body.chat ? "chat" : "post" };     // UN-RFC 0028
   delete sent.chat;
@@ -40,6 +42,7 @@ async function doSend(path, gid, body, local) {
   render();
 }
 
+// Send a post again that was not sent.
 function retry(job) {
   const p = S.pending[job];
   delete S.pending[job];
@@ -55,6 +58,7 @@ function pendingIn(g, msgs, chat) {
     p.group === g.id && !!p.chat === !!chat && !(p.message_id && have.has(p.message_id)));
 }
 
+// A job's progress from the core: postage, sent, reached the node, or not sent and why.
 async function jobEvent(e, draw = true) {                   // a post on its way (section 5)
   const p = S.pending[e.job];
   if (!p) {
@@ -79,6 +83,7 @@ async function jobEvent(e, draw = true) {                   // a post on its way
   if (draw) render();
 }
 
+// Show the group as threads or as a chat, for you (the owner's view stays theirs).
 async function toggleView() {
   const g = S.data && S.data.group;
   if (!g || !g.type || g.type === "inbox") return;
@@ -86,6 +91,7 @@ async function toggleView() {
   await loadGroup(); await loadSidebar();
 }
 
+// Copy text to the clipboard and say so.
 async function copy(text, done) {
   try { await navigator.clipboard.writeText(text); toast(done); }
   catch (_) { toast("Could not copy - select it and press Ctrl C."); }

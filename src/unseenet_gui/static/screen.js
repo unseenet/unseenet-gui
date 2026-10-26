@@ -11,6 +11,7 @@ function allGroups() {
   return (S.sidebar ? S.sidebar.hierarchies : []).flatMap(h => h.groups);
 }
 
+// Read the sidebar again from the core: groups, people, For you and your settings.
 async function loadSidebar() {
   try {
     const [d, st] = await Promise.all([api("GET", "/api/groups"), api("GET", "/api/settings")]);
@@ -27,6 +28,7 @@ async function loadSidebar() {
 const PHONE = window.matchMedia("(max-width: 760px)");     // the same width as app.css
 PHONE.addEventListener?.("change", () => render());
 
+// Show a group (or a chat, For you, the timeline), loading it, and remember where you were.
 async function openGroup(gid, rerender = true) {
   if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; S.moreTools = false; }
   if (rerender) S.pane = "group";      // the first group opened by itself leaves a phone on the list
@@ -39,6 +41,8 @@ async function openGroup(gid, rerender = true) {
   if (g && g.view === "chat" && !PHONE.matches) setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
 }
 
+// Read the group shown from the core again: its settings and messages, and what you may do
+// there.
 async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
@@ -65,12 +69,15 @@ function writeOf(data) {
   return { post: w.post, chat: w.chat, replies };
 }
 const NOT_HERE = "Only chosen people can write here.";
+// Whether you may post or chat in the group shown, and if not why (#13), from what the core
+// said.
 function mayWrite(d, what) {                      // what: "post" or "chat"
   const p = d && d.write && d.write[what];
   if (p) return p;
   const ok = !!(d && d.group && d.group.may_post);
   return { allowed: ok, reason: ok ? "" : NOT_HERE, code: ok ? "ok" : "other" };
 }
+// Whether you may answer this post, and if not why: closed comments, a channel, a ban.
 function mayReply(d, m) {
   const g = d.group;
   if (g.id === FOR_YOU || !m.readable || !m.key) return { allowed: false, reason: "", code: "none" };
@@ -87,6 +94,7 @@ function offProps(p, props) {
   return p.allowed ? props : { ...props, class: (props.class || "btn") + " off", "aria-disabled": "true",
     title: p.reason, onclick: (e) => { e.preventDefault(); if (p.reason) toast(p.reason); } };
 }
+// Reply to a post, or say why you cannot.
 function tryReply(m, g) {
   const p = mayReply(S.data, m);
   if (p.allowed) openReply(m, g);
@@ -94,6 +102,7 @@ function tryReply(m, g) {
 }
 
 let markTimer = null, toMark = new Set();
+// Mark the messages shown as read, in the core too.
 function markRead(msgs) {
   const ids = msgs.filter(m => !m.read).map(m => m.id);
   if (!ids.length) return;
@@ -112,6 +121,7 @@ function reading() {
   return !!(S.full && S.data && S.data.group && S.data.group.view !== "chat" && S.data.messages.length);
 }
 
+// The app: the sidebar and the group shown (on a phone one of them at a time).
 function appScreen() {
   const pane = S.gid && S.pane !== "groups" ? "group" : "groups";   // phones show one (app.css)
   return h("div", { class: "app pane-" + pane + (reading() ? " reading-full" : "") },
@@ -132,6 +142,7 @@ function forYouMarks(c) {
   return h("span", { class: "foryou", title, text: parts.join(" ") || `◄${c.for_you}` });
 }
 
+// The sidebar: you, For you, your feed, site and timeline, chats, and the group tree.
 function sidebar() {
   const sb = S.sidebar, me = S.state.me || {};
   const item = (gid, ic, label, extra, cls = "", title = null) => h("button", {

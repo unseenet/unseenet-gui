@@ -8,11 +8,13 @@
 
 // ---- the bootable image: network, keyboard, power ------------------------------
 let SYS = null;
+// Read the bootable image's system state from the GUI server: network, keyboard, power.
 async function loadSystem() {
   try { SYS = await api("GET", "/x/gui/system"); } catch (_) { SYS = null; }
   render();
 }
 
+// The bootable image's bar: network, keyboard layout, restart and shut down.
 function systemBar() {
   if (SYS === null) { SYS = false; loadSystem(); }
   const s = SYS || {};
@@ -30,6 +32,7 @@ function systemBar() {
     h("button", { class: "btn", onclick: () => power("poweroff") }, "Shut down"));
 }
 
+// Restart or shut down the computer the bootable image runs on, after asking.
 async function power(action) {
   if (!confirm(action === "poweroff" ? "Shut down the computer?" : "Restart the computer?")) return;
   try { await api("POST", "/x/gui/system/power", { action }); } catch (_) { }
@@ -70,6 +73,7 @@ function openUpdate() {
 }
 let updateProgress = () => {};
 
+// The bootable image's network: wired, or Wi-Fi networks to join with a password.
 function openNetwork() {
   const nets = {}, busy = {};
   let msg = "", pick = null;
@@ -115,6 +119,7 @@ function openNetwork() {
   render();
 }
 
+// First start: a name for you and a node, or restoring or copying an identity.
 function setupScreen() {
   const st = S.state, needName = !st.me, needNode = !st.node;
   if (needNode && S.knownNodes === null) {
@@ -171,6 +176,7 @@ function setupScreen() {
       h("button", { class: "btn primary", type: "submit", disabled: S.busy }, S.busy ? "Starting …" : "Start"))));
 }
 
+// After unlocking: the theme, the sidebar, the first group, and the server's events.
 async function afterUnlock() {
   if (S.state.setup) return;
   connectEvents();

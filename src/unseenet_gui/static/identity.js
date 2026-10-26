@@ -7,11 +7,13 @@
 const NOT_RESTORED = "Closed groups do not come back with recovery words: their owners must invite you again.";
 const NOT_A_WALLET = "These are Unseenet recovery words, not a cryptocurrency wallet phrase: never type them into a wallet.";
 
+// A dialog's heading with a close button.
 function dialogHead(title) {
   return h("div", { class: "dh" }, h("h2", { text: title }),
     h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x)));
 }
 
+// The 24 recovery words as a numbered grid.
 function wordsGrid(words) {
   return h("ol", { class: "words" }, words.map(w => h("li", { class: "mono", text: w })));
 }
@@ -32,6 +34,8 @@ function openShowWords(first = false) {
     } });
 }
 
+// The recovery words on screen (UN-RFC 0050 4.2), with save and print where this machine
+// allows it, then the check.
 function showWords(r, passphrase, first) {
   const canSave = !(S.state.bootable || S.state.web);
   const canPrint = !S.state.bootable;
@@ -53,6 +57,8 @@ function showWords(r, passphrase, first) {
   render();
 }
 
+// Ask for three of the words, so the person knows they wrote them down right (UN-RFC 0050
+// 4.2).
 function checkWords(r) {
   const pos = r.check || [3, 11, 19];
   formDialog({ label: "Check your recovery words", title: "Check your recovery words", focus: `#cw${pos[0]}`, button: "Check",
@@ -72,6 +78,7 @@ function checkWords(r) {
     } });
 }
 
+// A warning to read before something risky with the words; then runs the action.
 function confirmDanger(text, then) {
   S.dialog = { focus: ".dialog .btn", render: () => dialogShell({ label: "Be careful" },
     dialogHead("Be careful"),
@@ -81,6 +88,8 @@ function confirmDanger(text, then) {
   render();
 }
 
+// Save the words as a file in Downloads, after the warning; the GUI server refuses the
+// vault's own disk and cloud folders.
 async function saveWords(passphrase) {
   const back = S.dialog;
   confirmDanger("Whoever has this file is you: they can read your private posts and post in your name. Paper is safer. " +
@@ -93,6 +102,7 @@ async function saveWords(passphrase) {
   });
 }
 
+// Print the words, after the warning; the page prints only the words.
 async function printWords(r) {
   const back = S.dialog;
   confirmDanger("Whoever has the printed page is you. Print it on a printer you trust, and keep the page safe, away from this computer.", () => {
@@ -122,6 +132,8 @@ async function wordsReminder() {
 
 // ---- restoring (section 4.4) -------------------------------------------------------------
 let wordsCheckTimer = null;
+// As the words are typed: say how many are known, and which are not, a moment after typing
+// stops.
 function wordsChecker(area, out) {
   clearTimeout(wordsCheckTimer);
   wordsCheckTimer = setTimeout(async () => {
@@ -134,6 +146,7 @@ function wordsChecker(area, out) {
   }, 250);
 }
 
+// The fields of restoring from words: the words, checked as typed, and a display name.
 function restoreFields(vals) {
   const out = h("p", { class: "hint", role: "status", style: "margin:0", text: "" });
   const area = h("textarea", { id: "rwords", name: "words", class: "in mono", "data-k": "rwords", rows: 5, autocomplete: "off",
@@ -145,6 +158,7 @@ function restoreFields(vals) {
     h("p", { class: "hint", style: "margin:0", text: NOT_RESTORED })];
 }
 
+// Restore an identity from its recovery words (UN-RFC 0050 3.5).
 function openRestore() {
   formDialog({ label: "Restore from recovery words", title: "Restore from recovery words", focus: "#rwords", button: "Restore",
     note: "Four letters of each word are enough. The identity becomes your default.",
@@ -152,6 +166,8 @@ function openRestore() {
     submit: async (v) => { await afterRestore(await api("POST", "/api/recovery/restore", { words: v.words || "", display: v.display || "" })); } });
 }
 
+// After restoring: what came back from the network, and closed groups to ask to be invited
+// to again.
 async function afterRestore(r) {
   await loadState();
   const lead = { read: "Your groups, contacts and settings came back from the network.",
@@ -185,6 +201,7 @@ async function afterRestore(r) {
 // ---- copying (section 3) -----------------------------------------------------------------
 let copyDialog = null;            // the offer on screen, told by "copy" events
 
+// SVG markup from the GUI server (a QR code) as an element on the page.
 function svgNode(markup) {
   const doc = new DOMParser().parseFromString(markup, "image/svg+xml");
   const el = document.importNode(doc.documentElement, true);
@@ -194,6 +211,8 @@ function svgNode(markup) {
   return el;
 }
 
+// Copy an identity to another device (UN-RFC 0050 3.6): choose which, then the code and QR
+// code to type or scan there.
 function openCopyTo() {
   if (S.state.web) { toast("A browser cannot copy to another device; it can receive a copy."); return; }
   const ids = GUI.identities || [];
@@ -221,6 +240,8 @@ function openCopyTo() {
   render();
 }
 
+// The code and QR code of a copy in progress, the check words when the other device
+// connects, and Confirm.
 async function showOffer(offer) {
   let qr = null;
   try { qr = svgNode((await api("POST", "/x/gui/qr", { text: offer.qr })).svg); } catch (_) { /* the code is enough */ }
@@ -276,6 +297,7 @@ function scanSupported() {
   return "BarcodeDetector" in window && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
 }
 
+// Scan a QR code with the camera into the code field, where the browser can.
 async function scanInto(input) {
   let stream;
   try {
@@ -295,6 +317,7 @@ async function scanInto(input) {
   finally { if (stream) stream.getTracks().forEach(t => t.stop()); }
 }
 
+// The field for a copy's code, with a scan button where there is a camera.
 function codeFields(vals) {
   const input = h("input", { id: "ccode", name: "code", class: "in mono", "data-k": "ccode", autocomplete: "off", spellcheck: "false",
     autocapitalize: "off", placeholder: "7-guitar-tunnel", value: vals.code || "" });
@@ -302,6 +325,8 @@ function codeFields(vals) {
     scanSupported() ? h("button", { type: "button", class: "btn", onclick: () => scanInto(input) }, "Scan the QR code") : null];
 }
 
+// Connect with a code from another device, then compare the check words before the identity
+// is taken.
 async function receiveCopy(code, node) {
   const got = await api("POST", "/api/copy/receive", { code, node: node || "" });
   S.dialog = { focus: ".dialog .btn", render: () => dialogShell({ label: "Check words" },
@@ -315,6 +340,7 @@ async function receiveCopy(code, node) {
   return done;
 }
 
+// Get an identity from another device (UN-RFC 0050 3.6) with the code it shows.
 function openCopyFrom() {
   formDialog({ label: "Get identity from another device", title: "Get identity from another device", focus: "#ccode", button: "Connect",
     note: "On the other device choose \"Copy to another device\". The code works once, for 10 minutes.",
@@ -337,6 +363,8 @@ function setupHowChoice() {
     h("span", { text: t }))));
 }
 
+// The first-start fields for the way chosen: a new identity, restore from words, or copy
+// from another device.
 function setupHowFields() {
   const how = S.setupHow || "new";
   if (how === "restore") return restoreFields(S.setupVals || {});

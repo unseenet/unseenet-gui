@@ -1,0 +1,50 @@
+# Developers: the page's scripts
+
+The graphical client's page is plain JavaScript with no build step: `index.html` loads
+the scripts in `src/unseenet_gui/static/` in a fixed order, and they share one scope
+(unseenet-gui#152). The same files run in the local GUI, the portable and bootable
+builds, and - inlined into one file - the browser build (unseenet-entrance).
+
+- **`core.js` comes first**: the token, the theme, the core's local API (UN-RFC 0046)
+  turned into what the page draws, and the helpers everything uses - `h()` to make
+  elements, `api()`, `S` (the page's state), `render()`, `toast()`.
+- **`start.js` comes last of the split parts**: it starts the page, so every function
+  it needs exists by then. `identity.js`, `notify.js`, `publish.js` and `export.js` come
+  after, as before the split.
+- Every file opens with what belongs in it, and every function has a comment saying what
+  it does; `tests/test_scripts.py` fails on a new one without, and checks that every
+  script in `static/` is loaded. CI runs `node --check` on each.
+- The core serves `static/` flat (no sub-folders), so the scripts sit beside `app.css`.
+
+## The files, in the order they load
+
+| File | What belongs in it |
+|------|--------------------|
+| `core.js` | the page's base: an address to open, the token, the theme, the core's local API (UN-RFC 0046) into what the page draws, shared helpers, and rendering with focus and scroll kept. Everything else uses these |
+| `setup.js` | unlocking the vault and setting up a first identity |
+| `bootable.js` | the bootable image: network, keyboard and power |
+| `screen.js` | the app screen, and whether you may write in a group (#13) |
+| `grouptree.js` | the group tree in the sidebar (unseenet.client.grouptree, as in the TUI) |
+| `sites.js` | sites and their pages (UN-RFC 0035, UN-RFC 0046 section 4.15) |
+| `feeds.js` | feeds (UN-RFC 0034, UN-RFC 0046 section 4.14) |
+| `reactions.js` | reactions under posts, comments and chat lines (UN-RFC 0048, #107) |
+| `reader.js` | the newsreader and pinned posts (UN-RFC 0033, UN-RFC 0046 section 4.12) |
+| `markdown.js` | Markdown and emoji: the core's safe tree as DOM (UN-RFC 0031) |
+| `files.js` | files on posts (UN-RFC 0027, UN-RFC 0046 section 4.10) |
+| `grouprefs.js` | #group references (unseenet#172) |
+| `following.js` | following people and feeds (UN-RFC 0034 section 6, UN-RFC 0046 4.14) |
+| `ripening.js` | key ripening (UN-RFC 0025, #50) |
+| `chat.js` | chat |
+| `compose.js` | posting |
+| `dialogs.js` | dialogs shared by the page |
+| `moderation.js` | the owner's and moderators' tools, names (UN-RFC 0019), ignoring people (#72) and blocking in a hierarchy (UN-RFC 0018 5.4) |
+| `nodes.js` | your nodes (#111, unseenet#518) |
+| `profiles.js` | your vault's passphrase (#32) and profiles, anyone's and your own (#20, UN-RFC 0022) |
+| `emoji.js` | the emoji picker and :shortcode: completion while typing (#21) |
+| `keys.js` | keys and the command palette's shortcuts |
+| `events.js` | events from the server |
+| `start.js` | starting the page: kept last of these, so every function above exists |
+| `identity.js` | Recovery words and copying to another device (UN-RFC 0050, unseenet-gui#142) |
+| `notify.js` | Notifications when something new lands in For you (unseenet-gui#126). What is new |
+| `publish.js` | Publish a folder as a site (#125, on the core's site import, unseenet#538): pick a |
+| `export.js` | Export my data (#141, on the core's export, unseenet#577 / UN-RFC 0049 section 7): |

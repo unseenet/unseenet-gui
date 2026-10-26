@@ -8,6 +8,8 @@
 
 // ---- your vault's passphrase (#32, as the TUI's Change passphrase) ------------
 const COPIES_NOTE = "Only this vault file changes. Copies of it on other devices, sticks or backups still open with the old passphrase: replace or delete them.";
+// Change the vault's passphrase (#32), saying where copies of the vault are and that they
+// keep the old one.
 function openPassphrase() {
   formDialog({ label: "Change passphrase", title: "Change passphrase", focus: "#pold", button: "Change", note: COPIES_NOTE,
     fields: (vals) => [
@@ -100,6 +102,7 @@ async function openProfile(key, who = "", context = S.gid) {
   if (S.dialog && S.dialog.render === draw) render();
 }
 
+// A person's picture, or their identicon or initials, large for the profile dialog.
 function bigAvatar(key) {
   const p = personOf(key);
   if (p && p.picture) return h("img", { class: "av big pic", src: p.picture.data, alt: p.picture.alt || "", title: p.picture.alt || "" });
@@ -107,6 +110,7 @@ function bigAvatar(key) {
   return null;
 }
 
+// A yes-or-no dialog; ok runs on yes, danger makes the button red.
 function confirmDialog({ title, text, button, danger, ok }) {
   S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: title },
     h("div", { class: "dh" }, h("h2", { text: title }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
@@ -116,9 +120,11 @@ function confirmDialog({ title, text, button, danger, ok }) {
   render();
 }
 
+// A profile's links as lines to edit: kind, value and an optional # label.
 function linksText(links) {
   return (links || []).map(l => `${l.kind} ${l.value}` + (l.label ? `  # ${l.label}` : "")).join("\n");
 }
+// The links typed in the profile editor, checked line by line (UN-RFC 0022 links).
 function parseLinks(text) {
   const out = [];
   text.split("\n").forEach((line, i) => {
@@ -133,6 +139,7 @@ function parseLinks(text) {
   return out;
 }
 
+// Your own profile: open the editor with what is published.
 async function openMyProfile() {
   let p;
   try { p = await api("GET", "/api/profile"); } catch (x) { toast(x.message); return; }
@@ -151,6 +158,7 @@ async function openShareProfile(to, who) {
   try { p = await api("GET", "/api/profile"); } catch (x) { toast(x.message); return; }
   editProfile(p, { to, who });
 }
+// Who a private profile would be shared with here: the person of the chat shown, if any.
 function shareTarget() {
   const g = S.data && S.data.group;
   if (!g) return null;
@@ -158,6 +166,7 @@ function shareTarget() {
   if (String(g.id || "").startsWith("contact:")) return { to: g.id, who: g.label };
   return null;
 }
+// Take back a profile shared privately: an empty one goes to them.
 function withdrawShared({ to, who }) {
   confirmDialog({ title: "Take back your shared profile?", button: "Take back",
     text: `An empty profile goes to ${who}, and the one you shared is no longer shown. Copies they already kept cannot be taken back.`,
@@ -165,6 +174,8 @@ function withdrawShared({ to, who }) {
       catch (x) { toast(x.message); } } });
 }
 
+// The profile editor: about (Markdown or plain), links, picture, bot mark; publish, or
+// share privately with one person.
 function editProfile(p, share = null) {
   const cur = p.profile || {};
   const md = cur.about ? /markdown/i.test(cur.about_type || "") : !(S.sidebar && S.sidebar.markdown === false);
@@ -250,10 +261,13 @@ function editProfile(p, share = null) {
     } });
 }
 
+// The post selected in the threads list, or null in a chat.
 function selectedPost() {
   return (S.data && S.data.group && S.data.group.view !== "chat" && S.data.messages.find(x => x.id === S.post)) || null;
 }
 
+// The command palette's commands here (Ctrl+K): each with its name, key and when it is
+// offered.
 function commands() {
   const g = S.data && S.data.group;
   const cmds = [
@@ -355,6 +369,7 @@ function commands() {
   return cmds.concat(allGroups().map(x => ({ name: x.label, group: x, key: "", run: () => openGroup(x.id) })));
 }
 
+// The command palette: type to find a command, Enter to run it.
 function openPalette() {
   let q = "", sel = 0;
   const shown = () => commands().filter(c => !q || c.name.toLowerCase().includes(q) ||

@@ -41,6 +41,9 @@ const TOKEN = (() => {
 // answers (the GUI's port, and so its storage, can change every start).
 const THEMES = ["light", "dark"];
 let THEME = null;
+// Set the theme (light, dark, or null for the system's) and draw it; kept in this browser
+// and, unless save is false, with your settings in the core so it follows you. Without an
+// argument: the theme in use.
 function theme(set, save = true) {
   if (set !== undefined) {
     THEME = THEMES.includes(set) ? set : null;
@@ -54,6 +57,8 @@ function theme(set, save = true) {
   return THEME || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
 }
 theme();
+// The theme kept with your settings in the core, after unlocking: it wins over this
+// browser's copy.
 async function loadTheme() {          // the one kept with your settings counts
   try {
     const t = ((await api("GET", "/api/settings/clients/gui")).settings || {}).theme;
@@ -88,6 +93,8 @@ function colour(key) {
 }
 const person = (p) => ({ ...p, colour: colour(p.key) });
 
+// A group as the local API gives it (UN-RFC 0046 4.2) -> what the page draws: its label,
+// counts, roles and colour.
 function fromGroup(g) {
   const roles = g.roles || {}, pseudo = ["inbox", "contact"].includes(g.type) || g.id === FOR_YOU;
   return { ...g,
@@ -107,6 +114,8 @@ function fromGroup(g) {
     moderates: !!roles.moderates, maintainer: !!roles.maintainer };
 }
 
+// A row of a group's messages from the local API -> the message the page draws: who, when,
+// text, reactions, permissions.
 function fromRow(r) {
   const m = r.message;
   return { id: m.id, number: m.number, group: m.group, subject: m.subject, kind: m.kind,
@@ -131,7 +140,10 @@ function fromRow(r) {
 const NETWORK_NAMES = { facebook: "Facebook", x: "X", twitter: "X", instagram: "Instagram",
   mastodon: "Mastodon", bluesky: "Bluesky", tiktok: "TikTok", nostr: "Nostr", matrix: "Matrix",
   usenet: "Usenet", fidonet: "FidoNet", unseenet: "another Unseenet key" };
+// A network's name as people know it (facebook -> Facebook), for imported posts.
 function networkName(n) { return NETWORK_NAMES[n] || (n ? n.charAt(0).toUpperCase() + n.slice(1) : ""); }
+// "Imported from Facebook · originally 3 August 2026" for a post first published elsewhere
+// (UN-RFC 0049 5.1); "" for others.
 function originText(m) {
   if (!m.origin) return "";
   return "Imported from " + networkName(m.origin.network) +
@@ -139,6 +151,8 @@ function originText(m) {
       { day: "numeric", month: "long", year: "numeric" }) : "");
 }
 
+// The sidebar's data from the local API -> groups by hierarchy, people, For you's counts
+// and your feed and site.
 function fromSidebar(d, st) {
   const groups = d.groups.map(fromGroup), by = {};
   groups.forEach(g => (by[g.hierarchy] = by[g.hierarchy] || []).push(g));
@@ -160,6 +174,8 @@ function fromSidebar(d, st) {
 
 // The core's state, with this client's own from /x/gui/state (UN-RFC 0046 section 6).
 let GUI = {};
+// Read the core's state and the GUI's own (bootable, browser build, the update): who you
+// are and whether the vault is open.
 async function loadState(st) {
   st = st || await api("GET", "/api/state");
   try { GUI = await api("GET", "/x/gui/state"); } catch (_) { /* the core's state is enough */ }
@@ -198,12 +214,14 @@ function sendOnEnter(e, send) {
   e.preventDefault(); send(); growField(e.target);
 }
 
+// Let a text area grow with what is typed, up to a limit.
 function growField(el) {
   if (!el || el.tagName !== "TEXTAREA") return;
   el.style.height = "auto";
   el.style.height = Math.min(el.scrollHeight + 2, 160) + "px";
 }
 
+// An SVG icon from a path in a 24x24 box, drawn with the current colour.
 function svg(path, size = 16, width = 2) {
   const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   s.setAttribute("width", size); s.setAttribute("height", size); s.setAttribute("viewBox", "0 0 24 24");
@@ -238,6 +256,8 @@ function iconAction(icon, label, onclick, extra = {}, count = null) {
     svg(icon, 16, 2), count ? h("span", { text: String(count) }) : null);
 }
 
+// Call the core's local API (UN-RFC 0046) with the page's token; answers the JSON, or
+// throws with the API's error.
 async function api(method, path, body) {
   const res = await fetch(path, {
     method, headers: { "X-Unseenet-Token": TOKEN || "", ...(body ? { "Content-Type": "application/json" } : {}) },
@@ -253,6 +273,7 @@ async function api(method, path, body) {
   return data;
 }
 
+// A short message at the bottom of the page for four seconds.
 function toast(text) {
   document.querySelectorAll(".toast").forEach(t => t.remove());
   const t = h("div", { class: "toast", role: "status", text });
@@ -261,6 +282,8 @@ function toast(text) {
 }
 
 const sameDay = (a, b) => a.toDateString() === b.toDateString();
+// A time for a message: the time today, the day and time before (withDay false: always the
+// time).
 function when(iso, withDay = true) {
   if (!iso) return "";
   const d = new Date(iso), now = new Date();
@@ -270,12 +293,14 @@ function when(iso, withDay = true) {
   if (days < 7) return d.toLocaleDateString([], { weekday: "short" }) + " " + time;
   return d.toLocaleDateString([], { day: "numeric", month: "short" });
 }
+// The heading of a day in a chat: Today, Yesterday, or the weekday and date.
 function dayLabel(d) {
   const now = new Date(), y = new Date(now - 86400000);
   if (sameDay(d, now)) return "Today";
   if (sameDay(d, y)) return "Yesterday";
   return d.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" });
 }
+// Up to two letters for an avatar from a name.
 function initials(who) {
   const name = (who || "?").replace(/^You → /, "").replace(/^@/, "").replace(/ √$/, "").trim();
   const parts = name.split(/[\s.@_-]+/).filter(Boolean);
@@ -292,6 +317,7 @@ function avatar(m, small) {
   if (icon) return identiconEl(icon, cls);
   return h("span", { class: `${cls} c${m.colour ?? 5}`, "aria-hidden": "true", text: initials(m.who) });
 }
+// A key's identicon (the core's 5x5 pattern) as SVG, when there is no picture.
 function identiconEl(icon, cls) {
   const NS = "http://www.w3.org/2000/svg", el = document.createElementNS(NS, "svg");
   el.setAttribute("viewBox", "-1 -1 7 7"); el.setAttribute("class", cls + " idc"); el.setAttribute("aria-hidden", "true");
@@ -307,6 +333,8 @@ function identiconEl(icon, cls) {
 // together by the core so a node cannot tell whose you look at.
 const PEOPLE = new Map(), WANTED = new Set();
 let wantTimer = null;
+// What is known of a key (name, picture), asking the core for it with the next batch if it
+// is not known yet.
 function personOf(key) {
   const p = PEOPLE.get(key);
   if (p) return p;
@@ -317,6 +345,8 @@ function personOf(key) {
   }
   return null;
 }
+// Ask the core for the names and pictures of the keys asked for since the last time, at
+// most 255 at once, then draw again.
 async function loadPeople() {
   const keys = Array.from(WANTED).filter(k => !PEOPLE.has(k)).slice(0, 255);
   WANTED.clear();
@@ -398,6 +428,8 @@ function render() {
   }
 }
 
+// The whole page for the state it is in: no token, starting, locked, setting up, or the
+// app.
 function view() {
   if (!TOKEN) return noToken();
   if (!S.state) return h("div", { class: "unlock" }, h("p", { class: "muted", text: "Starting …" }));
@@ -406,6 +438,7 @@ function view() {
   return appScreen();
 }
 
+// The page opened without its one-time address: say how to open it.
 function noToken() {
   return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
     brandHead("Open Unseenet from its own window."),
@@ -419,6 +452,8 @@ function logo(size) {
           h("img", { class: "logo on-light", src: "/static/icon-ink.svg", alt: "", width: size, height: size })];
 }
 
+// The logo and a heading written like a message's Subject line, for the unlock and setup
+// screens.
 function brandHead(subject, headers) {
   return h("div", { class: "unlock-head" },
     logo(56),

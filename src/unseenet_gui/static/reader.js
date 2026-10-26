@@ -33,9 +33,11 @@ function currentPost(msgs) {
 // 7.3), and pin and unpin for the owner and moderators only (section 7.1).
 const PIN = "📌";
 const pinsOf = (d) => (d && d.group && d.group.pins) || [];
+// Whether you folded a group's pinned posts away here (this browser only).
 function pinsHidden(gid, where) {
   try { return localStorage.getItem(`pins-hidden:${where}:${gid}`) === "1"; } catch (_) { return false; }
 }
+// Fold a group's pinned posts away, or show them again (this browser only).
 function hidePins(gid, where, on) {
   try { if (on) localStorage.setItem(`pins-hidden:${where}:${gid}`, "1"); else localStorage.removeItem(`pins-hidden:${where}:${gid}`); }
   catch (_) { /* remembered for this page only */ }
@@ -47,6 +49,7 @@ function pinLine(p, m) {
   return p.subject || (m ? subjectOf(m) : "") || "A post this client has not fetched yet";
 }
 
+// The pinned posts at the top of the threads list (UN-RFC 0033), newest pin first.
 function pinnedSection(d, msgs) {
   const g = d.group, pins = pinsOf(d);
   if (!pins.length) return null;
@@ -77,6 +80,7 @@ function jumpToLine(id) {
   });
 }
 
+// The one-line bar of a chat's pinned posts (UN-RFC 0033).
 function pinBar(d, msgs) {
   const g = d.group, pins = pinsOf(d);
   if (!pins.length) return null;
@@ -97,6 +101,8 @@ function pinBar(d, msgs) {
     h("button", { class: "btn icon", "aria-label": "Hide the pins", title: "Hide the pins", onclick: () => hidePins(g.id, "chat", true) }, svg(ICON.x)));
 }
 
+// Pin or unpin a post through the core, which needs a moment for the marker's proof of
+// work.
 async function pinRequest(g, body, done) {
   toast(body.unpin ? "Unpinning … the marker needs its proof of work first." : "Pinning … the marker needs its proof of work first.");
   await api("POST", `/api/groups/${encodeURIComponent(g.id)}/pin`, body);
@@ -104,6 +110,7 @@ async function pinRequest(g, body, done) {
   closeDialog(); await loadGroup(); render(); toast(done);
 }
 
+// All the pinned posts of a group, to open or, for its owner and moderators, unpin.
 function openPinList() {
   const d = S.data, g = d && d.group;
   if (!g) return;
@@ -125,6 +132,7 @@ function openPinList() {
   render();
 }
 
+// Ask whether to unpin a post, and unpin it.
 function openUnpin(p, m) {
   const g = S.data && S.data.group;
   if (!g || !g.may_pin) return;
@@ -152,6 +160,7 @@ function openPin(m) {
     submit: async (v) => pinRequest(g, { id: m.id, note: (v.note || "").trim() }, "Pinned.") });
 }
 
+// A threads group: the list of threads and replies, and the reader below it.
 function threadsView(d) {
   const g = d.group, msgs = d.messages;
   if (!msgs.length) {
@@ -193,6 +202,7 @@ function threadsView(d) {
     table, readerPane(g, cur, msgs));
 }
 
+// A post on its way, shown in the list until the node has it.
 function pendingRow(job, p) {
   return h("div", { class: "prow pending" + (p.state === "failed" ? " failed" : ""), "data-job": job }, h("span", {}),
     h("span", { class: "sj", text: p.body.subject || "" }),
@@ -201,6 +211,7 @@ function pendingRow(job, p) {
       h("button", { class: "link", onclick: () => retry(job), title: p.error || "" }, "Not sent - again") : pendingState(p)));
 }
 
+// Whether a reply keeps its thread's subject, so the list can show it quieter.
 function sameSubject(m, msgs) {
   const bare = (s) => (s || "").replace(/^(re:\s*)+/i, "").trim().toLowerCase();
   const i = msgs.indexOf(m);
@@ -208,6 +219,7 @@ function sameSubject(m, msgs) {
   return false;
 }
 
+// A group's name for showing, also for groups not in the sidebar.
 function labelOf(gid) {
   const g = allGroups().find(x => x.id === gid);
   return g ? g.label : gid.split("@")[0];

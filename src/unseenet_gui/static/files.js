@@ -15,6 +15,8 @@ const PICS = new Map();                        // "group blob" -> {state, pic, e
 const ASKED = new Set();                       // pictures by ignored people you chose to see
 const SHOWN = /^image\/(png|jpeg|gif|webp)$/;
 
+// A picture a post carries, fetched through the core and decoded safely; asked for once per
+// page.
 function picture(gid, blob) {
   const k = gid + " " + blob, asked = ASKED.has(k);
   let p = PICS.get(k);
@@ -32,6 +34,7 @@ function picture(gid, blob) {
   return p;
 }
 
+// A file's size for people: KB or MB.
 function size(octets) {
   return octets >= 1048576 ? (octets / 1048576).toFixed(1) + " MB" : octets >= 1024 ? Math.round(octets / 1024) + " KB" : octets + " bytes";
 }
@@ -44,6 +47,7 @@ function filesOf(m, chat) {
   return rest.length ? h("div", { class: "files" + (chat ? " in-chat" : "") }, rest.map(a => fileView(m, a, false))) : null;
 }
 
+// A file on a post: the picture shown, or its name and size with a Save button.
 function fileView(m, a, inline) {
   const what = a.alt || a.name || "a picture";
   if (SHOWN.test(a.type)) {

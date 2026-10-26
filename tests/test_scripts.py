@@ -28,3 +28,25 @@ def test_start_comes_after_the_split_parts():
 def test_every_script_is_loaded():
     assert sorted(p.name for p in STATIC.glob("*.js")) == sorted(scripts()), \
         "a script in static/ that index.html does not load, or the other way round"
+
+
+FN = re.compile(r"^(async\s+)?function\s+([A-Za-z0-9_$]+)\s*\(")
+
+
+def test_every_function_says_what_it_does():
+    """#152: a comment above every top-level function - what it does, when it is used.
+    A new one without fails here."""
+    missing = []
+    for name in scripts():
+        lines = (STATIC / name).read_text().split("\n")
+        for i, ln in enumerate(lines):
+            m = FN.match(ln)
+            if not m:
+                continue
+            j = i - 1
+            while j >= 0 and not lines[j].strip():
+                j -= 1
+            above = lines[j].strip() if j >= 0 else ""
+            if not (above.startswith(("//", "*", "/*")) or above.endswith("*/")):
+                missing.append(f"{name}: {m.group(2)}")
+    assert not missing, "functions without a comment above them: " + ", ".join(missing)

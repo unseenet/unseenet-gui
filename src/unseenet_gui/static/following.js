@@ -20,6 +20,8 @@ async function setFollowing(body, who) {
   return r;
 }
 
+// Follow someone: a key, a fingerprint or an address, or the author of the selected post
+// (UN-RFC 0034 6).
 function openFollow() {
   const m = selectedPost();
   formDialog({ label: "Follow", title: "Follow someone", focus: "#ftarget", button: "Follow",
@@ -37,6 +39,7 @@ function openFollow() {
     } });
 }
 
+// The people and feeds you follow, to open, stop following, or see their profile.
 async function openFollowing() {
   let f;
   try { f = await api("GET", "/api/following"); } catch (x) { toast(x.message); return; }
@@ -144,6 +147,8 @@ async function openAddress(text) {
   render();
 }
 
+// Open an address: a group, post, page or person, unseenet: or its web form (UN-RFC 0031
+// 3.4.1).
 function openAddressDialog() {
   formDialog({ label: "Address", title: "Open an address", focus: "#addr", button: "Open",
     note: "An address of a group, a post, a page or a person - unseenet:…, or its web form https://…/a/… or web+unseenet:…",
@@ -180,9 +185,11 @@ function groupsInPost(m) {
   render();
 }
 
+// The text of the core's inline Markdown nodes, for copying and previews.
 function inlineText(nodes) {
   return (nodes || []).map(n => n.v !== undefined ? n.v : n.c ? inlineText(n.c) : n.t === "br" ? "\n" : "").join("");
 }
+// The text of a block tree, quotes included, one block a line.
 function inlineTextDeep(blocks) {
   return blocks.map(b => b.c && b.t !== "quote" ? inlineText(b.c) : b.c ? inlineTextDeep(b.c) : b.v || "").join("\n");
 }
@@ -198,6 +205,8 @@ function openLink(href) {
   window.open(href, "_blank", "noopener,noreferrer");
 }
 
+// The reader below the threads list: the selected post with who, when, files, reactions and
+// what you may do.
 function readerPane(g, m, msgs) {
   const marks = [];
   if (m.mine) marks.push(h("span", { class: "sm", text: "you" }));
@@ -267,6 +276,7 @@ function readerPane(g, m, msgs) {
         onclick: () => { S.full = !S.full; render(); } }, S.full ? "Back" : "Full screen", h("kbd", { text: S.full ? "Esc" : "F" }))));
 }
 
+// Move the selection up or down the threads list.
 function step(delta) {
   const msgs = S.data && S.data.messages;
   if (!msgs || !msgs.length) return;
@@ -277,6 +287,7 @@ function step(delta) {
   if (row) row.scrollIntoView({ block: "nearest" });
 }
 
+// Jump to the next unread post, in this group or the next one with unread posts.
 async function nextUnread() {
   const msgs = (S.data && S.data.messages) || [];
   const i = msgs.findIndex(m => m.id === S.post);
@@ -289,6 +300,7 @@ async function nextUnread() {
   else toast("Nothing unread.");
 }
 
+// Your signature as it will be signed, for the compose window's preview.
 async function signatureText() {
   try { const s = await api("GET", "/api/settings"); return s.signature_preview || ""; } catch (_) { return ""; }
 }
@@ -360,6 +372,8 @@ function chatMenu(p) {
       onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))) : null);
 }
 
+// The ⋯ menu of a post or chat line: reply privately, copy its address, edit, withdraw,
+// pin, report.
 function moreMenu(m) {
   if (!m || !m.readable) return null;
   const here = S.data && S.data.group;
@@ -380,6 +394,8 @@ function moreMenu(m) {
       onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))) : null);
 }
 
+// The compose window for a post, a reply, an edit or a private message: subject, text with
+// preview, files, signature.
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
   const dialog = { focus: "#body", node: null, files: [] };
   // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
@@ -456,6 +472,8 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
   askWho();
 }
 
+// What a post on its way shows: postage being worked out, sent, reached the node, or not
+// sent and why.
 function pendingState(p) {
   if (p.state === "failed") return h("span", { class: "state bad", text: "Not sent: " + (p.error || "") });
   if (p.state === "sent") return h("span", { class: "state" }, svg(ICON.check, 14, 2.5), "sent");

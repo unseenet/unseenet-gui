@@ -10,6 +10,8 @@
 let notifyTimer = null;
 let notifyAskedNow = false;            // "Not now": not again this session
 
+// Whether notifications can be shown here: a browser that has them, a secure page, not the
+// bootable image.
 function notifyPossible() {
   return "Notification" in window && !(S.state && S.state.bootable) && window.isSecureContext;
 }
@@ -21,6 +23,8 @@ function notifySoon() {
   notifyTimer = setTimeout(checkNotifications, 1000);
 }
 
+// Ask the core what is new in For you, and tell, ask first, or stay quiet as the reader
+// chose.
 async function checkNotifications() {
   let n;
   try { n = await api("GET", "/api/notifications"); } catch (_) { return; }
@@ -33,11 +37,14 @@ async function checkNotifications() {
   showNotification(n);
 }
 
+// Whether an item is already in view, so needs no notification.
 function onScreen(item) {
   return document.hasFocus() && (S.gid === item.group || S.gid === FOR_YOU ||
     (S.gid && S.gid.startsWith("contact:") && item.why === "private"));
 }
 
+// The notification: "N new in For you", or who and what when the reader chose so; one for a
+// burst.
 function showNotification(n) {
   if (Notification.permission !== "granted") return;
   const items = n.items.filter(i => !onScreen(i));
@@ -52,10 +59,12 @@ function showNotification(n) {
   } catch (_) { /* some browsers only allow it from a service worker: then not here */ }
 }
 
+// Change the notification choice, kept with your settings in the core.
 async function setNotify(changes) {
   await api("POST", "/api/settings", { notifications: changes });
 }
 
+// Ask once whether to tell about new messages: Yes, Not now, Never.
 function askNotifications(n) {
   notifyAskedNow = true;
   const yes = async () => {
@@ -104,6 +113,7 @@ function notifyCommands() {
   ];
 }
 
+// Read the notification choice from the core again, for the menu.
 async function refreshNotifySettings() {
   try { const st = await api("GET", "/api/settings"); S.settings = { ...(S.settings || {}), notifications: st.notifications }; }
   catch (_) { /* keep what we had */ }

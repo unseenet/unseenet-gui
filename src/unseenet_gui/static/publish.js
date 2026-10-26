@@ -10,10 +10,12 @@ const PUBLISH_MARK = { new: "+", changed: "~", unchanged: "=", remove: "−", ke
 const PUBLISH_WORD = { new: "new", changed: "changed", unchanged: "unchanged", remove: "removed",
   kept: "not in the folder - kept" };
 
+// Whether publishing a folder is offered: a site you write in, not the browser build.
 function publishPossible() {
   return !(S.state && S.state.web) && S.data && S.data.site && S.data.site.may_write;
 }
 
+// Choose a folder to publish as this site (#125).
 function openPublishFolder() {
   if (!publishPossible()) return;
   const g = S.data.group;
@@ -25,6 +27,7 @@ function openPublishFolder() {
   input.click();
 }
 
+// The chosen folder's files to the GUI server, then what would be sent.
 async function uploadFolder(g, files) {
   const form = new FormData();
   for (const f of files) {
@@ -44,6 +47,7 @@ async function uploadFolder(g, files) {
   await planPublish();
 }
 
+// Ask the core what publishing the folder would send (a dry run), and show it.
 async function planPublish() {
   const p = S.publish;
   p.busy = true; render();
@@ -54,6 +58,8 @@ async function planPublish() {
   p.busy = false; render();
 }
 
+// What would be sent - pages new, changed, unchanged, removed, and the changes made on the
+// way - and Publish.
 function showPublish() {
   S.dialog = { focus: ".dialog .btn.primary", render: () => {
     const p = S.publish, plan = p.plan;
