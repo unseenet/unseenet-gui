@@ -115,7 +115,22 @@ function fromRow(r) {
     pinned: !!r.pinned, address: r.address || "",
     // reactions (UN-RFC 0048): the counts, may you react, and its own group's set
     reactions: r.reactions || [], react: r.react || null, react_offered: r.react_offered || null,
-    comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "" };
+    comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "",
+    // first published elsewhere (UN-RFC 0049): {network, date, id, from}, and old on arrival
+    origin: m.origin || null, old_on_arrival: !!m.old_on_arrival };
+}
+
+// UN-RFC 0049 section 5.1: "Imported from Facebook · originally 3 August 2026" - the
+// origin date is the author's (or gateway's) claim, never shown as the time of posting.
+const NETWORK_NAMES = { facebook: "Facebook", x: "X", twitter: "X", instagram: "Instagram",
+  mastodon: "Mastodon", bluesky: "Bluesky", tiktok: "TikTok", nostr: "Nostr", matrix: "Matrix",
+  usenet: "Usenet", fidonet: "FidoNet", unseenet: "another Unseenet key" };
+function networkName(n) { return NETWORK_NAMES[n] || (n ? n.charAt(0).toUpperCase() + n.slice(1) : ""); }
+function originText(m) {
+  if (!m.origin) return "";
+  return "Imported from " + networkName(m.origin.network) +
+    (m.origin.date ? " · originally " + new Date(m.origin.date).toLocaleDateString(undefined,
+      { day: "numeric", month: "long", year: "numeric" }) : "");
 }
 
 function fromSidebar(d, st) {
@@ -1391,6 +1406,8 @@ function entryCard(d, e) {
     h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
       m.bot ? h("span", { class: "sm", text: "bot" }) : null,
       h("span", { class: "hint", text: when(m.date) }),
+      m.origin ? h("span", { class: "hint origin", title: "Posted " + when(m.date) + " - the date it was first published is the poster's claim",
+        text: originText(m) }) : null,
       timeline ? h("button", { class: "link efeed", onclick: () => openGroup(m.group) }, "in " + (m.group_label || labelOf(m.group))) : null,
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null),
       moreMenu(m)),
@@ -1712,6 +1729,7 @@ function threadsView(d) {
         m.private && !m.notice ? h("span", { class: "muted", text: "@ " }) : m.encrypted && !m.notice ? h("span", { class: "muted", text: "∩ " }) : null,
         // a reply with the thread's own subject: quieter, so new subjects stand out
         h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
+        m.origin ? h("span", { class: "muted origin", title: originText(m), text: "  ⇲ " + networkName(m.origin.network) }) : null,
         g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null),
       h("span", { class: "from mono" }, m.who, m.bot ? h("span", { class: "muted", text: " · bot" }) : null),
       h("span", { class: "date", text: when(m.date) }))),
@@ -2253,7 +2271,10 @@ function readerPane(g, m, msgs) {
   if (m.mine) marks.push(h("span", { class: "sm", text: "you" }));
   if (m.bot) marks.push(h("span", { class: "sm", title: "Its profile says it posts automatically (UN-RFC 0030)", text: "bot" }));
   else if (m.contact) marks.push(h("span", { class: "sm", text: "contact" }));
-  marks.push(h("span", { class: "sm", text: when(m.date) }));
+  if (m.origin) {                                     // UN-RFC 0049 5.1: the claim, and when posted
+    marks.push(h("span", { class: "sm origin", text: originText(m) }));
+    marks.push(h("span", { class: "sm", text: "posted " + when(m.date) }));
+  } else marks.push(h("span", { class: "sm", text: when(m.date) }));
   if (m.for_me === "reply") marks.push(h("span", { class: "sm you", text: "◄ reply to you" }));
   if (m.for_me === "mention") marks.push(h("span", { class: "sm you", text: "♦ names you" }));
   if (m.encrypted) marks.push(h("span", { class: "sm lock" }, svg(ICON.lock, 12, 2.5), " encrypted"));
@@ -2689,7 +2710,7 @@ function chatView(d) {
     const quoted = m.references.length && byId[m.references[m.references.length - 1]];
     const isPost = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
     grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : "") + (m.pinned ? " pinned" : ""), "data-id": m.id,
-      title: when(m.date) + (m.encrypted ? " · encrypted" : "") + (m.pinned ? " · pinned" : "") },
+      title: when(m.date) + (m.origin ? " · " + originText(m) : "") + (m.encrypted ? " · encrypted" : "") + (m.pinned ? " · pinned" : "") },
       moreMenu(m),
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN + " " }) : null,
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,

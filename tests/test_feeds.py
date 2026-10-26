@@ -45,6 +45,7 @@ class FeedAPI:
         self.changed = []                    # withdraw and edit, from the ⋯ menu
         self.entry_mine = False
         self.many = 0                     # more entries, for a feed taller than the window
+        self.imported = False             # the second entry first published on Facebook (#137)
         self.comments = [row(f"<c{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
                              key=f"ed25519:r{i}") for i in range(4)]
         self.comments.append(row("<d@x>", "Svar på svar", 2, refs=["<a@x>", "<c1@x>"], who="Dybt",
@@ -56,9 +57,12 @@ class FeedAPI:
         first = row("<a@x>", "En kort note", group=group)
         if self.entry_mine:
             first.update(mine=True, may_withdraw=True, may_edit=True)
-        return [first, *self.comments,
-                row("<b@x>", "Lang tekst her", kind="post", subject="En overskrift", comment=CLOSED,
-                    group=group),
+        second = row("<b@x>", "Lang tekst her", kind="post", subject="En overskrift", comment=CLOSED,
+                     group=group)
+        if self.imported:                 # UN-RFC 0049: an import of the author's own
+            second["message"].update(origin={"network": "facebook", "date": "2025-08-03T14:20:00Z",
+                                             "id": None, "from": None}, old_on_arrival=True)
+        return [first, *self.comments, second,
                 *[row(f"<m{i}@x>", f"Note {i}", group=group) for i in range(self.many)]]
 
     def group(self, gid=FEED):
@@ -372,3 +376,15 @@ async def test_withdraw_is_found_by_delete_in_the_palette(feed_page):
     await page.keyboard.type("delete")
     names = await page.locator(".dialog .cmd .nm").all_inner_texts()
     assert "Withdraw (delete) the selected post" in names
+
+
+async def test_an_imported_entry_says_where_it_was_first_published(feed_page):
+    """#137, UN-RFC 0049 section 5.1: the origin as a claim, the time of posting beside it."""
+    page, api = feed_page
+    api.imported = True
+    await open_feed(page)
+    origin = page.locator(".entry .origin")
+    await expect(origin).to_have_count(1)
+    await expect(origin).to_contain_text("Imported from Facebook")
+    await expect(origin).to_contain_text("2025")
+    assert "Posted" in (await origin.get_attribute("title"))
