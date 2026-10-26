@@ -1,0 +1,196 @@
+// feeds.js - feeds (UN-RFC 0034, UN-RFC 0046 section 4.14).
+//
+// Part of the page, split from app.js by area (#152): plain scripts in static/,
+// loaded in index.html's order, sharing one scope - no build step, the same in the local
+// GUI, the portable and bootable builds and the browser build. Uses core.js's
+// helpers (h, api, S, render, toast ...).
+"use strict";
+
+// ---- feeds (UN-RFC 0034, UN-RFC 0046 section 4.14) ---------------------------
+// Entries newest first, each whole, comments under each, oldest first; the core lays
+// the group out (Session.feed: every note its own entry) and says who may comment.
+// The timeline is the pseudo-group timeline:, every followed feed's entries.
+const FEED_SHOWN = 2;                              // comments shown before "Show all"
+function feedEntries(d) {
+  const out = [];
+  for (const m of d.messages) {
+    if (m.depth === 0 || !out.length) out.push({ m, comments: [] });
+    else out[out.length - 1].comments.push(m);
+  }
+  const pinned = out.filter(e => e.m.pinned);       // pinned entries first (section 4.1)
+  return pinned.concat(out.filter(e => !e.m.pinned));
+}
+
+// Keys in a feed (unseenet#490): up and down go from entry to entry, Space to the next
+// unread one, R comments on the one you are on - the same keys as the terminal client.
+function feedCurrent() {
+  const entries = S.data && S.data.group && S.data.group.view === "feed" ? feedEntries(S.data) : [];
+  return entries.find(e => e.m.id === S.post) || null;
+}
+function feedGo(e) {
+  if (!e) return;
+  S.post = e.m.id; render();
+  const el = document.querySelector(`.entry[data-id="${CSS.escape(e.m.id)}"]`);
+  if (el) el.scrollIntoView({ block: "start", behavior: "smooth" });
+}
+function feedStep(delta) {
+  const entries = feedEntries(S.data);
+  if (!entries.length) return;
+  const i = entries.findIndex(e => e.m.id === S.post);
+  feedGo(entries[i < 0 ? 0 : Math.max(0, Math.min(entries.length - 1, i + delta))]);
+}
+async function feedNextUnread() {
+  const entries = feedEntries(S.data);
+  const i = entries.findIndex(e => e.m.id === S.post);
+  const unread = e => !e.m.read || e.comments.some(c => !c.read);
+  const next = entries.slice(i + 1).find(unread) || entries.slice(0, Math.max(0, i)).find(unread);
+  if (next) { feedGo(next); return; }
+  S.post = null; await nextUnread();
+}
+function feedComment() {
+  const e = feedCurrent();
+  const el = e && document.querySelector(`[data-k="c:${CSS.escape(e.m.id)}"]`);
+  if (el) { el.focus(); el.scrollIntoView({ block: "nearest" }); }
+  else if (e) toast((e.m.comment && e.m.comment.reason) || "Comments are closed here.");
+}
+
+// Keys on a site: up and down go through its pages, left and right back and forward.
+function pageStep(delta) {
+  const site = S.data && S.data.site;
+  if (!site || !site.pages || !site.pages.length) return;
+  const i = site.pages.findIndex(p => p.path === site.path);
+  const next = site.pages[Math.max(0, Math.min(site.pages.length - 1, (i < 0 ? 0 : i) + delta))];
+  if (next && next.path !== site.path) openPage(S.data.group.id, next.path);
+}
+
+function feedView(d) {
+  const g = d.group, timeline = g.id === TIMELINE, entries = feedEntries(d);
+  S.feedOpen = S.feedOpen || {};
+  const shownMsgs = entries.flatMap(e => [e.m, ...visibleComments(e)]);
+  markRead(shownMsgs);
+  const note = !timeline && mayWrite(d, "chat").allowed && (g.kinds || ["chat"]).includes("chat");
+  const send = () => {
+    const input = document.querySelector('[data-k="note"]');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ""; S.drafts["note:" + g.id] = "";
+    doPost(g.id, { body: text, chat: true }, { text, chat: true, thread: "new:" + g.id });
+  };
+  const pendNew = Object.entries(S.pending).filter(([, p]) => p.thread === "new:" + g.id);
+  return h("div", { class: "content" }, h("section", { class: "feed", "aria-label": timeline ? "Timeline" : "Feed",
+    "data-scroll": "feed:" + g.id },
+    timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} feed${g.feeds === 1 ? "" : "s"} you follow, in the order they were written. Nobody is told whom you follow.` }) : null,
+    note ? h("form", { class: "chatbar notebar", onsubmit: (e) => { e.preventDefault(); send(); } },
+      h("div", { class: "row" },
+        h("label", { for: "note", class: "sr", text: "A note in " + g.label }),
+        h("input", { id: "note", type: "text", "data-k": "note", autocomplete: "off", placeholder: "Write a note in " + g.label,
+          value: S.drafts["note:" + g.id] || "", oninput: (e) => { S.drafts["note:" + g.id] = e.target.value; } }),
+        emojiButton("note"),
+        h("button", { class: "send", type: "submit", "aria-label": "Post the note" }, svg(ICON.send, 18, 2.5))),
+      h("div", { class: "hint" }, "A short note; New post gives one a headline.")) : null,
+    pendNew.map(([job, p]) => h("article", { class: "entry pending", "data-job": job },
+      h("div", { class: "etext", text: p.text }), p.state === "failed" ?
+        h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ", h("button", { class: "link", onclick: () => retry(job) }, "Try again")) :
+        pendingState(p))),
+    entries.length ? entries.map(e => entryCard(d, e)) :
+      h("div", { class: "empty" }, h("h2", { text: timeline ? "Nothing yet" : "No entries yet" }),
+        h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), and their entries come here." :
+          note ? "Write the first note above." : "" }))));
+}
+
+// what shows under an entry: all when opened; else the newest few, and always your own
+// (section 4.4 - never chosen by how many answers or reactions)
+// Many comments are folded to the newest few - and every conversation you are in: the
+// comments that are yours, answer you or name you, with what they answer and the answers
+// under them, so you can follow your own threads without opening them all.
+function visibleComments(e) {
+  if (S.feedOpen && S.feedOpen[e.m.id]) return e.comments;
+  const shown = new Set(e.comments.slice(-FEED_SHOWN).map(c => c.id));
+  const yours = e.comments.filter(c => c.mine || c.for_me);
+  const ids = new Set(e.comments.map(c => c.id));
+  yours.forEach(c => {
+    shown.add(c.id);
+    (c.references || []).forEach(r => { if (ids.has(r)) shown.add(r); });          // what it answers
+    e.comments.forEach(o => { if ((o.references || []).includes(c.id)) shown.add(o.id); });  // answers to it
+  });
+  return e.comments.filter(c => shown.has(c.id));
+}
+
+function entryCard(d, e) {
+  const m = e.m, g = d.group, timeline = g.id === TIMELINE;
+  const shown = visibleComments(e), hidden = e.comments.length - shown.length;
+  const byId = Object.fromEntries(e.comments.map(c => [c.id, c]));
+  const cp = m.comment || { allowed: false, reason: NOT_HERE };
+  const target = (S.answering && S.answering[m.id] && byId[S.answering[m.id]]) || null;
+  const send = () => {
+    const input = document.querySelector(`[data-k="c:${m.id}"]`);
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ""; S.drafts["c:" + m.id] = "";
+    const to = target || m;
+    if (S.answering) delete S.answering[m.id];
+    doPost(m.group, { body: text, chat: true, references: [...to.references, to.id] }, { text, chat: true, thread: m.id });
+  };
+  const pend = Object.entries(S.pending).filter(([, p]) => p.thread === m.id);
+  const own = groupOf(m.group) || g;
+  return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread") + (S.post === m.id ? " on" : ""), "data-id": m.id },
+    h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
+      m.bot ? h("span", { class: "sm", text: "bot" }) : null,
+      h("span", { class: "hint", text: when(m.date) }),
+      m.origin ? h("span", { class: "hint origin", title: "Posted " + when(m.date) + " - the date it was first published is the poster's claim",
+        text: originText(m) }) : null,
+      timeline ? h("button", { class: "link efeed", onclick: () => openGroup(m.group) }, "in " + (m.group_label || labelOf(m.group))) : null,
+      m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null),
+      moreMenu(m)),
+    m.kind !== "chat" ? h("h3", { class: "etitle", text: subjectOf(m) }) : null,
+    h("div", { class: "ebody" }, m.kind === "chat" && m.readable ? [m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false)] : messageBody(m)),
+    reactionBar(m),
+    // Comment (with the count) and Reply with a post as icons with tooltips; Pin and Copy
+    // address are in the ⋯ menu (#120)
+    h("div", { class: "eact" },
+      cp.allowed ? iconAction(ICON.bubble, "Comment", () => focusLater(`[data-k="c:${m.id}"]`), {}, e.comments.length || null) :
+        e.comments.length ? h("span", { class: "hint ccount", "aria-label": `${e.comments.length} comments` },
+          svg(ICON.bubble, 16, 2), String(e.comments.length)) : null,
+      m.replyPerm && m.replyPerm.allowed && (own.kinds || ["post"]).includes("post") ?
+        iconAction(ICON.mail, "Reply with a post", () => openReply(m, own)) : null),
+    h("div", { class: "comments" },
+      hidden > 0 ? h("button", { class: "link more", onclick: () => { S.feedOpen[m.id] = true; render(); } },
+        `Show all ${e.comments.length} comments`) :
+      S.feedOpen[m.id] && e.comments.length > FEED_SHOWN ? h("button", { class: "link more", onclick: () => { delete S.feedOpen[m.id]; render(); } },
+        "Show fewer") : null,
+      shown.map(c => commentEl(c, m, byId)),
+      pend.map(([job, p]) => h("div", { class: "comment mine pending", "data-job": job },
+        h("div", { class: "ctext", text: p.text }), p.state === "failed" ?
+          h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ", h("button", { class: "link", onclick: () => retry(job) }, "Try again")) :
+          pendingState(p))),
+      cp.allowed ? h("form", { class: "cbar", onsubmit: (ev) => { ev.preventDefault(); send(); } },
+        target ? h("div", { class: "hint answering" }, "Answering " + target.who + " ",
+          h("button", { class: "link", type: "button", "aria-label": "Answer the entry instead", onclick: () => { delete S.answering[m.id]; render(); } }, "×")) : null,
+        h("label", { for: "c-" + m.id, class: "sr", text: "Comment" }),
+        h("textarea", { id: "c-" + m.id, rows: 1, class: "grow-in", "data-k": "c:" + m.id, autocomplete: "off", spellcheck: "true",
+          placeholder: target ? "Your answer" : "Write a comment", value: S.drafts["c:" + m.id] || "",
+          title: "Enter sends · Shift+Enter new line",
+          oninput: (ev) => { S.drafts["c:" + m.id] = ev.target.value; growField(ev.target); },
+          onkeydown: (ev) => sendOnEnter(ev, send) }),
+        h("button", { class: "send", type: "submit", "aria-label": "Send the comment" }, svg(ICON.send, 16, 2.5))) :
+      cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
+}
+
+// two levels (section 4.2; the core caps the depth at 2): a deeper answer sits at the
+// second level and says whom it answers
+function commentEl(c, entry, byId) {
+  const parent = c.references.length ? byId[c.references[c.references.length - 1]] : null;
+  return h("div", { class: "comment" + (c.depth > 1 ? " answer" : "") + (c.mine ? " mine" : ""), "data-id": c.id },
+    avatar(c, true),
+    h("div", { class: "cb" },
+      h("div", { class: "chd" }, whoEl(c), h("span", { class: "hint", text: when(c.date) }),
+        parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null,
+        moreMenu(c)),
+      h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
+        [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
+      // the reactions given stay; adding one and Answer show on hover or focus (#120)
+      h("div", { class: "crow" }, reactionBar(c),
+        entry.comment && entry.comment.allowed ? iconAction(ICON.bubble, "Answer", () => {
+          S.answering = S.answering || {}; S.answering[entry.id] = c.id; render(); focusLater(`[data-k="c:${entry.id}"]`); },
+          { cls: "cans" }) : null)));
+}

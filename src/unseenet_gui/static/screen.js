@@ -1,0 +1,214 @@
+// screen.js - the app screen, and whether you may write in a group (#13).
+//
+// Part of the page, split from app.js by area (#152): plain scripts in static/,
+// loaded in index.html's order, sharing one scope - no build step, the same in the local
+// GUI, the portable and bootable builds and the browser build. Uses core.js's
+// helpers (h, api, S, render, toast ...).
+"use strict";
+
+// ---- app --------------------------------------------------------------
+function allGroups() {
+  return (S.sidebar ? S.sidebar.hierarchies : []).flatMap(h => h.groups);
+}
+
+async function loadSidebar() {
+  try {
+    const [d, st] = await Promise.all([api("GET", "/api/groups"), api("GET", "/api/settings")]);
+    S.sidebar = fromSidebar(d, st);
+  }
+  catch (err) { S.status = err.message; }
+  if (!S.gid) {
+    const first = allGroups()[0];
+    if (first) await openGroup(first.id, false);
+  }
+  render();
+}
+
+const PHONE = window.matchMedia("(max-width: 760px)");     // the same width as app.css
+PHONE.addEventListener?.("change", () => render());
+
+async function openGroup(gid, rerender = true) {
+  if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; S.moreTools = false; }
+  if (rerender) S.pane = "group";      // the first group opened by itself leaves a phone on the list
+  S.gid = gid;
+  revealGroup(gid);
+  await loadGroup();
+  if (rerender) render();
+  const g = S.data && S.data.group;
+  // a phone would pop up its keyboard over the chat: there you tap the input yourself
+  if (g && g.view === "chat" && !PHONE.matches) setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
+}
+
+async function loadGroup() {
+  if (!S.gid) return;
+  const gid = S.gid;
+  try {
+    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid));
+    let site = null;
+    if (data.group.view === "pages") site = await loadSite(gid);   // a site: its pages (UN-RFC 0035)
+    if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: writeOf(data), site };
+  } catch (err) { S.status = err.message; }
+}
+
+// ---- may you write here? (#13) -------------------------------------------------
+// Said before you write, as the terminal client does: the core's write_permission
+// (the kinds a group takes, bans, blocks, posters, closed-group members, comments in
+// channels and when they close). Buttons you may not use are
+// shown greyed out with the reason, rather than hidden, so people learn why.
+// The core says it with the group (unseenet#320): ``write`` on its head, ``reply``
+// on each row; contacts, For you and your inbox have neither.
+function writeOf(data) {
+  const w = data.group && data.group.write;
+  if (!w) return {};
+  const replies = {};
+  for (const r of data.rows) if (r.reply && r.message && r.message.id) replies[r.message.id] = r.reply;
+  return { post: w.post, chat: w.chat, replies };
+}
+const NOT_HERE = "Only chosen people can write here.";
+function mayWrite(d, what) {                      // what: "post" or "chat"
+  const p = d && d.write && d.write[what];
+  if (p) return p;
+  const ok = !!(d && d.group && d.group.may_post);
+  return { allowed: ok, reason: ok ? "" : NOT_HERE, code: ok ? "ok" : "other" };
+}
+function mayReply(d, m) {
+  const g = d.group;
+  if (g.id === FOR_YOU || !m.readable || !m.key) return { allowed: false, reason: "", code: "none" };
+  if (g.private_reply || g.type === "contact") return { allowed: true, reason: "", code: "ok" };
+  const p = d.write && d.write.replies && d.write.replies[m.id];
+  if (p) return p;
+  const post = mayWrite(d, "post");        // not read by the core yet: what holds for the group
+  return post.code === "channel_thread" ? { allowed: true, reason: "", code: "ok" } : post;
+}
+// In a channel open for comments, a reader's reply is a comment (UN-RFC 0030).
+const commenting = (d) => d.group.type === "channel" && mayWrite(d, "post").code === "channel_thread";
+// a button that says why it does nothing, instead of not being there
+function offProps(p, props) {
+  return p.allowed ? props : { ...props, class: (props.class || "btn") + " off", "aria-disabled": "true",
+    title: p.reason, onclick: (e) => { e.preventDefault(); if (p.reason) toast(p.reason); } };
+}
+function tryReply(m, g) {
+  const p = mayReply(S.data, m);
+  if (p.allowed) openReply(m, g);
+  else if (p.reason) toast(p.reason);
+}
+
+let markTimer = null, toMark = new Set();
+function markRead(msgs) {
+  const ids = msgs.filter(m => !m.read).map(m => m.id);
+  if (!ids.length) return;
+  ids.forEach(i => toMark.add(i));
+  msgs.forEach(m => { m.read = true; });
+  clearTimeout(markTimer);
+  const gid = S.gid;
+  markTimer = setTimeout(() => {
+    const list = [...toMark]; toMark.clear();
+    api("POST", `/api/groups/${encodeURIComponent(gid)}/read`, { ids: list }).catch(() => {});
+  }, 600);
+}
+
+// Full-screen reading, as the terminal client's reader (F): the post gets the whole window.
+function reading() {
+  return !!(S.full && S.data && S.data.group && S.data.group.view !== "chat" && S.data.messages.length);
+}
+
+function appScreen() {
+  const pane = S.gid && S.pane !== "groups" ? "group" : "groups";   // phones show one (app.css)
+  return h("div", { class: "app pane-" + pane + (reading() ? " reading-full" : "") },
+    ripeningBanner(),
+    h("div", { class: "body" }, sidebar(), h("main", { class: "main" }, mainArea())),
+    statusbar());
+}
+
+// replies to you (◄) and posts naming you (♦), counted apart (unseenet #170)
+function forYouMarks(c) {
+  if (!c.for_you) return null;
+  const parts = [];
+  if (c.replies) parts.push(`◄${c.replies}`);
+  if (c.mentions) parts.push(`♦${c.mentions}`);
+  const title = [c.replies ? `${c.replies} ${c.replies === 1 ? "reply" : "replies"} to you` : "",
+                 c.mentions ? `${c.mentions} ${c.mentions === 1 ? "post names" : "posts name"} you` : ""]
+    .filter(Boolean).join(", ");
+  return h("span", { class: "foryou", title, text: parts.join(" ") || `◄${c.for_you}` });
+}
+
+function sidebar() {
+  const sb = S.sidebar, me = S.state.me || {};
+  const item = (gid, ic, label, extra, cls = "", title = null) => h("button", {
+    class: `item ${cls}${S.gid === gid ? " on" : ""}`, onclick: () => openGroup(gid),
+    "aria-current": S.gid === gid ? "page" : null, title },
+    h("span", { class: "ic", text: ic }),
+    typeof label === "string" ? h("span", { class: "nm", text: label }) : h("span", { class: "nm" }, label), extra);
+  // the groups scroll; you stay at the bottom, however many groups there are
+  return h("nav", { class: "side", "aria-label": "Groups" },
+    h("div", { class: "side-scroll", "data-scroll": "side" },
+    h("div", { class: "brand" }, logo(30), h("span", { class: "grow", text: "Unseenet" }),
+      h("button", { class: "mini cmd-btn", "aria-label": "Commands", title: "Commands and search (Ctrl P)",
+        onclick: () => openPalette() }, svg(ICON.cmd, 16, 2.5))),
+    // a filter for what the sidebar lists, as / in the terminal client; Esc clears it
+    h("div", { class: "side-filter" }, svg(ICON.search, 16),
+      h("label", { for: "sidefilter", class: "sr", text: "Filter groups and chats" }),
+      h("input", { id: "sidefilter", type: "search", "data-k": "sidefilter", autocomplete: "off",
+        placeholder: "Filter groups and chats", value: S.sideFilter || "",
+        oninput: (e) => { S.sideFilter = e.target.value; render(); },
+        onkeydown: (e) => {
+          if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); S.sideFilter = ""; render(); }
+          else if (e.key === "Enter") {
+            const first = document.querySelector("nav.side .side-results .item");
+            if (first) { e.preventDefault(); first.click(); }
+          }
+        } })),
+    filtering() ? sideResults(sb, item) : null,
+    filtering() ? null : sb ? h("div", { class: "nav" },
+      item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
+      sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
+      // your own feed and site at the top, or the way to start them, as in the terminal client (gui#101)
+      ...[[sb.my_feed, "☰", "feed", openMyFeed, "Your own feed - public, anyone can comment"],
+          [sb.my_site, "▤", "site", openMySite, "Your own site of pages - public"]].map(([m, ic, kind, start, title]) =>
+        !m ? null : m.started
+        ? item(m.id, ic, "My " + kind, m.unread ? h("span", { class: "count", text: m.unread }) : null, "", title)
+        : h("button", { class: "item start", onclick: start, title },
+            h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: "Start my " + kind }))),
+      sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
+        sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
+      // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
+      sb.moderation ? h("button", { class: "item", onclick: openModeration },
+        h("span", { class: "ic", text: "✓" }), h("span", { class: "nm", text: "To approve" }),
+        h("span", { class: "count", text: sb.moderation })) : null,
+      sb.name_requests ? h("button", { class: "item", onclick: openNames },
+        h("span", { class: "ic", text: "@" }), h("span", { class: "nm", text: "Name requests" }),
+        h("span", { class: "count", text: sb.name_requests })) : null) : null,
+    filtering() ? null : sb ? h("div", { class: "nav" },
+      h("h3", { class: "row-h" },
+        h("button", { class: "fold-chats", "aria-expanded": String(foldState().chats !== false),
+          title: foldState().chats !== false ? "Fold the chats away" : "Show the chats",
+          onclick: () => { setFold("chats", foldState().chats === false); render(); } },
+          h("span", { class: "car", text: foldState().chats !== false ? "▾" : "▸" }), "chats",
+          foldState().chats === false && sb.people.some(p => p.unread) ?
+            h("span", { class: "count", text: sb.people.reduce((n, p) => n + (p.unread || 0), 0) }) : null),
+        h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
+        h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
+      foldState().chats === false ? null :
+      sb.people.length ? sb.people.map(p => h("div", { class: "personrow" }, h("button", {
+        class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`, onclick: () => openGroup(p.id),
+        title: p.contact ? null : "Not a contact - open the chat to add them" },
+        h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+        h("span", { class: "nm", text: p.label }),
+        p.unread ? h("span", { class: "count", text: p.unread }) : null),
+        chatMenu(p))) :
+        h("p", { class: "hint", style: "margin:0 10px", text: "Your chats, one per person. Add people as contacts, or start a chat with +." })) : null,
+    filtering() ? null : sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
+      h("p", { class: "muted", text: "Loading your groups …" }),
+    sb && !sb.hierarchies.length ? h("div", { class: "nav" },
+      h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
+      h("button", { class: "btn", onclick: openBrowse }, "Find groups", h("kbd", { text: "G" }))) : null),
+    h("div", { class: "me" },
+      // your picture and name open your profile (#83), as in most apps
+      h("button", { class: "me-open", title: "Your profile", "aria-label": "Your profile", onclick: openMyProfile },
+        avatar({ key: me.key, who: me.display, colour: 4 }, true)),
+      h("div", { class: "who" }, h("div", {}, h("button", { class: "me-name", title: "Your profile", onclick: openMyProfile,
+          text: me.label || me.display || "" })),
+        nodeLink(),
+        ripeLine()),
+      h("button", { class: "btn icon", "aria-label": "Show my key", title: "Show my key (K)", onclick: openKey, text: "K" })));
+}

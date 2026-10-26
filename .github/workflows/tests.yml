@@ -19,7 +19,7 @@ jobs:
       - run: pip install . pytest pytest-asyncio playwright
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest -q
-      - run: node --check src/unseenet_gui/static/app.js
+      - run: for f in src/unseenet_gui/static/*.js; do node --check "$f" || exit 1; done   # every script (#152)
 
   docs:
     # docs/ checked strictly, as unseenet-docs gathers it into unseenet.org
