@@ -12,12 +12,14 @@ function closeDialog() { S.dialog = null; render(); }
 // A click outside a dialog closes it only when the click also began outside it,
 // so a click that starts on a button, or text you select, never closes it.
 let downOnScrim = false;
+// The frame of every dialog: a scrim that closes it when clicked, a box, Escape to close.
 function dialogShell(props, ...kids) {
   return h("div", { class: "scrim", onmousedown: (e) => { downOnScrim = e.target === e.currentTarget; },
     onclick: (e) => { if (downOnScrim && e.target === e.currentTarget) closeDialog(); downOnScrim = false; } },
     h("div", { class: "dialog" + (props.wide ? " wide" : ""), role: "dialog", "aria-modal": "true", "aria-label": props.label }, kids));
 }
 
+// Your key: the fingerprint and key to give people, with its identicon.
 function openKey() {
   const me = S.state.me;
   S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Your key" },
@@ -33,6 +35,7 @@ function openKey() {
 // What Unseenet is, in plain words. The text is the core's (unseenet.core.about),
 // the same as the TUI's F1, so every client says the same. Works before unlocking too.
 let ABOUT = null;
+// About: the versions of the core and this client, and where the code is.
 async function openAbout() {
   if (!ABOUT) {
     try { ABOUT = await api("GET", "/api/about"); }
@@ -58,6 +61,7 @@ async function openAbout() {
   render();
 }
 
+// About the group shown: its address, owner, rules, retention, node and settings.
 function openInfo() {
   const g = S.data && S.data.group;
   if (!g || !g.type) return;

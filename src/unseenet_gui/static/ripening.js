@@ -15,6 +15,7 @@ const RIPE_TOP = 4;                       // the core ripens up to level 4 (runt
 const RIPE_STEP = [8, 8, 8, 4];           // next level / this level's threshold (core.ripening.LEVELS)
 let ripeSamples = [];                     // [t, ms] at the end of each segment, for a pace
 
+// Keep the ripening state the core reports, and measure its pace from segment to segment.
 function setRipening(r, fromSegment) {
   const was = S.ripening;
   S.ripening = { ...(was || {}), ...r };
@@ -27,12 +28,14 @@ function setRipening(r, fromSegment) {
   syncWakeLock();
 }
 
+// How far ripening is within the level you are at, 0 to 1.
 function ripeFraction(r) {               // within the level you are at, 0 to 1
   if (!r || !r.next_at) return 1;
   const from = r.level === null ? 0 : r.next_at / RIPE_STEP[r.level];
   return Math.max(0, Math.min(1, (r.t - from) / (r.next_at - from)));
 }
 
+// About how long until the next level, from this run's own pace; null until it can tell.
 function ripeSecondsLeft(r) {            // from this run's own pace; null until two segments are done
   if (!r || !r.next_at || r.paused || ripeSamples.length < 2) return null;
   const [[t0, m0], [t1, m1]] = [ripeSamples[0], ripeSamples[ripeSamples.length - 1]];
@@ -40,6 +43,7 @@ function ripeSecondsLeft(r) {            // from this run's own pace; null until
   return Math.max(0, (r.next_at - r.t) / ((t1 - t0) / ((m1 - m0) / 1000)));
 }
 
+// A time as people say it: about a minute, about 20 minutes, about 3 hours.
 function roughly(sec) {
   if (sec < 90) return "about a minute";
   if (sec < 5400) return `about ${Math.round(sec / 60)} minutes`;
@@ -47,6 +51,7 @@ function roughly(sec) {
   return `about ${Math.round(sec / 86400)} days`;
 }
 
+// The line under your name in the sidebar: your key's level and how ripening goes.
 function ripeLine() {                     // under your name in the sidebar
   const r = S.ripening;
   if (!r) return null;
@@ -57,6 +62,7 @@ function ripeLine() {                     // under your name in the sidebar
   return h("button", { class: "link ripe", title: "What is key ripening?", onclick: openRipening }, text);
 }
 
+// Pause ripening, or let it go on.
 async function setRipeningPaused(paused) {
   try {
     const r = await api("POST", "/api/ripening", { paused });
@@ -66,6 +72,7 @@ async function setRipeningPaused(paused) {
   render();
 }
 
+// What key ripening is (UN-RFC 0025) and where yours is: level, time left, pause.
 function openRipening() {
   const para = (t) => h("p", { style: "margin:0", text: t });
   S.dialog = { focus: ".dialog .btn.primary", render: () => {
@@ -117,6 +124,8 @@ function ripeningBanner() {
 }
 
 let wakeLock = null, wakeAsking = false;
+// In the browser build, keep the screen awake while a new key ripens to level 0, so it is
+// not slowed down.
 async function syncWakeLock() {
   const r = S.ripening;
   const want = !!(S.state && S.state.web && r && r.level === null && !r.paused && r.available !== false &&

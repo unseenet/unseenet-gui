@@ -29,8 +29,11 @@ function reactionBar(m) {
 }
 
 let reactPop = null;
+// Close the reaction picker.
 function closeReactions() { if (reactPop) { reactPop.remove(); reactPop = null; } }
 
+// The reaction picker under a post: the group's set first, any emoji where the group takes
+// any.
 function openReactions(m, button) {
   if (reactPop) { closeReactions(); return; }
   const set = m.react_offered || (S.data && S.data.group && S.data.group.reactions) || { offered: [], any: false };
@@ -47,6 +50,7 @@ function openReactions(m, button) {
   if (first) first.focus();
 }
 
+// React with an emoji, or take yours back, showing it at once until the core has sent it.
 async function reactTo(m, emoji) {
   const list = m.reactions || [];
   const mine = list.find(r => r.mine);
@@ -71,6 +75,7 @@ async function reactTo(m, emoji) {
   }
 }
 
+// Who gave an emoji (right-click on it).
 async function whoReacted(m, emoji) {
   try {
     const d = await api("POST", `/api/groups/${encodeURIComponent(m.group)}/react`, { id: m.id, emoji, who: true });
@@ -78,10 +83,12 @@ async function whoReacted(m, emoji) {
   } catch (x) { toast(x.message); }
 }
 
+// Focus an element after the page is drawn.
 function focusLater(sel) {
   setTimeout(() => { const el = document.querySelector(sel); if (el) el.focus(); });
 }
 
+// A group by its id, from the sidebar.
 function groupOf(gid) {
   return allGroups().find(x => x.id === gid) || null;
 }

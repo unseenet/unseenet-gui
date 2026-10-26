@@ -15,6 +15,8 @@ function nodeSource(n) {
     : n.source === "self" ? h("span", { class: "chip warn", title: "The node's own name: anyone can give a node any name", text: "unlisted" })
     : null;
 }
+// Your nodes (#111): which is used, how each is doing, add one, remove one, make one the
+// first.
 function openNodes() {
   let list = null, err = "", info = {}, asked = false, busy = false, open = null, adding = "";
   const load = async (withInfo) => {
@@ -120,6 +122,8 @@ function redrawDialog() {
   if (S.dialog && S.dialog.refresh) S.dialog.refresh(); else render();
 }
 
+// A dialog with fields and a submit button, that keeps what was typed across redraws and
+// shows the error.
 function formDialog({ label, title, focus, fields, submit, button, note, values }) {
   let err = "";
   const vals = { ...(values || {}) };       // what you entered, also across a refresh()
@@ -158,6 +162,7 @@ function formDialog({ label, title, focus, fields, submit, button, note, values 
   return dialog;
 }
 
+// Add a key as a contact with a name of your own, never seen by others.
 function openAddContact(key, name) {
   formDialog({ values: { key, name }, label: "Contact", title: key ? "Add contact" : "Add a contact", focus: key ? "#cname" : "#ckey", button: "Save",
     note: "The name is yours alone: others never see it, and nobody can fake it - it is tied to their key.",
@@ -186,6 +191,7 @@ async function closeChat(key, label) {
   toast(`Closed the chat with ${label}. It comes back when one of you writes.`);
 }
 
+// Remove a contact; the chat stays.
 async function removeContact(key, label) {
   try { await api("POST", "/api/contacts", { key, remove: true }); } catch (x) { toast(x.message); return; }
   await loadSidebar(); render();
@@ -215,6 +221,7 @@ function contactMatches(c, q) {
   return words.some(w => (w || "").toLowerCase().includes(q));
 }
 
+// Your contacts: find one, chat, add, rename, remove.
 function openContacts() {
   let removing = null;                         // Remove asks once more, on the button itself
   let query = "", at = 0;
@@ -327,6 +334,7 @@ async function openPost(key, who = "", subject = "", replyTo = null, quote = "")
   if (!subject) setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
+// Create a group: name, type, view (threads, chat, feed, site), kinds, files and comments.
 function openCreateGroup() {
   let gtype = "open", view = "threads", kinds = "both", files = "none", comments = "open";
   // a site is a channel (UN-RFC 0035 section 3): choosing Site makes it one, and
@@ -388,6 +396,7 @@ function openCreateGroup() {
     } });
 }
 
+// Invite a key to a closed group you own.
 function openInvite() {
   const g = S.data && S.data.group;
   if (!g || !g.owner || g.type !== "closed") return;
@@ -401,6 +410,7 @@ function openInvite() {
     } });
 }
 
+// Your signature: the template, and a preview of it as it will be signed.
 async function openSignature() {
   const cur = await api("GET", "/api/settings");
   formDialog({ values: { template: cur.signature }, label: "Signature", title: "Your signature", focus: "#sig", button: "Save",

@@ -18,6 +18,7 @@ function messageBody(m) {
   return [body, filesOf(m, false)];
 }
 
+// The core's safe Markdown tree (UN-RFC 0031) as DOM: blocks.
 function renderTree(blocks) {
   const out = [];
   blocks.forEach((b, i) => {
@@ -62,6 +63,7 @@ function renderChatLine(m) {
   return out;
 }
 
+// The core's inline Markdown nodes as DOM; links are shown, never followed outside Tor.
 function renderInline(nodes, inLink = false) {
   return nodes.map(n => {
     switch (n.t) {

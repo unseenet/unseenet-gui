@@ -12,6 +12,7 @@
 // history to go back and forward in (section 9.1). Its writers edit pages with a
 // preview rendered by the core, as readers will see them (section 9.2).
 const SITE = { path: {}, back: [], forward: [] };       // per site: the page shown; one history
+// Read a site and the page shown from the core (UN-RFC 0035).
 async function loadSite(gid) {
   let site, page = null, err = "";
   try { site = await api("GET", `/api/groups/${encodeURIComponent(gid)}/site`); }
@@ -33,6 +34,7 @@ async function openPage(gid, path, how = "go") {
   const sc = document.querySelector('[data-scroll^="page:"]');
   if (sc) sc.scrollTop = 0;
 }
+// Back or forward in the site's history of pages.
 function siteStep(dir) {
   const from = dir < 0 ? SITE.back : SITE.forward, to = dir < 0 ? SITE.forward : SITE.back;
   const at = from.pop();
@@ -41,6 +43,7 @@ function siteStep(dir) {
   openPage(at.gid, at.path, "step");
 }
 
+// A site: its pages, the page shown, and the writers' tools.
 function siteView(d) {
   const g = d.group, site = d.site || { pages: [] };
   if (site.error) return h("div", { class: "content" }, h("div", { class: "empty" }, h("h2", { text: "This site cannot be shown" }), h("p", { text: site.error })));
@@ -82,11 +85,13 @@ function siteView(d) {
         pendingPages(g))));
 }
 
+// Whether a page starts with its own heading, so its title is not shown twice.
 function pageOwnTitle(row) {
   const first = row && row.markdown && (row.tree || [])[0];
   return !!(first && first.t === "h" && first.n === 1);
 }
 
+// Pages on their way, shown until the node has them.
 function pendingPages(g) {
   const pend = Object.entries(S.pending).filter(([, p]) => p.group === g.id && p.page);
   return pend.length ? h("div", { class: "pagepend" }, pend.map(([job, p]) => h("div", { class: "hint" },
@@ -94,6 +99,7 @@ function pendingPages(g) {
       h("button", { class: "link", onclick: () => retry(job) }, "Try again")] : pendingState(p)))) : null;
 }
 
+// Remove a page or publish its previous version again, after asking.
 function pageAction(g, page, what) {
   const ask = what === "remove" ? `Remove the page "${page.title}"? Readers no longer see it; nodes keep the removal for a while.` :
     `Publish the version of "${page.title}" from ${when(page.previous.date)} by ${page.previous.who} again? It becomes the current one.`;

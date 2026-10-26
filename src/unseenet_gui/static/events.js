@@ -8,6 +8,8 @@
 
 // ---- events from the server --------------------------------------------
 let sidebarTimer = null;
+// The core's server events over a WebSocket (UN-RFC 0046 5): new posts, jobs, ripening,
+// refreshes; reconnecting when it drops.
 function connectEvents() {
   if (S.ws) return;
   const ws = new WebSocket(`ws://${location.host}/api/events`, ["unseenet", "unseenet-token." + TOKEN]);

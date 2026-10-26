@@ -5,8 +5,11 @@
 // Uses app.js's helpers: h, api, toast, S, render, dialogShell, closeDialog.
 "use strict";
 
+// Whether export is offered here: an open vault, not the browser build.
 function exportPossible() { return !(S.state && S.state.web) && S.state && S.state.unlocked; }
 
+// Export my data (#141): what it holds and never holds, private messages with a passphrase,
+// then the path.
 function openExport() {
   const st = { private: false, pass: "", again: "", busy: false, error: "", done: null };
   const go = async () => {

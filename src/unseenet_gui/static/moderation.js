@@ -13,6 +13,8 @@ async function leaveGroup(g) {
   toast("You no longer follow " + g.label + ". G finds it again.");
 }
 
+// The owner's group settings: title, description, rules, view, comments, files, reactions,
+// pins and pages.
 function openEditGroup() {
   const g = S.data && S.data.group;
   if (!g || !g.owner) return;
@@ -78,6 +80,7 @@ function openEditGroup() {
     } });
 }
 
+// Remove a group you own (UN-RFC 0013): with the reason readers will see, after a warning.
 function openRemoveGroup() {
   const g = S.data && S.data.group;
   if (!g || !g.owner) return;
@@ -123,6 +126,7 @@ function peopleDialog({ title, note, list, add, remove, addLabel, removeLabel, r
   render();
 }
 
+// The owner's moderators and posters of a group: add or remove keys.
 function openRoles() {
   const g = S.data && S.data.group;
   if (!g || !g.owner) return;
@@ -138,6 +142,7 @@ function openRoles() {
     addLabel: g.type === "channel" ? "Make poster" : "Make moderator", removeLabel: "Remove" });
 }
 
+// The keys banned from a group you own or moderate, to add or lift.
 function openBanned(prefill = "") {
   const g = S.data && S.data.group;
   if (!g || !g.owner) return;
@@ -267,6 +272,7 @@ async function ignorePerson(key, label, on = true) {
   await loadGroup(); await loadSidebar();
 }
 
+// Your own list of ignored people (#72): kept with your settings, never sent anywhere.
 function openIgnored() {
   let list = null;
   const load = () => api("GET", "/api/ignore").then(r => { list = r.ignored; if (S.dialog) render(); });
@@ -316,6 +322,7 @@ function openStateWhere() {
     } });
 }
 
+// Hide or show posts by bots (UN-RFC 0030 6), as a setting that follows you.
 async function toggleBots() {
   const on = !(S.sidebar && S.sidebar.hide_bots);
   await api("POST", "/api/settings", { hide_bots: on });
@@ -323,6 +330,7 @@ async function toggleBots() {
   toast(on ? "Posts by bots are hidden." : "You see bots again, marked bot.");
 }
 
+// Show people's pictures, or identicons only (UN-RFC 0022 8.5).
 async function togglePictures() {
   const on = !(S.sidebar && S.sidebar.pictures !== false);
   await api("POST", "/api/settings", { pictures: on });
@@ -331,6 +339,7 @@ async function togglePictures() {
   toast(on ? "People's pictures are shown." : "Identicons only: pictures are not fetched or shown.");
 }
 
+// Show or hide what a hierarchy's maintainer blocked (UN-RFC 0018 5.4).
 async function toggleShowBlocked() {
   const on = !(S.sidebar && S.sidebar.show_blocked);
   await api("POST", "/api/settings", { show_blocked: on });
@@ -338,6 +347,7 @@ async function toggleShowBlocked() {
   toast(on ? "You see posts blocked by maintainers, marked." : "Posts blocked by maintainers are hidden.");
 }
 
+// Remove a member from a closed group: the others get a new key, after asking.
 async function removeMember(g, m) {
   if (!window.confirm(`Remove ${m.label} from ${g.label}? The others get a new key; ${m.label} keeps what they already read.`)) return;
   await api("POST", `/api/groups/${encodeURIComponent(g.id)}/members/remove`, { key: m.key });
@@ -387,6 +397,7 @@ function openReport(m) {
     } });
 }
 
+// N: write a new post here - a thread, or in a chat a private post to that person.
 async function openCompose() {
   const g = S.data && S.data.group;
   if (g && g.type === "contact") { openPost(g.key, g.label.replace(/ √$/, "")); return; }   // N in a chat: a post
@@ -402,6 +413,7 @@ async function openCompose() {
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
+// Browse the groups your nodes carry, to read or follow one.
 function openBrowse() {
   let list = null, filter = "", err = "";
   api("GET", "/api/browse").then(r => { list = r.groups.map(fromGroup); if (S.dialog) render(); }).catch(e => { err = e.message; if (S.dialog) render(); });

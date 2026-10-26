@@ -16,6 +16,7 @@ const GROUP_REF = /(?<![\p{L}\p{N}_@#\/&.+-])#(?=[a-z0-9+_.-]*[a-z])([a-z0-9][a-
 // a full stop or a bracket after it is the sentence's, not the address's.
 const ADDRESS_REF = /(?<![\p{L}\p{N}_])unseenet:[^\s<>"']*[^\s<>"'.,;:!?)\]]/gu;
 
+// A plain text with #group references made buttons that open the group (unseenet#172).
 function linkGroups(text) {
   const t = text || "", out = [];
   let last = 0;
@@ -30,6 +31,7 @@ function linkGroups(text) {
   return out;
 }
 
+// The #group references in a text, as buttons, for under a post.
 function linkGroupRefs(text) {
   const out = [];
   let last = 0;

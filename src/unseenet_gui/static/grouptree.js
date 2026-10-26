@@ -12,21 +12,27 @@
 // open, a folder closed unless the open group is in it.
 const FOLDS_KEY = "unseenet-folds";
 let folds = null;
+// Which branches of the group tree are open, as this browser keeps them.
 function foldState() {
   if (folds) return folds;
   try { folds = JSON.parse(localStorage.getItem(FOLDS_KEY) || "{}") || {}; } catch (_) { folds = {}; }
   return folds;
 }
+// Open or close a branch of the group tree, and keep it so in this browser.
 function setFold(path, open) {
   foldState()[path] = open;
   try { localStorage.setItem(FOLDS_KEY, JSON.stringify(folds)); } catch (_) { /* not kept */ }
 }
+// Whether a branch of the tree holds a group, at any depth.
 function treeHas(node, gid) {
   return node.groups.includes(gid) || node.children.some(c => treeHas(c, gid));
 }
+// Every group in a branch of the tree, at any depth.
 function treeGroups(node) {
   return node.groups.concat(...node.children.map(treeGroups));
 }
+// Whether a branch is shown open: as folded by hand, else open when it is a hierarchy's
+// root or holds the group shown.
 function isOpen(node, root) {
   const f = foldState();
   return node.path in f ? f[node.path] : (root || treeHas(node, S.gid));
@@ -43,12 +49,14 @@ function revealGroup(gid) {
   }
 }
 
+// A sub-group's name with its leading dot shown quietly (".history.egypt").
 function dotted(name) {           // ".history.egypt" with a quiet leading dot
   return name.startsWith(".") ? [h("span", { class: "dot-pre", text: "." }), name.slice(1)] : name;
 }
 
 // The sidebar's filter (as / in the terminal client): what matches, in one list.
 function filtering() { return !!(S.sideFilter || "").trim(); }
+// The sidebar while filtering: the groups and people whose names match, without the tree.
 function sideResults(sb, item) {
   if (!sb) return null;
   const q = S.sideFilter.trim().toLowerCase();
@@ -70,6 +78,8 @@ function sideResults(sb, item) {
       text: "Nothing you follow matches. G finds groups on your node." }) : null);
 }
 
+// One hierarchy in the sidebar as a tree of groups (unseenet.client.grouptree), with unread
+// counts on closed branches.
 function hierarchyNav(hier, item) {
   const byId = Object.fromEntries(hier.groups.map(g => [g.id, g]));
   const unreadIn = node => treeGroups(node).reduce((n, id) => n + ((byId[id] || {}).unread || 0), 0);
@@ -106,6 +116,7 @@ function hierarchyNav(hier, item) {
     open ? contents(root) : null);
 }
 
+// A node's address made short for the status bar (an onion address cut in the middle).
 function shortNode(address) {
   if (!address) return "";
   const host = address.split(":")[0];
@@ -134,10 +145,13 @@ function nodeLink() {
     h("span", { class: "dot" + (up === true ? " ok" : up === false ? " bad" : "") }), " ",
     node ? how + " · " + nodeLabel(node) : "No node");
 }
+// Draw the status bar's node link again, without drawing the whole page.
 function redrawNodeLink() {
   const el = document.querySelector("[data-k='node-link']");
   if (el) el.replaceWith(nodeLink());
 }
+// The tooltip of the status bar's node link: the node's name, what it is and whether it is
+// connected.
 function nodeTitle(address) {
   if (!address) return "Your nodes";
   const n = (S.state.node_names || {})[address] || {};
@@ -181,6 +195,7 @@ function keyHints() {
   return out;
 }
 
+// The status bar: the keys that work here, the node you are connected to, and ripening.
 function statusbar() {
   const k = ([key, label, run]) => run ? h("button", { class: "khint", type: "button", tabindex: "-1", onclick: run }, h("kbd", { text: key }), " " + label)
     : h("span", { class: "khint" }, h("kbd", { text: key }), " " + label);
@@ -197,6 +212,8 @@ function statusbar() {
       S.state.status && !S.state.status_idle ? S.state.status + " · " : "", "pre-alpha"));
 }
 
+// The main part of the page: the group shown in its view (threads, chat, feed, site), or a
+// welcome.
 function mainArea() {
   const d = S.data;
   if (!S.gid || !d) {

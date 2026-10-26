@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Every function says what it does** (#152, part 2): a comment above each of
+  the page's 191 functions that had none, and `tests/test_scripts.py` fails on a
+  new one without; a Developers page with the map of the scripts. Comments only.
+
+- **app.js split into scripts by area** (#152, part 1): `core.js`, `setup.js`,
+  ... `start.js` in `static/`, each opening with what belongs in it, loaded in
+  `index.html`'s order and sharing one scope - no build step. A pure move: the
+  same code, line for line, in the same order. CI checks every script.
+
 - **Reactions in private chats and posts** (#140, on unseenet#513): the same
   reaction bar as in groups, any emoji; none on your own lines.
 
