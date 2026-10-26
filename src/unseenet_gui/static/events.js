@@ -46,7 +46,11 @@ function connectEvents() {
       updateProgress(e.text);
     } else if (type === "groups-changed" || type === "refreshed" || type === "inbox-ready") {
       if (type !== "groups-changed") notifySoon();             // #126 (notify.js)
-      if (type === "refreshed") { S.state.connected = !e.error; redrawNodeLink(); }
+      if (type === "refreshed") {
+        const was = S.state.connected;
+        S.state.connected = !e.error; redrawNodeLink();
+        if (S.dialog && was !== S.state.connected) render();   // the palette: grey or ready now
+      }
       sidebarSoon();
     } else if (type === "group-updated") {
       if (e.new) notifySoon();                                 // #126 (notify.js)
