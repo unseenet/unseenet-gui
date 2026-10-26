@@ -7,6 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The palette says what waits for the network**: while Unseenet is not
+  connected yet, what needs it (finding groups, opening an address, following,
+  creating or editing groups, names, sharing your profile, copying to another
+  device, updating ...) is grey and says *waiting for the network*, with a line on
+  how connecting goes; chosen anyway it says so instead of failing. It is ready by
+  itself once connected. What works offline (your rules, your nodes, contacts,
+  settings, writing - posts wait in the queue) works at once.
+
 - **"Your", as the client speaks to you**: *Your feed*, *Your site*, *Start your
   feed*, *Export your data*, *Show your key*, *Share your profile* - matching *For
   you* beside them; "my" stays only in your own words (*Use my rules*). The rule is

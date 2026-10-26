@@ -7,6 +7,8 @@ Run with: pip install -e '.[dev]' playwright; playwright install chromium;
 python -m pytest -q tests/test_rules.py
 """
 
+import re
+
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
@@ -194,3 +196,24 @@ async def test_your_rules_from_the_palette_does_not_open_the_post(rules_page):
     await expect(page.locator("#rules-text")).to_be_visible()
     assert await page.evaluate("S.full") is not True
     await expect(page.locator(".content.full")).to_have_count(0)
+
+
+@pytest.mark.parametrize("rules_page", [False], indirect=True)
+async def test_the_palette_while_not_connected(rules_page):
+    """What needs the network is grey and says so until Unseenet is connected; what does
+    not (your rules) works at once."""
+    page, _ = rules_page
+    await page.evaluate("S.state.connected = false; S.state.status = 'Tor: 5% Connecting to a relay'")
+    await page.evaluate("openPalette()")
+    await expect(page.locator(".pal-offline")).to_contain_text("Not connected yet - Tor: 5%")
+    await page.keyboard.type("find groups")
+    row = page.locator(".cmd", has_text="Find groups on your nodes")
+    await expect(row).to_have_class(re.compile("waiting"))
+    await expect(row).to_contain_text("waiting for the network")
+    await page.keyboard.press("Enter")
+    await expect(page.locator(".toast")).to_contain_text("Waiting for the network")
+    await expect(page.locator(".dialog")).to_have_count(1)            # the palette stays
+    await page.evaluate("S.state.connected = true; render()")
+    await expect(row).not_to_have_class(re.compile("waiting"))
+    await page.locator("#palette").fill("your rules")
+    await expect(page.locator(".cmd", has_text="Your rules")).not_to_have_class(re.compile("waiting"))

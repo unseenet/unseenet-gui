@@ -274,13 +274,13 @@ function commands() {
     { name: "New post", key: "N", when: g && g.type && mayWrite(S.data, "post").allowed && g.view !== "chat", run: openCompose },
     { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
     { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
-    { name: "Find groups on your nodes", key: "G", run: openBrowse },
+    { net: true, name: "Find groups on your nodes", key: "G", run: openBrowse },
     { name: "Your rules: what comes first, what is hidden or folded", key: "", also: "scorefile killfile score filter sort regler", run: openRules },
     { name: "Your nodes: add, remove, choose the default", key: "", also: "node server switch change onion noder skift", run: openNodes },
-    { name: "Create a group", key: "", run: openCreateGroup },
+    { net: true, name: "Create a group", key: "", run: openCreateGroup },
     { name: "Write a private post", key: "M", run: () => openWrite("", "post") },
     { name: "Contacts", key: "C", run: openContacts },
-    { name: "Names: claim yours, ask for one, give names under yours", key: "@", run: openNames },
+    { net: true, name: "Names: claim yours, ask for one, give names under yours", key: "@", run: openNames },
     { name: "People you ignore", key: "", run: openIgnored },
     { name: S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false ? "Tell people you mention" : "Stop telling people you mention", key: "",
       run: async () => { const on = !!(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false);
@@ -296,28 +296,29 @@ function commands() {
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     { name: S.sidebar && S.sidebar.hide_bots ? "Show bots" : "Hide bots: posts by keys that say they post automatically", key: "", run: toggleBots },
     { name: S.sidebar && S.sidebar.pictures === false ? "Show people's pictures" : "Identicons only: do not show people's pictures", key: "", run: togglePictures },
-    { name: "Your picture: in your profile", key: "", run: openMyProfile },
+    { net: true, name: "Your picture: in your profile", key: "", run: openMyProfile },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
-    { name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
-    { name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },
-    { name: "Moderators and posters", key: "", when: g && g.owner && g.type !== "closed", run: openRoles },
-    { name: "Banned from this group", key: "", when: g && g.owner, run: () => openBanned() },
-    { name: "Remove this group from the network", key: "", when: g && g.owner, run: openRemoveGroup },
+    { net: true, name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },
+    { net: true, name: "Edit this group", key: "", when: g && g.owner, run: openEditGroup },
+    { net: true, name: "Moderators and posters", key: "", when: g && g.owner && g.type !== "closed", run: openRoles },
+    { net: true, name: "Banned from this group", key: "", when: g && g.owner, run: () => openBanned() },
+    { net: true, name: "Remove this group from the network", key: "", when: g && g.owner, run: openRemoveGroup },
     { name: "Unsubscribe from this group", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type), run: () => leaveGroup(g) },
-    { name: "Withdraw (delete) the selected post", key: "D", also: "delete remove slet fjern tilbagetræk",
+    { net: true, name: "Withdraw (delete) the selected post", key: "D", also: "delete remove slet fjern tilbagetræk",
       when: selectedPost() && selectedPost().may_withdraw, run: () => openWithdraw(selectedPost()) },
-    { name: "Pin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && !selectedPost().pinned, run: () => openPin(selectedPost()) },
-    { name: "Unpin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && selectedPost().pinned, run: () => openPin(selectedPost()) },
+    { net: true, name: "Pin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && !selectedPost().pinned, run: () => openPin(selectedPost()) },
+    { net: true, name: "Unpin the selected post", key: "", when: S.data && S.data.group.may_pin && selectedPost() && selectedPost().pinned, run: () => openPin(selectedPost()) },
     { name: "Pinned posts in this group", key: "", when: pinsOf(S.data).length > 0, run: () => openPinList() },
-    { name: "Open an unseenet: address", key: "", run: openAddressDialog },
+    { net: true, name: "Open an unseenet: address", key: "", run: openAddressDialog },
     { name: "Timeline: every feed you follow", key: "", when: S.sidebar && S.sidebar.timeline.feeds > 0, run: () => openGroup(TIMELINE) },
-    { name: "Follow someone: their feeds, by key, name or address", key: "", run: openFollow },
+    { net: true, name: "Follow someone: their feeds, by key, name or address", key: "", run: openFollow },
     { name: "Whom you follow", key: "", run: openFollowing },
-    { name: "Your feed: start it, or go to it", key: "", run: openMyFeed },
-    { name: "Your site: start it, or go to it", key: "", run: openMySite },
+    // going to them works offline; starting one needs the network
+    { net: !(S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started), name: "Your feed: start it, or go to it", key: "", run: openMyFeed },
+    { net: !(S.sidebar && S.sidebar.my_site && S.sidebar.my_site.started), name: "Your site: start it, or go to it", key: "", run: openMySite },
     { name: "New page on this site", key: "", when: S.data && S.data.site && S.data.site.may_write,
       run: () => openPageEditor(S.data.group, S.data.site, null) },
-    { name: "Publish a folder as this site", key: "", also: "import upload markdown html folder site",
+    { net: true, name: "Publish a folder as this site", key: "", also: "import upload markdown html folder site",
       when: publishPossible(), run: openPublishFolder },                // #125 (publish.js)
     { name: "Show this group as a feed", key: "", when: g && g.type && !["inbox", "contact"].includes(g.type) && g.view !== "feed",
       run: async () => { await api("POST", `/api/groups/${encodeURIComponent(g.id)}/view`, { view: "feed" }); await loadGroup(); await loadSidebar(); render(); } },
@@ -328,18 +329,18 @@ function commands() {
     { name: "Copy the web address of the selected post (https://…)", key: "", when: selectedPost() && selectedPost().address && !selectedPost().private,
       run: () => copyWeb(selectedPost().address, "post") },
     { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
-    { name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
+    { net: true, name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Close this chat", key: "", also: "hide archive remove luk skjul", when: g && g.type === "contact",
       run: () => closeChat(g.key, g.label.replace(/ √$/, "")) },
-    { name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
+    { net: true, name: "Invite to this closed group", key: "", when: g && g.owner && g.type === "closed", run: openInvite },
     { name: "Edit your signature", key: "", run: openSignature },
-    { name: "Profile of this author: about, languages, links (UN-RFC 0022)", key: "", when: selectedPost() && selectedPost().key,
+    { net: true, name: "Profile of this author: about, languages, links (UN-RFC 0022)", key: "", when: selectedPost() && selectedPost().key,
       run: () => openProfile(selectedPost().key, selectedPost().who) },
-    { name: "Your profile: write, change or remove it", key: "", run: openMyProfile },
-    { name: g && g.type === "closed" ? "Share your profile with this group only" : "Share your profile with this person only", key: "",
+    { net: true, name: "Your profile: write, change or remove it", key: "", run: openMyProfile },
+    { net: true, name: g && g.type === "closed" ? "Share your profile with this group only" : "Share your profile with this person only", key: "",
       when: !!shareTarget(), run: () => openShareProfile(shareTarget().to, shareTarget().who) },
-    { name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
+    { net: true, name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
     ...notifyCommands(),                                      // #126 (notify.js)
     { name: "Export your data", key: "", also: "export download backup takeout data gdpr",
@@ -347,10 +348,10 @@ function commands() {
     { name: "Show recovery words" + (S.state.identity && !S.state.identity.words_written ? " (not written down yet)" : ""),
       key: "", also: "backup recovery seed words gendannelse", run: () => openShowWords(false) },
     { name: "Restore from recovery words", key: "", also: "recover backup words", run: openRestore },
-    { name: "Copy to another device (a code or QR code, then two check words)", key: "", also: "phone move transfer qr",
+    { net: true, name: "Copy to another device (a code or QR code, then two check words)", key: "", also: "phone move transfer qr",
       when: !S.state.web, run: openCopyTo },
-    { name: "Get identity from another device", key: "", also: "phone move transfer qr receive", run: openCopyFrom },
-    { name: "Update Unseenet", key: "", when: !!S.state.update, run: openUpdate },
+    { net: true, name: "Get identity from another device", key: "", also: "phone move transfer qr receive", run: openCopyFrom },
+    { net: true, name: "Update Unseenet", key: "", when: !!S.state.update, run: openUpdate },
     { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },
     { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
     { name: "Shut down the computer", key: "", when: S.state.bootable, run: () => power("poweroff") },
@@ -376,15 +377,24 @@ function openPalette() {
   const shown = () => commands().filter(c => !q || c.name.toLowerCase().includes(q) ||
     (c.also && c.also.includes(q)) ||
     (c.group && (c.group.title || "").toLowerCase().includes(q)));
-  const run = (c) => { S.dialog = null; render(); c.run(); };
+  // a command that needs the network, while Unseenet is not connected yet: said, not run -
+  // it is ready by itself once connected (the palette is drawn again then)
+  const waiting = (c) => c.net && !(S.state && S.state.connected);
+  const run = (c) => {
+    if (waiting(c)) { toast("Waiting for the network: this is ready as soon as Unseenet is connected."); return; }
+    S.dialog = null; render(); c.run();
+  };
   S.dialog = { focus: "#palette", render: () => {
     const list = shown();
     sel = Math.max(0, Math.min(sel, list.length - 1));
     const acts = list.filter(c => !c.group), grps = list.filter(c => c.group);
-    const row = (c) => h("button", { class: "cmd" + (list.indexOf(c) === sel ? " on" : ""), onclick: () => run(c),
+    const row = (c) => h("button", { class: "cmd" + (list.indexOf(c) === sel ? " on" : "") + (waiting(c) ? " waiting" : ""),
+      "aria-disabled": waiting(c) ? "true" : null, title: waiting(c) ? "Needs the network - not connected yet" : null,
+      onclick: () => run(c),
       onmousemove: () => { if (list.indexOf(c) !== sel) { sel = list.indexOf(c); render(); } } },
       c.group ? h("span", { class: "mono muted", style: "width:28px", text: (c.group.access || "") + c.group.icon }) : null,
       h("span", { class: "nm" + (c.group ? " mono" : ""), text: c.name }),
+      waiting(c) ? h("span", { class: "wait", text: "waiting for the network" }) : null,
       c.group && c.group.unread ? h("span", { class: "count", text: c.group.unread }) : null,
       c.key ? h("kbd", { text: c.key }) : null);
     return dialogShell({ label: "Command palette" },
@@ -403,6 +413,9 @@ function openPalette() {
         h("kbd", { text: "Esc" }),
         h("button", { class: "btn icon pal-close", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),   // phones: no Esc key
       h("div", { class: "db list", "data-scroll": "palette" },
+        S.state && !S.state.connected ? h("p", { class: "pal-offline", role: "status",
+          text: "Not connected yet - " + (S.state.status || "connecting").replace(/[\s.…]+$/, "") +
+            ". What needs the network is grey until then." }) : null,
         acts.length ? [h("div", { class: "sect", text: "Commands" }), acts.map(row)] : null,
         grps.length ? [h("div", { class: "sect", text: "Your groups" }), grps.map(row)] : null,
         !list.length ? h("p", { class: "muted", style: "padding:12px", text: "Nothing matches." }) : null),
