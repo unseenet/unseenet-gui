@@ -1,4 +1,4 @@
-// Export my data (#141, on the core's export, unseenet#577 / UN-RFC 0049 section 7):
+// Export your data (#141, on the core's export, unseenet#577 / UN-RFC 0049 section 7):
 // your articles as signed, their files, your sites, profile and state - never keys -
 // saved in Downloads; private posts and chats only when chosen, and then the whole
 // file encrypted with a passphrase. Not in the browser build yet (no Downloads there).
@@ -8,7 +8,7 @@
 // Whether export is offered here: an open vault, not the browser build.
 function exportPossible() { return !(S.state && S.state.web) && S.state && S.state.unlocked; }
 
-// Export my data (#141): what it holds and never holds, private messages with a passphrase,
+// Export your data (#141): what it holds and never holds, private messages with a passphrase,
 // then the path.
 function openExport() {
   const st = { private: false, pass: "", again: "", busy: false, error: "", done: null };
@@ -23,8 +23,8 @@ function openExport() {
     } catch (x) { st.error = x.message; }
     st.busy = false; st.pass = st.again = ""; render();
   };
-  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Export my data" },
-    h("div", { class: "dh" }, h("h2", { text: "Export my data" })),
+  S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Export your data" },
+    h("div", { class: "dh" }, h("h2", { text: "Export your data" })),
     st.done ? h("div", { class: "db" },
       h("p", { style: "margin:0" }, "Saved: ", h("span", { class: "mono", text: st.done.path })),
       h("p", { class: "hint", style: "margin:0", text: `${st.done.articles} articles, ${st.done.files} files, ${st.done.sites} sites` +

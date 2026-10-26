@@ -92,7 +92,7 @@ async function openMyFeed() {
         try { await api("POST", "/api/feed", { comments: st.comments }); }
         catch (x) { st.busy = false; st.err = x.message; render(); return; }
         closeDialog(); toast("Your feed is started: what you post there is public.");
-        await loadSidebar(); S.full = false; openGroup(f.id); } }, st.busy ? "Starting …" : "Start my feed")));
+        await loadSidebar(); S.full = false; openGroup(f.id); } }, st.busy ? "Starting …" : "Start your feed")));
   S.dialog = { focus: ".dialog .btn", render: draw };
   render();
 }

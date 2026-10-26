@@ -86,10 +86,10 @@ async function openProfile(key, who = "", context = S.gid) {
       p && p.mine ? h("button", { class: "btn", onclick: () => openMyProfile() }, "Edit") : null,
       p && p.mine ? h("button", { class: "btn", title: "Your own feed (UN-RFC 0034) - public",
         onclick: () => { closeDialog(); openMyFeed(); } },
-        S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started ? "My feed" : "Start my feed") : null,
+        S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started ? "Your feed" : "Start your feed") : null,
       p && p.mine ? h("button", { class: "btn", title: "Your own site of pages (UN-RFC 0035) - public",
         onclick: () => { closeDialog(); openMySite(); } },
-        S.sidebar && S.sidebar.my_site && S.sidebar.my_site.started ? "My site" : "Start my site") : null,
+        S.sidebar && S.sidebar.my_site && S.sidebar.my_site.started ? "Your site" : "Start your site") : null,
       p && !p.mine ? h("button", { class: "btn", title: "Only you stop seeing it (UN-RFC 0022 section 9.2)", onclick: async () => {
         try { await api("POST", "/api/profile/hide", { key, hidden: !p.hidden }); }
         catch (x) { toast(x.message); return; }
@@ -342,7 +342,7 @@ function commands() {
     { name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
     ...notifyCommands(),                                      // #126 (notify.js)
-    { name: "Export my data", key: "", also: "export download backup takeout data gdpr",
+    { name: "Export your data", key: "", also: "export download backup takeout data gdpr",
       when: exportPossible(), run: openExport },                    // #141 (export.js)
     { name: "Show recovery words" + (S.state.identity && !S.state.identity.words_written ? " (not written down yet)" : ""),
       key: "", also: "backup recovery seed words gendannelse", run: () => openShowWords(false) },
@@ -358,7 +358,7 @@ function commands() {
     { name: "Follow the system's theme", key: "", when: !!THEME, run: () => { theme(null); render(); } },
     { name: S.sidebar && S.sidebar.state_local ? "Your state: keep it in the network again" : "Your state: keep it on this device only",
       key: "", when: !!S.sidebar, run: openStateWhere },
-    { name: "Show my key", key: "K", run: openKey },
+    { name: "Show your key", key: "K", run: openKey },
     { name: "Key ripening: your level, what it means" + (S.ripening && typeof S.ripening.paused === "boolean" ? ", pause or resume" : ""),
       key: "", when: !!S.ripening, run: openRipening },
     { name: "About Unseenet: what it is, why, and how it protects you", key: "F1", run: openAbout },
