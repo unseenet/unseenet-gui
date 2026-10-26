@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Reactions in private chats and posts** (#140, on unseenet#513): the same
+  reaction bar as in groups, any emoji; none on your own lines.
+
 - **Export my data** (#141, on unseenet#577): in the menu - your posts, comments,
   chat lines and pages as signed, their files, your profile and the groups you
   follow, saved in Downloads; never your keys; says that it holds only what the
