@@ -111,9 +111,9 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
 @media (prefers-reduced-motion: reduce) { .bar > span { animation: none; width: 100%; opacity: .5; } }
 .bar.determinate > span { animation: none; transition: width .2s linear; }   /* postage progress (#29) */
 .choices { display: flex; flex-direction: column; gap: 6px; max-height: 190px; overflow-y: auto; }
-.choice { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px;
+.choice, .howpick { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 10px;
   border: 1px solid var(--line-2); background: transparent; text-align: left; }
-.choice[aria-pressed="true"] { border-color: var(--green); background: var(--ink-2); }
+.choice[aria-pressed="true"], .howpick[aria-pressed="true"] { border-color: var(--green); background: var(--ink-2); }
 .choice small { display: block; color: var(--muted); }
 
 /* ---- app shell ------------------------------------------------------------ */
@@ -850,3 +850,19 @@ textarea.grow-in { resize: none; field-sizing: content; overflow-y: auto; line-h
 .cbar textarea.grow-in { height: auto; min-height: 36px; padding: 7px 14px; }
 .comment .ctext { white-space: pre-wrap; }
 .chatbar .row, .cbar { align-items: flex-end; }
+
+/* recovery words and copying (UN-RFC 0050, #142) */
+.words { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px 24px; margin: 0; padding-left: 28px;
+  grid-auto-flow: column; grid-template-rows: repeat(12, auto); font-size: 15px; }
+.warn { color: var(--red); }
+.check { display: flex; gap: 8px; align-items: flex-start; }
+.howpicks { display: flex; flex-wrap: wrap; gap: 6px; }
+.copy .qr { width: 220px; height: 220px; align-self: center; background: #fff; border-radius: 8px; }
+.copy .code, .checkwords { font-size: 22px; text-align: center; margin: 4px 0; letter-spacing: .02em; }
+video.scan { width: 100%; max-height: 240px; border-radius: 8px; background: #000; }
+.print-sheet { display: none; }
+@media print {
+  body > *:not(.print-sheet) { display: none !important; }
+  .print-sheet { display: block; color: #000; background: #fff; font-size: 14pt; }
+  .print-sheet .words { font-size: 14pt; }
+}

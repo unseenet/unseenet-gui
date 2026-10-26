@@ -575,15 +575,22 @@ function setupScreen() {
     const f = e.target;
     S.busy = true; S.error = ""; render();
     try {
-      await loadState(await api("POST", "/api/setup", {
-        display: needName ? f.display.value : "", node: needNode ? (f.custom.value.trim() || S.setupNode || "") : "" }));
-      await afterUnlock();
+      const node = needNode ? (f.custom.value.trim() || S.setupNode || "") : "";
+      // UN-RFC 0050: an identity you have, from its words or another device (identity.js)
+      if (!(needName && await setupOther(f, node))) {
+        await loadState(await api("POST", "/api/setup", { display: needName ? f.display.value : "", node }));
+        S.firstWords = needName;
+        await afterUnlock();
+        if (needName) openShowWords(true);       // write them down now, or later (4.2)
+      }
     } catch (err) { S.error = err.message; }
     S.busy = false; render();
   };
   return h("div", { class: "unlock" }, h("div", { class: "unlock-box" },
     brandHead("First start."),
     h("form", { class: "form", onsubmit: submit },
+      needName ? setupHowChoice() : null,
+      needName && (S.setupHow || "new") !== "new" ? setupHowFields() :
       needName ? [h("label", { for: "display", text: "Your name" }),
         h("input", { id: "display", name: "display", class: "field", "data-k": "display", required: true,
           placeholder: "What others see next to your posts" }),
@@ -607,6 +614,7 @@ async function afterUnlock() {
   if (S.state.setup) return;
   connectEvents();
   await Promise.all([loadSidebar(), loadTheme()]);
+  if (!S.firstWords) wordsReminder();          // UN-RFC 0050 4.2 (identity.js)
   offerProtocolHandler();
   if (OPEN_AT) { const a = OPEN_AT; OPEN_AT = null; openAddress(a); }
 }
@@ -4108,6 +4116,12 @@ function commands() {
       when: !!shareTarget(), run: () => openShareProfile(shareTarget().to, shareTarget().who) },
     { name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
+    { name: "Show recovery words" + (S.state.identity && !S.state.identity.words_written ? " (not written down yet)" : ""),
+      key: "", also: "backup recovery seed words gendannelse", run: () => openShowWords(false) },
+    { name: "Restore from recovery words", key: "", also: "recover backup words", run: openRestore },
+    { name: "Copy to another device (a code or QR code, then two check words)", key: "", also: "phone move transfer qr",
+      when: !S.state.web, run: openCopyTo },
+    { name: "Get identity from another device", key: "", also: "phone move transfer qr receive", run: openCopyFrom },
     { name: "Update Unseenet", key: "", when: !!S.state.update, run: openUpdate },
     { name: "Network and Wi-Fi", key: "", when: S.state.bootable, run: openNetwork },
     { name: "Restart the computer", key: "", when: S.state.bootable, run: () => power("reboot") },
@@ -4470,6 +4484,7 @@ function connectEvents() {
     let e;
     try { e = JSON.parse(ev.data); } catch (_) { return; }
     const type = e.event;
+    if (type === "copy") { copyEvent(e); return; }           // UN-RFC 0046 4.19 (identity.js)
     const sidebarSoon = () => {
       clearTimeout(sidebarTimer);
       sidebarTimer = setTimeout(async () => {

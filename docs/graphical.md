@@ -64,7 +64,10 @@ and a vault. Do not run both on the same vault at the same time.
 1. **Choose a passphrase.** It encrypts your vault. There is no way to
    recover it if you forget it.
 2. **Choose a display name.** This is just a label. Your real identity is a
-   key pair that is created for you.
+   key pair that is created for you. Right after, the client shows your 24
+   **recovery words** to write down (or *Later*). Already have an identity?
+   Choose *Restore from recovery words* or *Get it from another device*
+   instead.
 3. **Choose a node.** The client suggests one of the project's nodes at
    random, so not everyone starts on the same one, and keeps the others as
    backups. Choose *Another node* for an address you were given.
@@ -101,8 +104,29 @@ first post waits a few minutes more, once, while your new key
 - What you may not write, it says before you write: in a channel's comments,
   under a ban, in a closed group you are not in.
 - Your vault: change its passphrase (copies elsewhere keep the old one).
+- Recovery words and copying (from 0.3, see below).
 - A light and a dark theme, and phones and other narrow screens. On the
   bootable image also the network, Wi-Fi, the keyboard, restart and shut down.
+
+## Recovery words and other devices
+
+- **Recovery words.** 24 words that bring your identity back on any device;
+  your groups, contacts and settings come back from the network. *Show
+  recovery words* in the menu shows them after your passphrase; type three
+  back to note they are written down, or the client reminds you at most once
+  a week. *Print* and *Save as file* (to Downloads, refused when that is on
+  the vault's own disk or looks like a cloud folder) are there behind a
+  warning - paper is safer. On the bootable image they are only shown.
+  **Closed groups do not come back** with the words: after *Restore from
+  recovery words* the client lists them and can ask their owners to invite
+  you again.
+- **Copy to another device.** Choose which identities, and whether the keys
+  of closed groups go too. The client shows a QR code and a code such as
+  `7-guitar-tunnel`; on the other device choose *Get identity from another
+  device* and scan it (where the browser can use a camera) or type it. Both
+  show the same two check words, and only when you confirm here is anything
+  sent - straight to the other device over Tor. In a browser through an
+  entrance you can only receive a copy.
 
 Not yet - use the [terminal client](https://unseenet.org/client/): Tor bridges and several
 identities. **Updating** a stick or portable folder of the graphical client
