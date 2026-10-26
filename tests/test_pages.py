@@ -41,6 +41,7 @@ class SiteAPI:
     def __init__(self, may_write):
         self.owner = may_write == "owner"                # the site's owner (#98)
         self.may_write = bool(may_write)
+        self.published = []                              # #125: publish a folder
         self.settings = []
         self.posted = []
         self.heading = False              # pages that begin with their own # heading
@@ -83,6 +84,20 @@ class SiteAPI:
                     "hierarchies": [{"name": "site", "tree": None}], "inbox": {"id": "inbox:test"}}
         elif request.method == "GET" and path == f"/api/groups/{SITE}":
             data = {"group": self.group(), "rows": []}
+        elif path == f"/api/groups/{SITE}/site" and request.method == "POST":   # #125
+            body = await request.json()
+            self.published.append(body)
+            data = {"job": "jp"} if body.get("dry_run") is False else {
+                "changes": [{"path": "index", "title": "Velkommen", "action": "changed",
+                             "source": "index.md", "files": []},
+                            {"path": "ny", "title": "Ny side", "action": "new", "source": "ny.md",
+                             "files": ["a.jpg"]},
+                            {"path": "about", "title": "Om mig",
+                             "action": "remove" if body.get("prune") else "kept",
+                             "source": None, "files": []}],
+                "notes": ["index.md:3: HTML turned into Markdown"], "problems": [], "sent": 0}
+        elif path == "/x/gui/site-folder":
+            data = {"folder": "/tmp/unseenet-site-x", "files": 2}
         elif path == f"/api/groups/{SITE}/site":
             data = {"id": SITE, "label": "Min side", "title": "Andreas' side", "home": "index",
                     "owner": {"key": "ed25519:a", "label": "Andreas"}, "may_write": self.may_write,
@@ -284,3 +299,29 @@ async def test_a_site_may_say_search_engines_may_index_it(site_page):
     await dialog.get_by_role("button", name="Save").click()
     await expect(dialog).to_have_count(0)
     assert api.settings[-1]["index"] == "yes"
+
+
+@pytest.mark.parametrize("site_page", [True], indirect=True)
+async def test_publish_a_folder(site_page):
+    """#125: the files of a folder -> what would be sent -> Publish only what changed."""
+    page, api = site_page
+    await expect(page.get_by_role("button", name="Publish a folder…")).to_be_visible()
+    await page.evaluate("uploadFolder(S.data.group, [new File(['# Hej'], 'index.md'), "
+                        "new File(['x'], 'ny.md')])")
+    dialog = page.get_by_role("dialog", name="Publish a folder")
+    await expect(dialog.locator("tr.changed")).to_contain_text("/index")
+    await expect(dialog.locator("tr.new")).to_contain_text("1 picture")
+    await expect(dialog.locator("tr.kept")).to_contain_text("kept")
+    await expect(dialog.get_by_text("1 change made on the way")).to_be_visible()
+    assert api.published[-1] == {"folder": "/tmp/unseenet-site-x", "prune": False, "dry_run": True}
+    await dialog.get_by_label("Remove pages that are no longer in the folder").check()
+    await expect(dialog.locator("tr.remove")).to_contain_text("/about")
+    await dialog.get_by_role("button", name="Publish 3 pages").click()
+    await expect(dialog).to_have_count(0)
+    assert api.published[-1] == {"folder": "/tmp/unseenet-site-x", "prune": True, "dry_run": False}
+
+
+@pytest.mark.parametrize("site_page", [False], indirect=True)
+async def test_no_publishing_for_readers(site_page):
+    page, _ = site_page
+    await expect(page.get_by_role("button", name="Publish a folder…")).to_have_count(0)

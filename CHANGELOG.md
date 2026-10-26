@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Publish a folder as a site** (#125, on unseenet#538): on a site you write
+  in, *Publish a folder…* (and the menu) - pick a folder of Markdown or HTML
+  files, see what would be sent (new, changed, unchanged, removed pages, and
+  every change made on the way), choose whether pages no longer in the folder
+  go, and Publish: only what changed is sent. Not in the browser build.
+
 - **Notifications** (#126): a system notification when something lands in
   For you - private messages, replies, mentions - from the core's
   `/api/notifications`, only while the window is open (no push). Asked once
