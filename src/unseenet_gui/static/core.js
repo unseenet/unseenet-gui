@@ -296,6 +296,45 @@ function when(iso, withDay = true) {
   if (days < 7) return d.toLocaleDateString([], { weekday: "short" }) + " " + time;
   return d.toLocaleDateString([], { day: "numeric", month: "short" });
 }
+// How long ago, as feeds say it: now, 5 min, 2 h, Yesterday 14:20, 3 days, then the date
+// (with the year when it is another year).
+function ago(iso, now = new Date()) {
+  if (!iso) return "";
+  const d = new Date(iso), s = (now - d) / 1000;
+  if (s < 45) return "now";
+  if (s < 3600) return `${Math.max(1, Math.round(s / 60))} min`;
+  if (sameDay(d, now)) return `${Math.round(s / 3600)} h`;
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  const time = d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  if (sameDay(d, y)) return "Yesterday " + time;
+  const days = Math.floor(s / 86400);
+  if (days < 7) return `${Math.max(2, days)} days`;
+  return d.toLocaleDateString([], d.getFullYear() === now.getFullYear()
+    ? { day: "numeric", month: "short" } : { day: "numeric", month: "short", year: "numeric" });
+}
+
+// The exact date and time, for the tooltip and screen readers.
+function exactTime(iso) {
+  return iso ? new Date(iso).toLocaleString([], { weekday: "long", day: "numeric", month: "long",
+    year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+}
+
+// A time as feeds show it: how long ago, the exact time on hover; kept fresh by tickAgo.
+function timeEl(iso, cls = "hint") {
+  if (!iso) return null;
+  return h("time", { class: cls + " ago", datetime: iso, "data-ago": iso, title: exactTime(iso), text: ago(iso) });
+}
+
+// Every minute: how long ago, again, in place - nothing else is drawn.
+function tickAgo() {
+  const now = new Date();
+  document.querySelectorAll("[data-ago]").forEach(el => {
+    const t = ago(el.dataset.ago, now);
+    if (el.textContent !== t) el.textContent = t;
+  });
+}
+setInterval(tickAgo, 60000);
+
 // The heading of a day in a chat: Today, Yesterday, or the weekday and date.
 function dayLabel(d) {
   const now = new Date(), y = new Date(now - 86400000);

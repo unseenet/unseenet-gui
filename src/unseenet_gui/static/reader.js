@@ -204,7 +204,7 @@ function threadsView(d) {
         m.score !== undefined ? h("span", { class: "score", title: "Your rules' score - ⋯ says why",
           text: `  ${m.score > 0 ? "+" : ""}${m.score}` }) : null),
       h("span", { class: "from mono" }, m.who, m.bot ? h("span", { class: "muted", text: " · bot" }) : null),
-      h("span", { class: "date", text: when(m.date) }))),
+      h("span", { class: "date" }, timeEl(m.date, "")))),
     pend.map(([job, p]) => pendingRow(job, p)));
   return h("div", { class: "content news" + (S.full ? " full" : "") + (S.mobileReading ? " reading" : "") },
     table, readerPane(g, cur, msgs));

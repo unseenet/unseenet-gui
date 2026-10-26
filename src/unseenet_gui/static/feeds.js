@@ -10,7 +10,9 @@
 // Entries newest first, each whole, comments under each, oldest first; the core lays
 // the group out (Session.feed: every note its own entry) and says who may comment.
 // The timeline is the pseudo-group timeline:, every followed feed's entries.
-const FEED_SHOWN = 2;                              // comments shown before "Show all"
+const FEED_SHOWN = 1;                              // the newest comment shown, and your own talks
+const COMMENT_PAGE = 20;                           // "View more" shows this many more at a time
+const CLIP_LINES = 6;                              // an entry's text before "… more" (10 wide)
 // A feed's entries, each with its comments under it, newest first (UN-RFC 0034).
 function feedEntries(d) {
   const out = [];
@@ -73,6 +75,7 @@ function pageStep(delta) {
 function feedView(d) {
   const g = d.group, timeline = g.id === TIMELINE, entries = feedEntries(d);
   S.feedOpen = S.feedOpen || {};
+  requestAnimationFrame(clipEntries);              // "… more" only where text is really hidden
   const shownMsgs = entries.flatMap(e => [e.m, ...visibleComments(e)]);
   markRead(shownMsgs);
   const note = !timeline && mayWrite(d, "chat").allowed && (g.kinds || ["chat"]).includes("chat");
@@ -111,15 +114,22 @@ function feedView(d) {
 // comments that are yours, answer you or name you, with what they answer and the answers
 // under them, so you can follow your own threads without opening them all.
 function visibleComments(e) {
-  if (S.feedOpen && S.feedOpen[e.m.id]) return e.comments;
-  const shown = new Set(e.comments.slice(-FEED_SHOWN).map(c => c.id));
-  const yours = e.comments.filter(c => c.mine || c.for_me);
+  const how = (S.commentsHow || {})[e.m.id] || "newest";
   const ids = new Set(e.comments.map(c => c.id));
-  yours.forEach(c => {
-    shown.add(c.id);
-    (c.references || []).forEach(r => { if (ids.has(r)) shown.add(r); });          // what it answers
-    e.comments.forEach(o => { if ((o.references || []).includes(c.id)) shown.add(o.id); });  // answers to it
-  });
+  const near = (keep) => {                       // a comment, what it answers and answers to it
+    const out = new Set();
+    keep.forEach(c => {
+      out.add(c.id);
+      (c.references || []).forEach(r => { if (ids.has(r)) out.add(r); });
+      e.comments.forEach(o => { if ((o.references || []).includes(c.id)) out.add(o.id); });
+    });
+    return out;
+  };
+  if (how === "yours") return e.comments.filter(c => near(e.comments.filter(x => x.mine)).has(c.id));
+  if (how === "mentions") return e.comments.filter(c => near(e.comments.filter(x => x.for_me)).has(c.id));
+  const open = (S.feedOpen && S.feedOpen[e.m.id]) || 0;            // how many more you opened
+  const shown = new Set(e.comments.slice(-(FEED_SHOWN + open)).map(c => c.id));
+  near(e.comments.filter(c => c.mine || c.for_me)).forEach(id => shown.add(id));   // your own talks
   return e.comments.filter(c => shown.has(c.id));
 }
 
@@ -144,14 +154,14 @@ function entryCard(d, e) {
   return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread") + (S.post === m.id ? " on" : ""), "data-id": m.id },
     h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
       m.bot ? h("span", { class: "sm", text: "bot" }) : null,
-      h("span", { class: "hint", text: when(m.date) }),
-      m.origin ? h("span", { class: "hint origin", title: "Posted " + when(m.date) + " - the date it was first published is the poster's claim",
+      timeEl(m.date),
+      m.origin ? h("span", { class: "hint origin", title: "Posted " + exactTime(m.date) + " - the date it was first published is the poster's claim",
         text: originText(m) }) : null,
       timeline ? h("button", { class: "link efeed", onclick: () => openGroup(m.group) }, "in " + (m.group_label || labelOf(m.group))) : null,
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN }) : null),
       moreMenu(m)),
     m.kind !== "chat" ? h("h3", { class: "etitle", text: subjectOf(m) }) : null,
-    h("div", { class: "ebody" }, m.kind === "chat" && m.readable ? [m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false)] : messageBody(m)),
+    entryBody(m),
     reactionBar(m),
     // Comment (with the count) and Reply with a post as icons with tooltips; Pin and Copy
     // address are in the ⋯ menu (#120)
@@ -162,10 +172,7 @@ function entryCard(d, e) {
       m.replyPerm && m.replyPerm.allowed && (own.kinds || ["post"]).includes("post") ?
         iconAction(ICON.mail, "Reply with a post", () => openReply(m, own)) : null),
     h("div", { class: "comments" },
-      hidden > 0 ? h("button", { class: "link more", onclick: () => { S.feedOpen[m.id] = true; render(); } },
-        `Show all ${e.comments.length} comments`) :
-      S.feedOpen[m.id] && e.comments.length > FEED_SHOWN ? h("button", { class: "link more", onclick: () => { delete S.feedOpen[m.id]; render(); } },
-        "Show fewer") : null,
+      commentsHead(e, hidden),
       shown.map(c => commentEl(c, m, byId)),
       pend.map(([job, p]) => h("div", { class: "comment mine pending", "data-job": job },
         h("div", { class: "ctext", text: p.text }), p.state === "failed" ?
@@ -184,6 +191,53 @@ function entryCard(d, e) {
       cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
 }
 
+// An entry's text, cut after a few lines with "… more" when it is long - opened in place,
+// "Show less" at its end - and its pictures under it, never cut, so a picture post shows
+// its picture (unseenet-gui#143). Whether it is long is measured after drawing (clipEntries).
+function entryBody(m) {
+  if (m.kind === "chat" && m.readable)
+    return h("div", { class: "ebody" }, m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false));
+  const [text, files] = messageBody(m);
+  const open = S.textOpen && S.textOpen[m.id];
+  return h("div", { class: "ebody" },
+    h("div", { class: "etext" + (open ? " open" : " clip"), "data-clip": m.id }, text),
+    open ? h("button", { class: "link less", onclick: () => { delete S.textOpen[m.id]; render(); } }, "Show less") :
+      h("button", { class: "link emore", onclick: () => { S.textOpen = { ...(S.textOpen || {}), [m.id]: true }; render(); } }, "… more"),
+    files);
+}
+
+// After a feed is drawn: an entry's text that is cut by only a line or two is shown whole,
+// and "… more" is shown only where something is really hidden.
+function clipEntries() {
+  document.querySelectorAll(".etext.clip").forEach(el => {
+    const line = parseFloat(getComputedStyle(el).lineHeight) || 22;
+    const hidden = el.scrollHeight - el.clientHeight;
+    const long = hidden > line * 2;
+    el.classList.toggle("fits", !long);
+    el.parentElement.classList.toggle("cut", long);
+  });
+}
+
+// Over an entry's comments: how many are not shown and "View N more" (COMMENT_PAGE at a
+// time), the choice of which to show when there are many - newest, where you wrote, what
+// names you - and "Show fewer". What is shown is never chosen by how many answer or react
+// (UN-RFC 0034 section 4.4).
+function commentsHead(e, hidden) {
+  const id = e.m.id, how = (S.commentsHow || {})[id] || "newest";
+  const set = (v) => { S.commentsHow = { ...(S.commentsHow || {}), [id]: v }; render(); };
+  const choice = e.comments.length > 3 ? h("div", { class: "cwhich", role: "group", "aria-label": "Which comments" },
+    [["newest", "Newest"], ["yours", "Where you wrote"], ["mentions", "Mentions you"]]
+      .filter(([v]) => v === "newest" || (v === "yours" ? e.comments.some(c => c.mine) : e.comments.some(c => c.for_me)))
+      .map(([v, label]) => h("button", { class: "chip" + (how === v ? " on" : ""), "aria-pressed": String(how === v),
+        type: "button", onclick: () => set(v) }, label))) : null;
+  const more = how === "newest" && hidden > 0 ? h("button", { class: "link more", onclick: () => {
+    S.feedOpen[id] = ((S.feedOpen[id]) || 0) + COMMENT_PAGE; render(); } },
+    `View ${Math.min(hidden, COMMENT_PAGE) === hidden ? hidden : COMMENT_PAGE + " of " + hidden} more comment${hidden === 1 ? "" : "s"}`) : null;
+  const fewer = how === "newest" && S.feedOpen[id] ? h("button", { class: "link more", onclick: () => {
+    delete S.feedOpen[id]; render(); } }, "Show fewer") : null;
+  return choice || more || fewer ? h("div", { class: "chead" }, choice, more, fewer) : null;
+}
+
 // two levels (section 4.2; the core caps the depth at 2): a deeper answer sits at the
 // second level and says whom it answers
 function commentEl(c, entry, byId) {
@@ -191,7 +245,7 @@ function commentEl(c, entry, byId) {
   return h("div", { class: "comment" + (c.depth > 1 ? " answer" : "") + (c.mine ? " mine" : ""), "data-id": c.id },
     avatar(c, true),
     h("div", { class: "cb" },
-      h("div", { class: "chd" }, whoEl(c), h("span", { class: "hint", text: when(c.date) }),
+      h("div", { class: "chd" }, whoEl(c), timeEl(c.date),
         parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null,
         moreMenu(c)),
       h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :

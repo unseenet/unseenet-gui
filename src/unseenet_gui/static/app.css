@@ -925,6 +925,23 @@ pre.why { white-space: pre-wrap; margin: 0; padding: .75rem; background: var(--i
 .pal-offline { margin: 4px 8px 8px; padding: 8px 10px; font-size: 12px; color: var(--muted);
   border: 1px dashed var(--line-2); border-radius: 8px; }
 
+/* feeds (unseenet-gui#143): long text cut with "… more", pictures never cut */
+.etext.clip { max-height: calc(1.6em * 6); overflow: hidden; position: relative; }
+@media (min-width: 1100px) { .etext.clip { max-height: calc(1.6em * 10); } }
+.etext.clip:not(.fits)::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 3.2em;
+  background: linear-gradient(transparent, var(--ink-deep)); pointer-events: none; }
+.etext.clip.fits { max-height: none; }
+.ebody .emore { display: none; }
+.ebody.cut .emore { display: inline-block; margin: 2px 0 6px; }
+.ebody .less { margin: 2px 0 6px; }
+time.ago { white-space: nowrap; }
+/* many comments: which, and how many more */
+.chead { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; margin-bottom: 6px; }
+.chead .more { margin: 0; padding-left: 0; }
+.cwhich { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { border: 1px solid var(--line-2); background: transparent; color: var(--muted); border-radius: 999px;
+  padding: 3px 10px; font-size: 12px; cursor: pointer; }
+.chip.on { color: var(--on-green); background: var(--green); border-color: var(--green); }
 /* the ⋯ menu at a post's head: grouped */
 .ph .post-more { margin-left: auto; }
 .more .menu .msect { padding: 8px 12px 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
