@@ -237,7 +237,8 @@ src/unseenet_gui/
   boot.py         the bootable image's session (cage) and its self-test
   splash.py       the boot splash, drawn on the framebuffer
   selftest.py     does this build work?
-  static/         the page: index.html, app.css, app.js (no build step)
+  static/         the page: index.html, app.css and plain scripts by area (core.js first,
+                  start.js ...), loaded in index.html's order - no build step
 tests/            the server: the core's guards, the page, /x/gui/
 tools/
   dev.sh          a playground without Tor (seed_dev.py fills it)

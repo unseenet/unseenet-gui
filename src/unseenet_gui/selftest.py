@@ -35,7 +35,7 @@ async def _server_check() -> bool:
         url = await asyncio.wait_for(ready, 20)
         base, token = url.split("/#t=")
         page = await asyncio.to_thread(_get, base + "/")
-        script = await asyncio.to_thread(_get, base + "/static/app.js")
+        script = await asyncio.to_thread(_get, base + "/static/core.js")
         refused = await asyncio.to_thread(_get, base + "/api/state")
         state = await asyncio.to_thread(_get, base + "/api/state", token)
         task.cancel()
@@ -43,7 +43,7 @@ async def _server_check() -> bool:
             await task
         except asyncio.CancelledError:
             pass
-    ok = (page[0] == 200 and b"app.js" in page[1] and script[0] == 200 and refused[0] == 401
+    ok = (page[0] == 200 and b"core.js" in page[1] and script[0] == 200 and refused[0] == 401
           and state[0] == 200 and json.loads(state[1]).get("unlocked") is False)
     print(f"Server:    {'serves the page and the API, refuses without the token' if ok else 'BROKEN'}"
           f" (page {page[0]}, script {script[0]}, no token {refused[0]}, with token {state[0]})")

@@ -64,11 +64,11 @@ async def test_other_hosts_and_origins_are_refused(client):
 
 async def test_page_and_its_files_have_a_strict_csp(client):
     r = await client.get("/", headers=host(client))
-    assert r.status == 200 and b"app.js" in await r.read()
+    assert r.status == 200 and b"core.js" in await r.read()
     csp = r.headers["Content-Security-Policy"]
     assert "default-src 'none'" in csp and "script-src 'self'" in csp and "unsafe" not in csp
     assert r.headers["Referrer-Policy"] == "no-referrer"
-    r = await client.get("/static/app.js", headers=host(client))
+    r = await client.get("/static/core.js", headers=host(client))
     assert r.status == 200 and r.content_type == "text/javascript"
 
 
