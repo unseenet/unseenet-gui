@@ -4143,6 +4143,8 @@ function commands() {
     { name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
     ...notifyCommands(),                                      // #126 (notify.js)
+    { name: "Export my data", key: "", also: "export download backup takeout data gdpr",
+      when: exportPossible(), run: openExport },                    // #141 (export.js)
     { name: "Show recovery words" + (S.state.identity && !S.state.identity.words_written ? " (not written down yet)" : ""),
       key: "", also: "backup recovery seed words gendannelse", run: () => openShowWords(false) },
     { name: "Restore from recovery words", key: "", also: "recover backup words", run: openRestore },
