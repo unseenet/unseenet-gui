@@ -162,8 +162,13 @@ async def test_the_editor(rules_page):
     await expect(page.locator(".dialog")).to_contain_text("suggestion")
     await box.fill("+10 if autor in following")
     await expect(page.locator("#rules-check")).to_contain_text("did you mean 'author'")
+    await expect(page.locator(".rules-ed .gutter .bad")).to_have_text("1\n")   # the line marked
+    await page.locator(".rules-problems button").first.click()                # goes to it
+    assert await page.evaluate("[document.activeElement.id, document.activeElement.selectionStart,"
+                               " document.activeElement.selectionEnd]") == ["rules-text", 0, 25]
     await box.fill("+10 if author in following  # friends")
     await expect(page.locator("#rules-check")).to_contain_text("all understood")
+    await expect(page.locator(".rules-ed .gutter .bad")).to_have_count(0)
     await page.locator(".dialog .btn.primary").click()
     await page.wait_for_timeout(300)
     assert ("/api/rules", {"text": "+10 if author in following  # friends", "on": True}) in api.requests

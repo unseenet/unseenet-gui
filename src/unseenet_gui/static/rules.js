@@ -11,8 +11,10 @@
 
 let rulesCheckTimer = null;
 
-// Open the rules editor: your rules (or the core's suggestion when you have none), checked
-// a moment after typing stops, with whether they are used, and Save.
+// Open the rules editor: your rules (or the core's suggestion when you have none) with line
+// numbers beside them, checked a moment after typing stops - each line not understood
+// marked in the numbers and listed, a click on it going to the line - whether they are
+// used, and Save.
 async function openRules() {
   let r;
   try { r = await api("GET", "/api/rules"); } catch (x) { toast(x.message); return; }
@@ -23,22 +25,28 @@ async function openRules() {
     rulesCheckTimer = setTimeout(async () => {
       try { const c = await api("POST", "/api/rules/check", { text: st.text });
             st.problems = c.problems; st.count = c.rules; } catch (_) { /* checked on save */ }
-      const out = document.querySelector("#rules-check");
-      if (out) out.replaceWith(rulesCheck(st));
+      redrawRulesCheck(st);
     }, 300);
   };
-  if (st.suggested) check();
-  S.dialog = { focus: "#rules-text", render: () => dialogShell({ label: "Your rules", class: "wide" },
-    dialogHead("Your rules - for your feed and your groups"),
-    h("p", { class: "hint", style: "margin:0", text: "Only you see them: they run here, and go with your " +
-      "identity to your other devices." + (st.suggested ? " This is a suggestion - it is yours only if you save it." : "") }),
-    h("textarea", { id: "rules-text", class: "in mono rules", "data-k": "rules-text", rows: 16, spellcheck: "false",
-      value: st.text, oninput: (e) => { st.text = e.target.value; check(); } }),
-    rulesCheck(st),
-    h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.on, onchange: (e) => { st.on = e.target.checked; } }),
-      " Use my rules (off keeps them, to turn on again)"),
-    st.error ? h("p", { class: "error", role: "alert", text: st.error }) : null,
-    h("div", { class: "buttons" },
+  check();
+  S.dialog = { focus: "#rules-text", render: () => dialogShell({ label: "Your rules", wide: true },
+    dialogHead("Your rules"),
+    h("div", { class: "db" },
+      h("p", { class: "hint", style: "margin:0", text: "For your feed and your groups. Only you see them: " +
+        "they run here, and go with your identity to your other devices." }),
+      st.suggested ? h("p", { class: "note suggestion", text: "This is a suggestion, so you can see what rules " +
+        "look like. It is yours only if you save it." }) : null,
+      h("div", { class: "rules-ed" },
+        h("pre", { class: "gutter", "aria-hidden": "true" }, gutterLines(st)),
+        h("textarea", { id: "rules-text", "data-k": "rules-text", spellcheck: "false", wrap: "off",
+          "aria-label": "Your rules", value: st.text,
+          oninput: (e) => { st.text = e.target.value; redrawGutter(st); check(); },
+          onscroll: (e) => { const g = document.querySelector(".rules-ed .gutter"); if (g) g.scrollTop = e.target.scrollTop; } })),
+      h("div", { id: "rules-check", role: "status" }, rulesCheck(st)),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.on, onchange: (e) => { st.on = e.target.checked; } }),
+        " Use my rules - off keeps them, to turn on again"),
+      st.error ? h("p", { class: "error", role: "alert", text: st.error }) : null),
+    h("div", { class: "df btns" },
       h("button", { class: "btn", type: "button", onclick: closeDialog }, "Cancel"),
       h("button", { class: "btn primary", type: "button", disabled: st.busy, onclick: async () => {
         st.busy = true; st.error = ""; render();
@@ -54,11 +62,49 @@ async function openRules() {
   render();
 }
 
-// The line under the editor: how many rules are understood, or each line that is not and why.
+// The line numbers beside the editor, one per line of the text; lines not understood marked.
+function gutterLines(st) {
+  const bad = new Set((st.problems || []).map(p => p.line));
+  const n = Math.max(1, st.text.split("\n").length);
+  return Array.from({ length: n }, (_, i) => h("span", { class: bad.has(i + 1) ? "bad" : null,
+    title: bad.has(i + 1) ? "Not understood - see below" : null, text: String(i + 1) + "\n" }));
+}
+
+// Draw the line numbers again in place, so the text and the caret are left alone.
+function redrawGutter(st) {
+  const g = document.querySelector(".rules-ed .gutter");
+  const area = document.querySelector("#rules-text");
+  if (!g) return;
+  g.replaceChildren(...gutterLines(st));
+  if (area) g.scrollTop = area.scrollTop;
+}
+
+// Draw the check again in place: the list of problems and the marked line numbers.
+function redrawRulesCheck(st) {
+  const out = document.querySelector("#rules-check");
+  if (out) out.replaceChildren(rulesCheck(st));
+  redrawGutter(st);
+}
+
+// Select line ``n`` of the editor and bring it into view.
+function goToRuleLine(n) {
+  const area = document.querySelector("#rules-text");
+  if (!area) return;
+  const lines = area.value.split("\n");
+  const start = lines.slice(0, n - 1).reduce((a, l) => a + l.length + 1, 0);
+  area.focus();
+  area.setSelectionRange(start, start + (lines[n - 1] || "").length);
+  const lh = parseFloat(getComputedStyle(area).lineHeight) || 20;
+  area.scrollTop = Math.max(0, (n - 3) * lh);
+}
+
+// Under the editor: how many rules are understood, or each line that is not and why - a
+// click goes to the line.
 function rulesCheck(st) {
-  return h("div", { id: "rules-check", class: "hint mono", role: "status", style: "white-space:pre-wrap;margin:0" },
-    st.problems && st.problems.length ? st.problems.map(p => `line ${p.line}: ${p.message}`).join("\n")
-      : `${st.count || 0} rule(s), all understood.`);
+  if (!(st.problems && st.problems.length))
+    return h("p", { class: "rules-ok", text: `${st.count || 0} rule(s), all understood.` });
+  return h("div", { class: "rules-problems" }, st.problems.map(p => h("button", { type: "button",
+    onclick: () => goToRuleLine(p.line) }, h("b", { text: `Line ${p.line}` }), " " + p.message)));
 }
 
 // Why is this post here: which of your rules gave which points (UN-RFC 0051 section 10).

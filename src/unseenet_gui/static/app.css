@@ -883,5 +883,21 @@ ul.notes { font-size: 12px; max-height: 180px; overflow: auto; }
 .prow.hl { box-shadow: inset 3px 0 0 var(--green); }
 .prow .score { color: var(--muted); font-size: .85em; font-variant-numeric: tabular-nums; }
 .prow .folded { color: var(--muted); font-style: italic; cursor: pointer; }
-textarea.rules { width: 100%; min-height: 18rem; font-size: .9rem; line-height: 1.45; }
-pre.why { white-space: pre-wrap; margin: 0; padding: .75rem; background: var(--paper-2); border-radius: 6px; }
+/* the rules editor: line numbers beside the text, lines not understood marked */
+.rules-ed { display: flex; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden;
+  background: var(--ink-deep); }                     /* as the dialogs' other fields */
+.rules-ed:focus-within { border-color: var(--green); }
+.rules-ed .gutter { margin: 0; padding: 10px 8px 10px 10px; min-width: 3.2em; text-align: right;
+  font: 13px/1.6 var(--mono); color: var(--muted); user-select: none; overflow: hidden;
+  border-right: 1px solid var(--line-2); height: 50vh; min-height: 240px; box-sizing: border-box; }
+.rules-ed .gutter .bad { color: var(--red); font-weight: 700; }
+.rules-ed textarea { flex: 1; min-width: 0; height: 50vh; min-height: 240px; margin: 0; border: none; outline: none;
+  padding: 10px 12px; font: 13px/1.6 var(--mono); white-space: pre; overflow: auto; resize: none;
+  background: transparent; color: inherit; tab-size: 4; box-sizing: border-box; }
+.note.suggestion { border-top: none; padding-top: 0; }
+.rules-ok { margin: 0; font-size: 12px; color: var(--muted); }
+.rules-problems { display: flex; flex-direction: column; gap: 4px; }
+.rules-problems button { text-align: left; background: none; border: none; padding: 2px 0; cursor: pointer;
+  font: 12px/1.45 var(--mono); color: var(--red); }
+.rules-problems button:hover { text-decoration: underline; }
+pre.why { white-space: pre-wrap; margin: 0; padding: .75rem; background: var(--ink-deep); border: 1px solid var(--line-2); border-radius: 10px; }

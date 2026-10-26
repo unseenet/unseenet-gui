@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The rules editor, better** (unseenet#615): line numbers beside the rules,
+  the lines not understood marked in red and listed below - a click goes to the
+  line; laid out as the other dialogs (wide, the buttons at the bottom right),
+  readable in the light theme too.
+
 - **Your own rules** (unseenet#615, UN-RFC 0051): *Your rules* in the palette - an
   editor checked as you type (each line not understood, and why), the core's
   suggestion when you have none (yours only if you save it), and *Use my rules*
