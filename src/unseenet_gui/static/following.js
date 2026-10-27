@@ -440,6 +440,8 @@ function moreMenu(m) {
     m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
     ...ruleItems(m),                        // your own rules: why, and the thread's mark
     ...reportItems(m),                      // spam reports: show anyway, publish one
+    // report it to those who can act on it - in a feed, a comment or a chat as in the reader
+    !m.mine && !m.private && m.group ? ["Report", () => openReport(m)] : null,
   ].filter(Boolean);
   if (!items.length) return null;
   const open = S.menuFor === m.id;

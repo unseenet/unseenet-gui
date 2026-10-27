@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Report wherever a post is shown** (asked for by the maintainer): *Report* is in the
+  ⋯ menu of feed entries, comments and chat lines too, not only in the reader; from
+  the timeline it reports to the post's own group. A group's *?* has *Reporting*:
+  how, who acts on it, and the issuers that hide posts for you.
+
 - **PDFs in private posts and reports** (unseenet#637): every inbox takes PDFs now, so
   the compose window for a private post and the report window offer them (*Add
   screenshots or PDFs*). A PDF is never shown in the app; saving one adds a warning

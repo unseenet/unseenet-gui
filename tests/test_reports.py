@@ -256,3 +256,24 @@ async def test_the_report_window(reports_page, tmp_path):
     [(path, body)] = [r for r in api.requests if r[0].endswith("/report")]
     assert body["targets"] == [0] and body["reason"] == "threats" and body["note"].startswith("Se **")
     assert body["files"][0]["name"] == "skaerm.png" and body["files"][0]["alt"] == "Truslen"
+
+
+@pytest.mark.parametrize("reports_page", [{"view": "feed"}, {"view": "chat"}], indirect=True)
+async def test_report_from_a_feed_and_a_chat(reports_page):
+    """Asked for by the maintainer: Report is in the ⋯ menu wherever a post is shown, not
+    only in the reader of a threads view."""
+    page, api = reports_page
+    item = page.locator(".entry, .bubble", has_text="køb billige ure").filter(
+        has_not=page.locator(".reported")).first
+    await item.hover()
+    await item.locator(".morebtn").first.click()
+    await page.get_by_role("menuitem", name="Report", exact=True).click()
+    await expect(page.locator(".report-dlg h2")).to_have_text("Report a post")
+    await expect(page.locator(".report-dlg .rtarget")).to_have_count(2)
+
+
+@pytest.mark.parametrize("reports_page", [{}], indirect=True)
+async def test_the_group_info_says_how_to_report(reports_page):
+    page, _ = reports_page
+    await page.evaluate("openInfo()")
+    await expect(page.locator(".dialog")).to_contain_text("Report in its ⋯ menu")

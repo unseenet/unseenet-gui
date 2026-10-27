@@ -373,11 +373,12 @@ function openWithdraw(m) {
 // why, what you want to tell them in Markdown, and screenshots, sent encrypted to each
 // (unseenet#74, #70). The post is shown small at the top, so the title stays short.
 function openReport(m) {
-  const g = S.data && S.data.group;
+  // the post's own group: in the timeline or For you, not the list it is shown in
+  const g = (m && m.group && groupOf(m.group)) || (S.data && S.data.group);
   if (!g || !m) return;
   const st = { targets: null, reasons: [], reason: "", chosen: new Set(), err: "", busy: false, anonymous: false };
   const dialog = { focus: "#rnote", node: null, files: [] };
-  api("GET", `/api/groups/${encodeURIComponent(g.id)}/report?id=${encodeURIComponent(m.id)}`)
+  api("GET", `/api/groups/${encodeURIComponent(m.group || g.id)}/report?id=${encodeURIComponent(m.id)}`)
     .then(r => { st.targets = r.targets; st.reasons = r.reasons || []; r.targets.forEach(x => st.chosen.add(x.i)); })
     .catch(e => { st.err = e.message; st.targets = []; })
     .then(() => { if (S.dialog === dialog) redraw(); });
@@ -390,7 +391,7 @@ function openReport(m) {
     const files = dialog.files.map(f => ({ name: f.name, data: f.data, alt: (f.alt || "").trim() }));
     st.busy = true; st.err = ""; redraw();
     try {
-      const { sent } = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/report`,
+      const { sent } = await api("POST", `/api/groups/${encodeURIComponent(m.group || g.id)}/report`,
         { id: m.id, targets: [...st.chosen], reason: st.reason, note: (S.drafts["rnote:" + m.id] || "").trim(),
           files, anonymous: st.anonymous });
       delete S.drafts["rnote:" + m.id];
