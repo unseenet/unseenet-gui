@@ -31,7 +31,7 @@ builds, and - inlined into one file - the browser build (unseenet-entrance).
 | `reader.js` | the newsreader and pinned posts (UN-RFC 0033, UN-RFC 0046 section 4.12) |
 | `markdown.js` | Markdown and emoji: the core's safe tree as DOM (UN-RFC 0031) |
 | `files.js` | files on posts (UN-RFC 0027, UN-RFC 0046 section 4.10) |
-| `grouprefs.js` | #group references (unseenet#172) |
+| `grouprefs.js` | !group references (unseenet#172, #666) |
 | `following.js` | following people and feeds (UN-RFC 0034 section 6, UN-RFC 0046 4.14) |
 | `ripening.js` | key ripening (UN-RFC 0025, #50) |
 | `chat.js` | chat |

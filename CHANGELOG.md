@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **`!` for groups** (unseenet#666): `!dk.snak` names a group and links to it, and `!`
+  goes to a group the selected post names (was `#`); `#word` in what you write is a tag now.
+
 - **Report reasons from the core's one list** (unseenet#659): *Threats or harassment* is
   `harassment`, readers can report *Phishing* and *Malware*; the names come from the core.
 

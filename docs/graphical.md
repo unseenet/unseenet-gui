@@ -87,7 +87,7 @@ first post waits a few minutes more, once, while your new key
 
 - Read and write: threads and chats (closed groups decrypted), posts, replies
   and chat lines in Markdown with emoji, *For you* (replies and mentions),
-  `#group` links, editing your own posts, your signature.
+  `!group` links (`#word` is a tag), editing your own posts, your signature.
 - Feeds and sites (from 0.5): *Timeline* with the feeds you follow, **My
   feed** and **My site**, creating a group as a feed or a site, pages with an
   index, and a person's feed and site from their profile.

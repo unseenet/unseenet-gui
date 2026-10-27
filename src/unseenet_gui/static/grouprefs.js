@@ -1,4 +1,4 @@
-// grouprefs.js - #group references (unseenet#172).
+// grouprefs.js - !group references (unseenet#172, #666: # is a tag now).
 //
 // Part of the page, split from app.js by area (#152): plain scripts in static/,
 // loaded in index.html's order, sharing one scope - no build step, the same in the local
@@ -6,17 +6,17 @@
 // helpers (h, api, S, render, toast ...).
 "use strict";
 
-// ---- #group references (unseenet #172) ----------------------------------
-// The same rule as the core's group_refs(): '#' and a group name (a-z, digits, + _ -
-// and dots), maybe '@' and the start of the owner's fingerprint. Not '# heading',
-// not '#170', not inside a word or a URL.
-const GROUP_REF = /(?<![\p{L}\p{N}_@#\/&.+-])#(?=[a-z0-9+_.-]*[a-z])([a-z0-9][a-z0-9+_-]*(?:\.[a-z0-9][a-z0-9+_-]*)*)(?:@([a-z2-7]{4,16}))?(?![\p{L}\p{N}_+@-]|\.[\p{L}\p{N}_])/gu;
+// ---- !group references (unseenet #172, #666) ------------------------------
+// The same rule as the core's group_refs(): '!' and a group name (a-z, digits, + _ -
+// and dots), maybe '@' and the start of the owner's fingerprint - as Lemmy writes
+// !community. Not "Hello!", not a picture '![...]', not '!170', not inside a word.
+const GROUP_REF = /(?<![\p{L}\p{N}_@#!\/&.+-])!(?=[a-z0-9+_.-]*[a-z])([a-z0-9][a-z0-9+_-]*(?:\.[a-z0-9][a-z0-9+_-]*)*)(?:@([a-z2-7]{4,16}))?(?![\p{L}\p{N}_+@-]|\.[\p{L}\p{N}_])/gu;
 
 // A bare unseenet: address in plain text is a link too (UN-RFC 0031 section 3.4.1);
 // a full stop or a bracket after it is the sentence's, not the address's.
 const ADDRESS_REF = /(?<![\p{L}\p{N}_])unseenet:[^\s<>"']*[^\s<>"'.,;:!?)\]]/gu;
 
-// A plain text with #group references made buttons that open the group (unseenet#172).
+// A plain text with !group references made buttons that open the group (unseenet#172).
 function linkGroups(text) {
   const t = text || "", out = [];
   let last = 0;
@@ -31,7 +31,7 @@ function linkGroups(text) {
   return out;
 }
 
-// The #group references in a text, as buttons, for under a post.
+// The !group references in a text, as buttons, for under a post.
 function linkGroupRefs(text) {
   const out = [];
   let last = 0;
