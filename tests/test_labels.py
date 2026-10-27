@@ -49,6 +49,12 @@ class LabelsAPI(ReportsAPI):
             return web.json_response({"group": {"id": "tag:serier", "label": "#serier", "view": "feed",
                                                 "tag": "serier", "hierarchy": "", "may_post": False,
                                                 "kinds": ["post"], "pins": []}, "rows": [r]})
+        if request.path.endswith("/language/choose"):            # unseenet#692
+            body = await request.json()
+            self.requests.append((request.path, body))
+            return web.json_response({"codes": body["languages"], "from": "chosen"})
+        if request.path.endswith("/language"):
+            return web.json_response({"codes": ["da"], "from": "conversation"})
         if request.path == "/api/labels/profile":
             body = await request.json()
             self.requests.append((request.path, body))
@@ -198,6 +204,7 @@ async def test_languages_in_the_info_and_by_the_chat(page_with):
     await page.locator("#chlang").fill("en")
     await page.locator(".dialog .btn.primary").click()
     await expect(chip).to_have_text("en")
+    assert any(r[0].endswith("/language/choose") and r[1] == {"languages": ["en"]} for r in api.requests)
     await page.locator("#chat").fill("Hello")
     await page.locator("#chat").press("Enter")
     await page.wait_for_timeout(300)
