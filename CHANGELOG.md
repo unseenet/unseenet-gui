@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Publish as the issuer beside you** (unseenet#654): with an issuer beside your own
+  identity in the vault - the project's in its maintainer's - a report sent to you
+  says *Publish a spam report… as reports@unseenet*, and the dialog says the report is
+  signed by that issuer, not by you.
+
 - **A report sent to you says what to do** (unseenet#650): *Open the reported post*, and
   for an issuer *Publish a spam report…* with the reporter's reason - in your inbox
   and in a team inbox you read. Becoming an issuer asks *where reports sent to you
