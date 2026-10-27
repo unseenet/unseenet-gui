@@ -117,15 +117,24 @@ async function openIssuing() {
   const r = await loadReports();
   if (!r) { toast("Could not read your report settings."); return; }
   if (!r.mine) {
+    let teams = [];
+    try { teams = (await api("GET", "/api/teams")).teams.filter(t => t.reader); } catch (_) { /* none */ }
     formDialog({ label: "Become an issuer", title: "Become a spam report issuer", focus: "#rpolicy", button: "Start",
       note: "Your reports are public and signed with your key. They hide posts only for those who choose to follow you.",
       fields: (v) => [
         h("label", { for: "rpolicy", text: "What you report, and how" }),
         h("textarea", { id: "rpolicy", name: "policy", class: "in", rows: 3, value: v.policy || "" }),
-        h("label", { for: "rcontact", text: "Where to object (an inbox or a web address, optional)" }),
+        h("label", { for: "rland", text: "Where reports sent to you land" }),
+        h("select", { id: "rland", name: "land", class: "in" },
+          h("option", { value: "", selected: !v.land, text: "Your own inbox (Private posts)" }),
+          teams.map(t => h("option", { value: t.group, selected: v.land === t.group, text: t.name + " - a team inbox you read" }))),
+        h("p", { class: "hint", style: "margin:0", text: "A team inbox lets others read and answer reports with you. " +
+          "It is also where people object to your reports." }),
+        h("label", { for: "rcontact", text: "Or where to object, if not there (a web address, optional)" }),
         h("input", { id: "rcontact", name: "contact", class: "in", value: v.contact || "" })],
       submit: async (v) => {
-        S.reports = await api("POST", "/api/reports/start", { policy: (v.policy || "").trim(), contact: (v.contact || "").trim() });
+        const contact = (v.land || "").trim() || (v.contact || "").trim();
+        S.reports = await api("POST", "/api/reports/start", { policy: (v.policy || "").trim(), contact });
         closeDialog(); toast("Your reports group is started."); openIssuing();
       } });
     return;
@@ -167,7 +176,7 @@ function openPublish(p) {
   const reasons = (S.reports && S.reports.reasons) || Object.keys(REASON_TEXT);
   formDialog({ label: "Publish a spam report", title: "Report “" + (p.subject || p.id) + "”", focus: "#rreason", button: "Publish",
     note: "Your report is public and signed by you; the person who told you is never named in it.",
-    values: { reason: "spam", days: 365 },
+    values: { reason: p.reason || "spam", days: 365 },
     fields: (v) => [
       h("label", { for: "rreason", text: "Why" }),
       h("select", { id: "rreason", name: "reason", class: "in" }, reasons.map(x =>
@@ -190,6 +199,29 @@ function openPublish(p) {
 // Whether you publish spam reports: from your settings, or what /api/reports said.
 function isIssuer() {
   return !!((S.sidebar && S.sidebar.report_issuer) || (S.reports && S.reports.mine));
+}
+
+// A report someone sent you (in your inbox or a team inbox you read): open the post it
+// names, and - as an issuer - publish a report of it, with the reporter's reason. The
+// reporter is never named in what you publish.
+function reportedPostButtons(m) {
+  const r = m.report;
+  if (!r) return null;
+  return [
+    h("button", { class: "btn", onclick: () => openReportedPost(r) }, "Open the reported post"),
+    isIssuer() ? h("button", { class: "btn primary", onclick: () => openPublish({ id: r.id, group: r.group,
+      key: r.author_key, subject: m.subject.replace(/^Report: /, ""), reason: r.reason }) }, "Publish a spam report…") : null];
+}
+
+// Go to the post a report names, if you follow its group; otherwise say how.
+async function openReportedPost(r) {
+  if (!groupOf(r.group)) {
+    toast("You do not follow " + labelOf(r.group) + ": follow it (G) and find " + r.id);
+    return;
+  }
+  await openGroup(r.group);
+  S.post = r.id; S.mobileReading = true;
+  render();
 }
 
 // The ⋯ menu's items for reports: show a hidden post anyway; as an issuer, publish a

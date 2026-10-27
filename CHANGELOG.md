@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A report sent to you says what to do** (unseenet#650): *Open the reported post*, and
+  for an issuer *Publish a spam report…* with the reporter's reason - in your inbox
+  and in a team inbox you read. Becoming an issuer asks *where reports sent to you
+  land*: your inbox, or a team inbox you read, so others can handle them with you.
+
 - **Report wherever a post is shown** (asked for by the maintainer): *Report* is in the
   ⋯ menu of feed entries, comments and chat lines too, not only in the reader; from
   the timeline it reports to the post's own group. A group's *?* has *Reporting*:
