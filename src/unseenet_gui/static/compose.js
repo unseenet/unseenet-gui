@@ -13,7 +13,7 @@ function doPost(gid, body, local) {
   if (body.languages === undefined) {
     const chosen = S.langChosen && S.langChosen[gid];
     const sug = S.data && S.data.group && S.data.group.id === gid && S.data.group.suggested_languages;
-    if (chosen) body = { ...body, languages: chosen };          // [] too: forget it here
+    if (chosen) body = { ...body, languages: chosen };          // your choice for lines here
     else if (sug && sug.codes && sug.codes.length) body = { ...body, languages: sug.codes };
   }
   return doSend(`/api/groups/${encodeURIComponent(gid)}/post`, gid, body, local);
@@ -168,8 +168,34 @@ function languageChip(gid) {
         h("input", { id: "chlang", name: "codes", class: "in", value: v.codes || "" })],
       submit: async (v) => {
         const chosen = languageCodes(v.codes);
-        g.suggested_languages = { codes: chosen, from: chosen.length ? "you" : "" };
-        S.langChosen = { ...(S.langChosen || {}), [gid]: chosen };   // sent with the next line
+        // kept by the core for your lines here, in every client (unseenet#692)
+        let r = { codes: chosen, from: chosen.length ? "chosen" : "" };
+        try { r = await api("POST", `/api/groups/${encodeURIComponent(gid)}/language/choose`, { languages: chosen }); }
+        catch (_) { /* this page still uses it */ }
+        g.suggested_languages = { codes: r.codes || [], from: r.from || "" };
+        S.langChosen = { ...(S.langChosen || {}), [gid]: chosen.length ? chosen : null };
         closeDialog(); render();
       } }) }, codes.length ? codes.join(" ") : "—");
+}
+
+
+// A chat line's language from its text, at pauses in typing (unseenet#686): the core keeps
+// the conversation's for short lines and changes it only for a longer line it is sure of.
+// Never over a language chosen with the chip.
+let chatLangTimer = null;
+// Ask the core what the chat line being written is in, after a pause.
+function chatLanguage(gid, text) {
+  clearTimeout(chatLangTimer);
+  if ((S.langChosen || {})[gid] || !text.trim()) return;
+  chatLangTimer = setTimeout(async () => {
+    const g = S.data && S.data.group;
+    if (!g || g.id !== gid || !g.suggested_languages) return;
+    try {
+      const r = await api("POST", `/api/groups/${encodeURIComponent(gid)}/language`, { text, kind: "chat" });
+      const before = (g.suggested_languages.codes || []).join(" ");
+      g.suggested_languages = { codes: r.codes || [], from: r.from || "" };
+      const chip = document.querySelector(".chatbar .langchip");
+      if (chip && before !== (r.codes || []).join(" ")) chip.textContent = (r.codes || []).join(" ") || "—";
+    } catch (_) { /* keep it */ }
+  }, 700);
 }

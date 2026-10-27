@@ -103,7 +103,7 @@ function chatView(d) {
         h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
         h("textarea", { id: "chat", rows: 1, class: "grow-in", "data-k": "chat", autocomplete: "off", spellcheck: "true",
           placeholder: "Message " + (g.access || "") + (g.access ? " " : "") + g.label, value: S.drafts["chat:" + g.id] || "",
-          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; growField(e.target); },
+          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; growField(e.target); chatLanguage(g.id, e.target.value); },
           onkeydown: (e) => sendOnEnter(e, send) }),
         ...attach,
         languageChip(g.id),                               // what you write in here (0052 5a)

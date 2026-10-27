@@ -97,6 +97,10 @@ class LocalAPI:
             data = {"group": group(gid), "rows": [row("other", gid), row("mine", gid, True)]}
             if self.updated:
                 data["rows"].append(row("incoming", gid))
+        elif path.endswith("/language"):                 # from the text (unseenet#686)
+            asked = await request.json()
+            english = " the " in " " + asked.get("text", "").replace("\n", " ") + " "
+            data = {"codes": ["en"], "from": "text"} if english else {"codes": ["da"], "from": "group"}
         elif path.endswith("/mentioned"):
             body = await request.json()
             self.mentions.append(body)
@@ -411,3 +415,19 @@ async def test_no_suggestion_sends_no_language(compose_page):
     await page.locator("#body").press("Control+s")
     await expect(page.get_by_role("dialog")).to_have_count(0)
     assert "languages" not in api.sent[-1][1]
+
+
+async def test_the_language_follows_the_text_until_you_choose(compose_page):
+    """unseenet#686: the field takes what the core tells from the text at pauses - and
+    never again once you typed in it yourself."""
+    page, api = compose_page
+    await page.evaluate("S.data.group.suggested_languages = {codes: ['da'], from: 'group'}")
+    await open_compose(page)
+    await page.locator("#subject").fill("Hello")
+    await page.locator("#body").fill("This is the text in English\n")
+    await expect(page.locator("#clang")).to_have_value("en", timeout=4000)
+    await expect(page.locator(".langrow")).to_contain_text("from your text")
+    await page.locator("#clang").fill("da")                   # yours now
+    await page.locator("#body").fill("Still the English text, more of it\n")
+    await page.wait_for_timeout(1200)
+    await expect(page.locator("#clang")).to_have_value("da")

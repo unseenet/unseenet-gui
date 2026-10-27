@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The language from your text** (unseenet#686): while you write, at pauses, the core tells
+  the language from the text - the *Language* field follows it (*from your text*), until
+  you change the field yourself; a reply starts from the post it answers. The chat chip
+  follows a longer line in another language; short lines keep the conversation's.
+
 - **Languages where they belong** (unseenet#671): a group's languages (and tags) in its
   *?* window; the *Language* field under the text, by the tags - chosen after writing,
   not before; and a small language chip by the chat and comment inputs - what the core
