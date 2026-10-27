@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Publish as the issuer beside you** (unseenet#654): with an issuer beside your own
+  identity in the vault - the project's in its maintainer's - a report sent to you
+  says *Publish a spam report… as reports@unseenet*, and the dialog says the report is
+  signed by that issuer, not by you.
 - **The report window closes at once** (unseenet#653): the report is sent in the
   background - a sealed copy for each receiver takes a minute or two of postage - and
   a note says when it has reached them all, or why not.

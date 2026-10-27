@@ -188,8 +188,10 @@ async function openIssuing() {
 // (UN-RFC 0045 section 4). ``p``: {id, group, key, subject}.
 function openPublish(p) {
   const reasons = (S.reports && S.reports.reasons) || Object.keys(REASON_TEXT);
+  const mine = S.reports && S.reports.mine;
+  const as = mine && mine.label && mine.label !== "you" ? mine.label : "you";
   formDialog({ label: "Publish a spam report", title: "Report “" + (p.subject || p.id) + "”", focus: "#rreason", button: "Publish",
-    note: "Your report is public and signed by you; the person who told you is never named in it.",
+    note: `The report is public and signed by ${as === "you" ? "you" : "the issuer " + as}; the person who told you is never named in it.`,
     values: { reason: p.reason || "spam", days: 365 },
     fields: (v) => [
       h("label", { for: "rreason", text: "Why" }),
@@ -214,9 +216,21 @@ function openPublish(p) {
     } });
 }
 
-// Whether you publish spam reports: from your settings, or what /api/reports said.
+// Whether you publish spam reports - you, or an issuer beside you in your vault: from your
+// settings, or what /api/reports said.
 function isIssuer() {
   return !!((S.sidebar && S.sidebar.report_issuer) || (S.reports && S.reports.mine));
+}
+
+// "Publish a spam report…", and as whom when it is not you (an issuer beside you in your
+// vault, the project's in its maintainer's). Asks the core once, then redraws.
+function publishLabel() {
+  if (isIssuer() && !S.reports && !S.reportsAsked) {
+    S.reportsAsked = true;
+    loadReports().then(() => render());
+  }
+  const mine = S.reports && S.reports.mine;
+  return "Publish a spam report…" + (mine && mine.label && mine.label !== "you" ? " as " + mine.label : "");
 }
 
 // A report someone sent you (in your inbox or a team inbox you read): open the post it
@@ -228,7 +242,7 @@ function reportedPostButtons(m) {
   return [
     h("button", { class: "btn", onclick: () => openReportedPost(r) }, "Open the reported post"),
     isIssuer() ? h("button", { class: "btn primary", onclick: () => openPublish({ id: r.id, group: r.group,
-      key: r.author_key, subject: m.subject.replace(/^Report: /, ""), reason: r.reason }) }, "Publish a spam report…") : null];
+      key: r.author_key, subject: m.subject.replace(/^Report: /, ""), reason: r.reason }) }, publishLabel()) : null];
 }
 
 // Go to the post a report names, if you follow its group; otherwise say how.
@@ -248,7 +262,7 @@ function reportItems(m) {
   if (!m || m.private) return [];
   return [
     m.reported ? ["Show anyway", () => showReported(m)] : null,
-    isIssuer() && !m.mine && !m.reported ? ["Publish a spam report…",
+    isIssuer() && !m.mine && !m.reported ? [publishLabel(),
       () => openPublish({ id: m.id, group: m.group, key: m.key, subject: subjectOf(m) })] : null,
   ];
 }
