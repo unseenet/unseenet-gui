@@ -301,7 +301,7 @@ function readerPane(g, m, msgs) {
         messageBody(m),
         m.signature && !labelCovered(m) ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null,
         h("div", { class: "rbar-row" }, reactionBar(m),
-          tagChips(m, { groupTags: g.id === TIMELINE || g.id === FOR_YOU })))),
+          tagChips(m, { groupTags: isMixed(g) || g.id === FOR_YOU })))),
     h("div", { class: "pbar" },
       canReply ? h("button", offProps(rp, { class: "btn primary", onclick: () => openReply(m, g) }),
         commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,

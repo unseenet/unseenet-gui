@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Everything with a tag** (unseenet#672): a click on a tag shows every post with it in
+  your groups and feeds, as a feed, each in its own group - not only the view you are in.
+
 - **Tags and content warnings** (#186, UN-RFC 0052, 0053): warnings as square flags at the
   top left of a post - a fixed colour each, always with the word and who set it - and
   the post's text and pictures blurred behind *Show anyway*, or hidden as a quiet line,

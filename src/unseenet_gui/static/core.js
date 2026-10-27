@@ -80,6 +80,9 @@ const S = {
 // them into the objects the rest of this file draws, so the drawing stays as it was.
 const FOR_YOU = "for-you:";                          // the core's pseudo group (threads.FOR_YOU)
 const TIMELINE = "timeline:";                        // every feed you follow (threads.TIMELINE)
+const TAGGED = "tag:";                               // + a tag: everything with it (threads.TAGGED)
+// Posts from many groups, each in its own: the timeline and a tag's view.
+const isMixed = (g) => !!g && (g.id === TIMELINE || String(g.id).startsWith(TAGGED));
 const ACCESS_ICONS = { moderated: "√", channel: "►", closed: "∩" };
 const VIEW_ICONS = { chat: "»", data: "¤", threads: "≡", feed: "☰", pages: "⌂" };
 const MARKDOWN = "text/markdown; charset=utf-8; variant=unseenet";   // core.markup.MARKDOWN_TYPE

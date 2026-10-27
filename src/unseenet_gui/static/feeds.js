@@ -73,7 +73,7 @@ function pageStep(delta) {
 // A feed or the timeline: entries with their pictures, the start of long ones, and their
 // comments.
 function feedView(d) {
-  const g = d.group, timeline = g.id === TIMELINE, entries = feedEntries(d);
+  const g = d.group, timeline = isMixed(g), entries = feedEntries(d);
   S.feedOpen = S.feedOpen || {};
   requestAnimationFrame(clipEntries);              // "… more" only where text is really hidden
   const shownMsgs = entries.flatMap(e => [e.m, ...visibleComments(e)]);
@@ -89,6 +89,7 @@ function feedView(d) {
   const pendNew = Object.entries(S.pending).filter(([, p]) => p.thread === "new:" + g.id);
   return h("div", { class: "content" }, h("section", { class: "feed", "aria-label": timeline ? "Timeline" : "Feed",
     "data-scroll": "feed:" + g.id },
+    String(g.id).startsWith(TAGGED) ? h("p", { class: "hint feed-note", text: `Everything tagged ${g.tag} in your groups and feeds, newest first - the authors' tags, the groups', and topics of labellers you follow for topics.` }) :
     timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} feed${g.feeds === 1 ? "" : "s"} you follow, ${d.messages.some(x => x.score !== undefined) ? "in the order your rules give (⋯ on an entry says why)" : "in the order they were written"}. Nobody is told whom you follow.` }) : null,
     note ? h("form", { class: "chatbar notebar", onsubmit: (e) => { e.preventDefault(); send(); } },
       h("div", { class: "row" },
@@ -136,7 +137,7 @@ function visibleComments(e) {
 
 // One entry of a feed: who, when, the text, pictures, reactions and its comments.
 function entryCard(d, e) {
-  const m = e.m, g = d.group, timeline = g.id === TIMELINE;
+  const m = e.m, g = d.group, timeline = isMixed(g);
   const shown = visibleComments(e), hidden = e.comments.length - shown.length;
   const byId = Object.fromEntries(e.comments.map(c => [c.id, c]));
   const cp = m.comment || { allowed: false, reason: NOT_HERE };

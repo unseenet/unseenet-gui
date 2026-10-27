@@ -41,6 +41,13 @@ class LabelsAPI(ReportsAPI):
         return {**super().group(), "tags": ["film"]}
 
     async def handle(self, request):
+        if request.path.startswith("/api/groups/tag:"):           # everything with a tag (0052)
+            r = row("<t@x>", "Med tag", kind="post")
+            r["message"].update(tags=["serier"])
+            r.update(group_label="dk.snak")
+            return web.json_response({"group": {"id": "tag:serier", "label": "#serier", "view": "feed",
+                                                "tag": "serier", "hierarchy": "", "may_post": False,
+                                                "kinds": ["post"], "pins": []}, "rows": [r]})
         if request.path == "/api/labels/warning":
             body = await request.json()
             self.requests.append((request.path, body))
@@ -111,9 +118,9 @@ async def test_a_tag_filters_and_a_labellers_topic(page_with):
     await page.locator(".prow", has_text="Trailer").click()
     reader = page.locator(".reader")
     await expect(reader.locator(".tchip.lab")).to_contain_text("teknik")         # a labeller's topic
-    await reader.locator(".tchip", has_text="serier").click()
-    await expect(page.locator(".tagbar")).to_contain_text("serier")
-    await expect(page.locator(".prow:not(.head)")).to_have_count(2)              # Slutningen, Trailer
+    await reader.locator(".tchip", has_text="serier").click()                      # everything with it
+    await expect(page.locator(".feed-note")).to_contain_text("Everything tagged serier")
+    await expect(page.locator(".entry")).to_have_count(1)
 
 
 @pytest.mark.parametrize("page_with", [{"view": "feed"}], indirect=True)
