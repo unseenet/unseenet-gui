@@ -951,3 +951,18 @@ time.ago { white-space: nowrap; }
 /* the sidebar's top stays put; only the groups and chats scroll (#144) */
 .side-top { flex: none; display: flex; flex-direction: column; gap: 10px; padding: 16px 12px 10px;
   border-bottom: 1px solid var(--line); }
+
+/* the group list (gui#167): ⋯ on each group and heading, and a heading that is the group */
+.grouprow { position: relative; display: flex; align-items: center; }
+.grouprow > .item { flex: 1; min-width: 0; padding-right: 30px; }
+.grouprow > .more { position: absolute; right: 4px; }
+.nav h3.grouprow > .more { position: static; margin-left: 0; }
+.grouprow:hover .morebtn, .grouprow .more.open .morebtn { opacity: 1; }
+.car-btn { flex: 0 0 22px; align-self: stretch; border: 0; border-radius: 6px; background: transparent;
+  color: var(--muted); font-size: 14px; cursor: pointer; padding: 0; }
+.car-btn:hover, .car-btn:focus-visible { background: var(--ink-2); color: var(--paper); }
+.headrow > .item { padding-left: 2px; }
+.fold.top > .headrow > .item.head .nm { color: var(--paper); font-weight: 600; }
+.fold.top > .sub { margin-left: 10px; }
+/* a hierarchy of one group has no heading: keep the space a heading would give */
+.nav.solo { margin-top: 12px; }

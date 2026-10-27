@@ -7,6 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A ⋯ menu on groups in the sidebar** (#167), on hover, on a right click, and
+  always visible on a touch screen: About this group, Mark all read, Copy address,
+  Edit group (the owner) and Unsubscribe. A hierarchy's heading has Mark all read
+  and Fold too.
+- **No heading over a group of the same name** (#167): `unseenet` is one row
+  that opens the group, and its arrow folds what is under it (the same for a
+  folder like `.snak`). A hierarchy with only one group you follow is that group
+  alone, by its full name (`feed`, `site`), and headings lose `.*`.
 - **The sidebar's top stays put** (#144): the logo, the filter and For you,
   Timeline, your feed and site, Private posts stay while the groups and chats
   scroll - as the account box at the bottom.

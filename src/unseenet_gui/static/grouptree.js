@@ -79,41 +79,158 @@ function sideResults(sb, item) {
 }
 
 // One hierarchy in the sidebar as a tree of groups (unseenet.client.grouptree), with unread
-// counts on closed branches.
+// counts on closed branches. A heading and a group with the same name are one row (gui#167):
+// `unseenet` is the group and folds what is under it; a hierarchy with only one group you
+// follow is that group alone, by its full name, without a heading.
 function hierarchyNav(hier, item) {
   const byId = Object.fromEntries(hier.groups.map(g => [g.id, g]));
   const unreadIn = node => treeGroups(node).reduce((n, id) => n + ((byId[id] || {}).unread || 0), 0);
-  const leaf = (id, shown) => {
+  const groupsIn = node => treeGroups(node).map(id => byId[id]).filter(Boolean);
+  const suffix = g => { const at = g.label.indexOf("@"); return at >= 0 ? g.label.slice(at) : ""; };
+  const fullName = g => g.label.split("@")[0];
+  // a group's row: the button, and its ⋯ (also on a right click)
+  const leaf = (id, shown, extra = []) => {
     const g = byId[id];
     if (!g) return null;
-    const at = g.label.indexOf("@");
-    return item(g.id, (g.access || "") + g.icon, dotted(shown + (at >= 0 ? g.label.slice(at) : "")), [
+    return groupRow(g, item(g.id, (g.access || "") + g.icon, dotted(shown + suffix(g)), [
       forYouMarks(g),
-      g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""), g.label);
+      g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""), g.label), extra);
   };
+  // "Mark all read" for the groups under a heading, when any of them has something unread
+  const readAll = (node, name) => {
+    const gs = groupsIn(node).filter(g => g.unread);
+    return gs.length ? [["Mark all read in " + name, () => markAllRead(gs)]] : [];
+  };
+  const toggle = node => { setFold(node.path, !isOpen(node, node === hier.tree)); render(); };
+  // a heading that is also a group (unseenet with .chat and .help under it): the arrow folds,
+  // the name opens the group, and closed it counts what is unread under it
+  const headGroup = (node, shown, root) => {
+    const g = byId[node.groups[0]], open = isOpen(node, root), unread = unreadIn(node);
+    const count = open ? g.unread : unread;
+    return h("div", { class: "fold" + (root ? " top" : "") },
+      groupRow(g, [
+        h("button", { class: "car-btn", type: "button", "aria-expanded": open ? "true" : "false",
+          "aria-label": (open ? "Fold " : "Unfold ") + node.path + ".*", title: (open ? "Fold " : "Unfold ") + node.path + ".*",
+          onclick: () => toggle(node) }, open ? "▾" : "▸"),
+        item(g.id, (g.access || "") + g.icon, dotted(shown + suffix(g)), [
+          forYouMarks(g),
+          count ? h("span", { class: "count", text: count }) : null],
+          "group head" + (count ? " unread" : ""), g.label)],
+        [[node.path + ".*", [...readAll(node, node.path), [open ? "Fold" : "Unfold", () => toggle(node)]]]], "headrow"),
+      open ? h("div", { class: "sub" }, under(node)) : null);
+  };
+  // what is under a heading: its other groups of the same name, then its folders and groups
+  const under = node => [
+    node.groups.slice(1).map(id => leaf(id, node.own)),
+    node.children.map(c => c.children.length ? folder(c) : c.groups.map(id => leaf(id, "." + c.label)))];
   const contents = node => [
     node.groups.map(id => leaf(id, node.own)),                   // alt.history inside .history
     node.children.map(c => c.children.length ? folder(c) : c.groups.map(id => leaf(id, "." + c.label)))];
   const folder = node => {
+    if (node.groups.length && byId[node.groups[0]]) return headGroup(node, "." + node.label, false);
     const open = isOpen(node, false), unread = unreadIn(node);
     return h("div", { class: "fold" },
       h("button", { class: "item group folder" + (unread ? " unread" : ""), "aria-expanded": open ? "true" : "false",
-        title: node.path + ".*", onclick: () => { setFold(node.path, !open); render(); } },
+        title: node.path + ".*", onclick: () => toggle(node) },
         h("span", { class: "ic", text: open ? "▾" : "▸" }), h("span", { class: "nm" }, dotted("." + node.label)),
         !open && unread ? h("span", { class: "count", text: unread }) : null),
       open ? h("div", { class: "sub" }, contents(node)) : null);
   };
-  if (!hier.tree) return h("div", { class: "nav" }, h("h3", { text: hier.name + ".*" }),
-    hier.groups.map(g => leaf(g.id, g.label)));
-  const root = hier.tree, open = isOpen(root, true), unread = unreadIn(root);
+  if (!hier.tree) return h("div", { class: "nav" }, h("h3", { text: hier.name }),
+    hier.groups.map(g => leaf(g.id, fullName(g))));
+  const root = hier.tree;
+  // one group you follow here: just that group, by its full name
+  const only = treeGroups(root);
+  if (only.length === 1 && byId[only[0]]) return h("div", { class: "nav solo" }, leaf(only[0], fullName(byId[only[0]])));
+  if (root.groups.length && byId[root.groups[0]]) return h("div", { class: "nav" }, headGroup(root, hier.name, true));
+  const open = isOpen(root, true), unread = unreadIn(root), menuId = "hier:" + hier.name;
   return h("div", { class: "nav" },
-    h("h3", { class: "row-h fold-h" },
+    h("h3", { class: "row-h fold-h grouprow", oncontextmenu: (e) => { e.preventDefault(); S.menuFor = menuId; render(); } },
       h("button", { class: "fold-t", "aria-expanded": open ? "true" : "false",
         title: open ? "Fold " + hier.name + ".*" : "Unfold " + hier.name + ".*",
-        onclick: () => { setFold(root.path, !open); render(); } },
-        h("span", { class: "car", text: open ? "▾" : "▸" }), hier.name + ".*"),
-      !open && unread ? h("span", { class: "count", text: unread }) : null),
+        onclick: () => toggle(root) },
+        h("span", { class: "car", text: open ? "▾" : "▸" }), hier.name),
+      !open && unread ? h("span", { class: "count", text: unread }) : null,
+      sideMenu(menuId, "More for " + hier.name + ".*",
+        [[null, [...readAll(root, hier.name).map(([, run]) => ["Mark all read", run]), [open ? "Fold" : "Unfold", () => toggle(root)]]]])),
     open ? contents(root) : null);
+}
+
+// A group's row in the sidebar: its button(s) and its ⋯, which a right click opens too.
+// ``more`` adds sections to the menu (the hierarchy, for a heading that is a group).
+function groupRow(g, buttons, more = [], cls = "") {
+  const id = "group:" + g.id;
+  return h("div", { class: "grouprow " + cls, oncontextmenu: (e) => { e.preventDefault(); S.menuFor = id; render(); } },
+    buttons, groupMenu(g, more));
+}
+
+// The ⋯ of a group in the sidebar (gui#167): about it, mark it read, its address, the
+// owner's settings, unsubscribe. Per-group notifications are not here: notifications are
+// For you's, not a group's.
+function groupMenu(g, more = []) {
+  return sideMenu("group:" + g.id, "More for " + g.label, [
+    [more.length ? "This group" : null, [
+      ["About this group", () => withGroup(g.id, openInfo)],
+      g.unread ? ["Mark all read", () => markAllRead([g])] : null,
+      ["Copy address", () => copyGroupAddress(g)],
+      g.owner ? ["Edit group", () => withGroup(g.id, openEditGroup)] : null,
+      ["Unsubscribe", () => unsubscribeGroup(g)]]],
+    ...more]);
+}
+
+// A ⋯ menu in the sidebar, in sections ([title or null, [[label, run] ...]]), placed where
+// the window has room so the sidebar's scrolling does not cut it off.
+function sideMenu(id, label, sections) {
+  sections = sections.map(([t, items]) => [t, items.filter(Boolean)]).filter(([, items]) => items.length);
+  if (!sections.length) return null;
+  const open = S.menuFor === id;
+  if (open) requestAnimationFrame(() => placePostMenu(".side-more.open"));
+  return h("div", { class: "more side-more" + (open ? " open" : "") },
+    h("button", { class: "morebtn", type: "button", "aria-label": label, title: label, "aria-haspopup": "menu",
+      "aria-expanded": String(open), onclick: (e) => { e.stopPropagation(); S.menuFor = open ? null : id; render(); } }, "⋯"),
+    open ? h("div", { class: "menu", role: "menu" }, sections.map(([title, items]) => [
+      title ? h("div", { class: "msect", role: "presentation", text: title }) : null,
+      items.map(([text, run]) => h("button", { class: "mi", type: "button", role: "menuitem",
+        onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, text))])) : null);
+}
+
+// Do something about a group that works on the group shown (About, Edit group): open it first.
+async function withGroup(gid, run) {
+  if (S.gid !== gid) await openGroup(gid);
+  run();
+}
+
+// Mark every post in these groups read. The core takes Message-IDs, at most 500 at a time,
+// until it can mark a whole group (unseenet#625).
+async function markAllRead(groups) {
+  try {
+    for (const g of groups) {
+      const d = await api("GET", "/api/groups/" + encodeURIComponent(g.id));
+      const ids = d.rows.filter(r => !r.read && r.message && r.message.id).map(r => r.message.id);
+      for (let i = 0; i < ids.length; i += 500)
+        await api("POST", `/api/groups/${encodeURIComponent(g.id)}/read`, { ids: ids.slice(i, i + 500) });
+    }
+  } catch (x) { toast(x.message); return; }
+  if (groups.some(g => g.id === S.gid)) await loadGroup();
+  await loadSidebar();
+  toast(groups.length === 1 ? groups[0].label + " is read." : "All read.");
+}
+
+// Copy a group's unseenet: address, which the sidebar does not carry: ask the core for it.
+async function copyGroupAddress(g) {
+  try {
+    const d = await api("GET", "/api/groups/" + encodeURIComponent(g.id));
+    if (d.group.address) copy(d.group.address, "The group's address is copied.");
+    else toast("This group has no address to copy.");
+  } catch (x) { toast(x.message); }
+}
+
+// Stop following a group from the sidebar, the shown one or another.
+async function unsubscribeGroup(g) {
+  try { await api("POST", "/api/subscribe", { id: g.id, on: false }); } catch (x) { toast(x.message); return; }
+  if (S.gid === g.id) { S.gid = null; S.data = null; }
+  await loadSidebar();
+  toast("You no longer follow " + g.label + ". G finds it again.");
 }
 
 // A node's address made short for the status bar (an onion address cut in the middle).
