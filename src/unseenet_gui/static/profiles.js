@@ -231,7 +231,8 @@ function editProfile(p, share = null) {
   dialog = formDialog({ label: share ? "Share your profile" : "Your profile", focus: "#pabout", button: share ? "Share …" : "Publish",
     title: share ? `A profile for ${share.who} only` : "Your public profile - anybody can read it",
     values: { about: cur.about || "", markdown: md, lang: (cur.lang || []).join(", "), links: linksText(cur.links) },
-    note: "Kinds of links: " + (p.link_kinds || []).join(", ") + ", or x-something. Links are shown as written; nobody checks them.",
+    note: "Kinds of links: " + (p.link_kinds || []).join(", ") + ", or x-something. Links are shown as written; nobody checks them." +
+      (share ? "" : " What you see blurred or hidden - for a child, say - is set under Who reads on this device (Ctrl K), never in your profile."),
     fields: (vals) => [
       ...(share ? [] : picturePart()),      // your picture is public: not in a shared profile
       h("label", { for: "pabout", text: "About you - a few lines, or a small home page" }),
@@ -281,6 +282,7 @@ function commands() {
     { name: "Your rules: what comes first, what is hidden or folded", key: "", also: "scorefile killfile score filter sort regler", run: openRules },
     { net: true, name: "Spam reports: the issuers that hide posts for you", key: "", also: "spam report issuer nocem hidden skjult", run: openReportIssuers },
     { net: true, name: "Content warnings and labels", key: "", also: "spoiler nsfw blur sløret advarsel labeller tags age alder", run: openContentWarnings },
+    { net: true, name: "Who reads on this device: an age guide for warnings", key: "", also: "age alder barn child kids parental", run: openAgeGuide },
     { net: true, name: isIssuer() ? "Your spam reports: sent to you, published, withdraw" : "Become a spam report issuer", key: "",
       also: "spam report issuer publish publicer", run: openIssuing },
     { name: "Your nodes: add, remove, choose the default", key: "", also: "node server switch change onion noder skift", run: openNodes },

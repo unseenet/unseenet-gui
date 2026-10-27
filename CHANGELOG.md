@@ -9,6 +9,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 - **Everything with a tag** (unseenet#672): a click on a tag shows every post with it in
   your groups and feeds, as a feed, each in its own group - not only the view you are in.
+- **Who reads on this device** (unseenet#674, UN-RFC 0053 6.1): an age guide - under 13,
+  13 to 17, an adult - that sets what is blurred and hidden. Nothing of the answer is kept;
+  only the settings, which you can change. It says plainly that it covers only what is
+  marked. In the palette, beside *Content warnings*, and named by *Your profile*.
 
 - **Tags and content warnings** (#186, UN-RFC 0052, 0053): warnings as square flags at the
   top left of a post - a fixed colour each, always with the word and who set it - and
