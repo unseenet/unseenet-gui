@@ -233,7 +233,7 @@ function postMenu(m, g) {
   ].map(([title, items]) => [title, items.filter(Boolean)]).filter(([, items]) => items.length);
   if (!groups.length) return null;
   const open = S.menuFor === "post:" + m.id;
-  if (open) requestAnimationFrame(placePostMenu);
+  if (open) requestAnimationFrame(() => placePostMenu());
   return h("div", { class: "more post-more" + (open ? " open" : "") },
     h("button", { class: "morebtn", type: "button", "aria-label": "More", title: "More for this post", "aria-haspopup": "menu",
       "aria-expanded": String(open), onclick: (e) => { e.stopPropagation(); S.menuFor = open ? null : "post:" + m.id; render(); } }, "⋯"),
@@ -246,9 +246,9 @@ function postMenu(m, g) {
 // Put an open post menu where the window has room for it - under its button, or above it
 // when the button is low - outside the reader's scrolling, which would cut it off; long,
 // it scrolls itself.
-function placePostMenu() {
-  const btn = document.querySelector(".post-more.open .morebtn");
-  const menu = document.querySelector(".post-more.open .menu");
+function placePostMenu(sel = ".post-more.open") {
+  const btn = document.querySelector(sel + " .morebtn");
+  const menu = document.querySelector(sel + " .menu");
   if (!btn || !menu) return;
   const r = btn.getBoundingClientRect(), gap = 6, edge = 12;
   const below = window.innerHeight - r.bottom - gap - edge, above = r.top - gap - edge;
