@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Proven from an older key** (unseenet#684, UN-RFC 0049 7.3): a post brought from an
+  Unseenet export with a proof that holds says *proven from the key …* by its origin.
+
 - **The language of what you write** (#194, unseenet#671): a *Language* field by the subject,
   filled with what the core suggests and why - what you wrote in here last, the group's,
   or your profile's; change it there, and it is remembered for the group. Chat lines and
