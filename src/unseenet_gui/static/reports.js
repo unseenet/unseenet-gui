@@ -13,14 +13,21 @@
 // toast), dialogs.js's dialogShell and nodes.js's formDialog.
 "use strict";
 
+// what a reason is called (lower case, inline): from the core's one list once /api/reports
+// has answered (unseenet#659), these until then
 const REASON_TEXT = { spam: "spam", flood: "flooding", phishing: "phishing", malware: "malware",
-  illegal: "illegal", other: "other" };
+  harassment: "threats or harassment", illegal: "illegal", other: "other" };
+// A reason's name, from the core's list when known.
+function reasonText(r) {
+  const l = S.reports && S.reports.reason_labels && S.reports.reason_labels[r];
+  return l ? l.split(" - ")[0].toLowerCase() : (REASON_TEXT[r] || r);
+}
 
 // "Hidden by Spamjægeren: spam" for a post hidden by a report, "" for others.
 function reportedText(m) {
   const r = m && m.reported;
   if (!r) return "";
-  return `Hidden by ${r.label}: ${REASON_TEXT[r.reason] || r.reason}` +
+  return `Hidden by ${r.label}: ${reasonText(r.reason)}` +
     (r.kind === "key" ? " (its author)" : "") + (r.automatic ? " · automatic" : "");
 }
 
@@ -196,7 +203,8 @@ function openPublish(p) {
     fields: (v) => [
       h("label", { for: "rreason", text: "Why" }),
       h("select", { id: "rreason", name: "reason", class: "in" }, reasons.map(x =>
-        h("option", { value: x, selected: (v.reason || "spam") === x }, REASON_TEXT[x] || x))),
+        h("option", { value: x, selected: (v.reason || "spam") === x },
+          (S.reports && S.reports.reason_labels && S.reports.reason_labels[x]) || REASON_TEXT[x] || x))),
       p.key ? h("label", { class: "check" }, h("input", { type: "checkbox", name: "key", checked: !!v.key }),
         " Also its author: everything they post, for") : null,
       p.key ? h("input", { name: "days", type: "number", min: 1, max: 365, class: "in short", value: v.days || 365,
