@@ -69,8 +69,7 @@ function openEditGroup() {
         pick("reactions", "none", reacts, "None", "no likes here"),
         pick("reactions", "any", reacts, "Any emoji", "the six first"),
         pick("reactions", "own", reacts, "Your own", "up to 12, below")),
-      reacts === "own" ? h("input", { id: "ereacts", name: "reaction_set", class: "in", "data-k": "ereacts",
-        "aria-label": "Your own reactions", placeholder: "e.g. 🎉 ❤️ 👏", value: vals.reaction_set }) : null,
+      reacts === "own" ? ownReactionSet(vals.reaction_set) : null,
       site ? h("label", { text: "Search engines" }) : null,
       site ? h("div", { class: "choices row" },
         pick("index", "no", index, "Not indexed", "found by its address only"),
@@ -104,12 +103,49 @@ function openEditGroup() {
       await api("POST", `/api/groups/${encodeURIComponent(g.id)}/settings`,
         { title: v.title.trim(), description: v.description.trim(), rules,
           rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds,
-          reactions: reacts === "own" ? [...new Set((v.reaction_set || "").split(/[\s,]+/).filter(Boolean))] : reacts,
+          reactions: reacts === "own" ? splitOwnSet(v.reaction_set) : reacts,
           ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}),
           ...(issuers.map(i => i.key).join(" ") !== startIssuers ? { report_issuers: issuers.map(i => i.key) } : {}),
           ...(g.type === "inbox" && (v.team_name || "") !== (g.team_name || "") ? { team_name: (v.team_name || "").trim() } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
+}
+
+// A group's own set of reactions (UN-RFC 0048 section 4): at most 12 emoji, each once.
+const OWN_SET_MAX = 12;
+const splitOwnSet = (text) => [...new Set((text || "").split(/[\s,]+/).filter(Boolean))];
+
+// Choosing your own set (#179): the emoji as chips - a click takes one out -, the emoji
+// picker to add more, open for several picks in a row, and the field for pasting. The
+// field is the form's value (reaction_set); the chips follow it.
+function ownReactionSet(value) {
+  const field = h("input", { id: "ereacts", name: "reaction_set", class: "in", "data-k": "ereacts",
+    "aria-label": "Your own reactions", placeholder: "e.g. 🎉 ❤️ 👏", value: value || "",
+    oninput: () => draw() });
+  const chips = h("div", { class: "chips own-set", role: "group", "aria-label": "Your set" });
+  const put = (set) => {
+    field.value = set.join(" ");
+    field.dispatchEvent(new Event("input", { bubbles: true }));   // the form keeps it
+  };
+  const add = (e) => {
+    const set = splitOwnSet(field.value);
+    if (set.includes(e)) return;
+    if (set.length >= OWN_SET_MAX) { toast(`Your own set takes up to ${OWN_SET_MAX} emoji.`); return; }
+    put([...set, e]);
+  };
+  const draw = () => {
+    const set = splitOwnSet(field.value);
+    chips.replaceChildren(...set.map(e => h("button", { type: "button", class: "chip emo-chip", text: e,
+        title: "Take " + e + " out", "aria-label": "Take " + e + " out", onclick: () => put(set.filter(x => x !== e)) })),
+      h("span", { class: "hint" + (set.length > OWN_SET_MAX ? " error" : ""), text: `${set.length} of ${OWN_SET_MAX}` }));
+  };
+  draw();
+  // the glyph itself goes in, not its :shortcode: - a set is emoji, not text; no picker
+  // with a core without /api/emoji
+  const button = emojiMissing ? null : h("button", { type: "button", class: "btn emoji-btn", "aria-haspopup": "dialog",
+    "aria-label": "Add emoji", title: "Add emoji to your set - the picker stays open for more",
+    onclick: (ev) => openEmojiPicker("ereacts", ev.currentTarget, add, { stay: true }) }, svg(ICON.smile, 16), " Emoji");
+  return h("div", { class: "own-set-box" }, chips, h("div", { class: "row-in" }, field, button));
 }
 
 // Remove a group you own (UN-RFC 0013): with the reason readers will see, after a warning.
