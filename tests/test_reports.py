@@ -35,8 +35,8 @@ def row(mid, subject, reported=None, kind="post", minute=0):
 
 
 class ReportsAPI:
-    def __init__(self, view="threads", issuer=False, received=False):
-        self.view, self.issuer, self.received = view, issuer, received
+    def __init__(self, view="threads", issuer=False, received=False, owner=False):
+        self.view, self.issuer, self.received, self.owner = view, issuer, received, owner
         self.shown, self.following = set(), True
         self.requests = []
 
@@ -53,6 +53,7 @@ class ReportsAPI:
 
     def group(self):
         return {"id": GROUP, "label": "dk.snak", "type": "open", "view": self.view, "hierarchy": "dk",
+                "owner": self.owner, "report_issuers": [{"key": ISSUER, "label": "Spamjægeren"}] if self.owner else [],
                 "may_post": True, "unread": 0, "kinds": ["post", "chat"], "pins": [], "max_pins": 0,
                 "write": {"post": {"allowed": True}, "chat": {"allowed": True}}}
 
@@ -308,3 +309,21 @@ async def test_an_issuer_chooses_where_reports_land(reports_page):
     await page.locator(".dialog .btn.primary").click()
     await page.wait_for_timeout(300)
     assert ("/api/reports/start", {"policy": "", "contact": "operator@proj"}) in api.requests
+
+
+@pytest.mark.parametrize("reports_page", [{"owner": True}], indirect=True)
+async def test_the_owner_chooses_the_issuers_readers_follow_here(reports_page):
+    """Asked for by the maintainer: a group's owner sets the issuers its readers follow
+    by default (UN-RFC 0045 7.5), in Edit group."""
+    page, api = reports_page
+    await page.evaluate("openEditGroup()")
+    dlg = page.locator(".dialog")
+    await expect(dlg).to_contain_text("Spam reports here")
+    await dlg.locator(".rrow", has_text="Spamjægeren").get_by_role("button", name="Remove").click()
+    await page.locator("#eissuer").fill("ed25519:another")
+    await dlg.get_by_role("button", name="Add", exact=True).click()
+    await expect(dlg.locator(".rrow")).to_have_count(1)
+    await dlg.locator(".btn.primary").click()
+    await page.wait_for_timeout(300)
+    [(_, body)] = [r for r in api.requests if r[0].endswith("/settings")]
+    assert body["report_issuers"] == ["ed25519:another"]

@@ -998,3 +998,10 @@ time.ago { white-space: nowrap; }
 /* team inboxes (UN-RFC 0047, #68) */
 .team-removed { margin: 8px 12px; }
 .sm.bad { color: var(--red); }
+
+/* Edit group: the issuers its readers follow here (UN-RFC 0045 7.5) */
+.dialog .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.dialog .chip { border: 1px solid var(--line-2); background: transparent; color: inherit; border-radius: 999px;
+  padding: 4px 12px; cursor: pointer; font: inherit; font-size: 13px; }
+.dialog .row-in { display: flex; gap: 8px; }
+.dialog .row-in .in { flex: 1 1 auto; }
