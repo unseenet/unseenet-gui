@@ -19,6 +19,12 @@ expect = playwright.expect
 TOKEN = "t" * 43
 GROUP = "alt.likes@abcd"
 SET = ["👍", "👎", "❤️", "😂", "😮", "😢"]
+EMOJI = {                                                # GET /api/emoji, a small table
+    "table": {"tada": "🎉", "heart": "❤️", "clap": "👏"},
+    "categories": [{"name": "Activities", "codes": ["tada"]},
+                   {"name": "Smileys & Emotion", "codes": ["heart", "clap"]}],
+    "names": {"tada": "party popper hooray", "heart": "red heart love", "clap": "clapping hands"},
+}
 
 
 class ReactAPI:
@@ -93,6 +99,8 @@ class ReactAPI:
             data = {"ok": True}
         elif request.method == "GET" and path == f"/api/groups/{GROUP}":
             data = {"group": self.head(), "rows": self.rows()}
+        elif path == "/api/emoji":                   # the core's table, a small one (#179)
+            data = EMOJI
         elif path == "/api/pictures":
             data = {"pictures": {}}
         else:
@@ -188,6 +196,54 @@ async def test_settings_choose_the_set(page_api):
     await dialog.get_by_role("button", name="Save").click()
     await expect(dialog).to_have_count(0)
     assert api.settings[-1]["reactions"] == ["🎉", "❤️"]
+
+
+@pytest.mark.parametrize("page_api", [("feed", True)], indirect=True)
+async def test_settings_pick_the_set_with_the_emoji_picker(page_api):
+    """#179: the picker adds glyphs and stays open for more; no duplicates; a chip takes
+    one out; the field still takes what is pasted."""
+    page, api = page_api
+    await page.evaluate("openEditGroup()")
+    dialog = page.get_by_role("dialog", name="Edit group")
+    await dialog.get_by_role("button", name="Your own").click()
+    await dialog.get_by_role("button", name="Add emoji").click()
+    picker = page.get_by_role("dialog", name="Choose an emoji")
+    await picker.get_by_role("searchbox", name="Search emoji").fill("party")
+    await picker.get_by_role("button", name="tada").click()
+    await expect(picker).to_be_visible()                              # open for the next one
+    await picker.get_by_role("button", name="tada").click()           # a second time: once only
+    await picker.get_by_role("searchbox", name="Search emoji").fill("heart")
+    await picker.get_by_role("button", name="heart").click()
+    field = dialog.get_by_label("Your own reactions")
+    await expect(field).to_have_value("🎉 ❤️")                        # the glyphs, not :tada:
+    chips = dialog.get_by_role("group", name="Your set")
+    await expect(chips).to_contain_text("2 of 12")
+    await chips.get_by_role("button", name="Take 🎉 out").click()
+    await expect(field).to_have_value("❤️")
+    await expect(picker).to_be_visible()                              # the set is not "outside"
+    await field.fill("❤️ 👏")                                         # pasting still works
+    await expect(chips.get_by_role("button", name="Take 👏 out")).to_be_visible()
+    await page.keyboard.press("Escape")                               # closes the picker first
+    await expect(picker).to_have_count(0)
+    await expect(dialog).to_be_visible()
+    await dialog.get_by_role("button", name="Save").click()
+    await expect(dialog).to_have_count(0)
+    assert api.settings[-1]["reactions"] == ["❤️", "👏"]
+
+
+@pytest.mark.parametrize("page_api", [("feed", True)], indirect=True)
+async def test_settings_own_set_stops_at_twelve(page_api):
+    page, api = page_api
+    await page.evaluate("openEditGroup()")
+    dialog = page.get_by_role("dialog", name="Edit group")
+    await dialog.get_by_role("button", name="Your own").click()
+    await dialog.get_by_label("Your own reactions").fill("😀 😃 😄 😁 😆 😅 🤣 😂 🙂 🙃 😉 😊")
+    await dialog.get_by_role("button", name="Add emoji").click()
+    picker = page.get_by_role("dialog", name="Choose an emoji")
+    await picker.get_by_role("searchbox", name="Search emoji").fill("party")
+    await picker.get_by_role("button", name="tada").click()
+    await expect(page.locator(".toast")).to_contain_text("up to 12")
+    await expect(dialog.get_by_role("group", name="Your set")).to_contain_text("12 of 12")
 
 
 @pytest.mark.parametrize("page_api", [("feed", True)], indirect=True)

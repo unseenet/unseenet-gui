@@ -103,14 +103,14 @@ function emojiButton(k) {
 }
 
 // Open the emoji picker for a text field (or onPick for reactions); a second click closes
-// it.
-function openEmojiPicker(k, button, onPick = null) {
+// it. stay: it stays open after a pick, for choosing several (a group's own set, #179).
+function openEmojiPicker(k, button, onPick = null, { stay = false } = {}) {
   if (picker && picker.k === k) { closeEmojiPicker(); return; }
   closeEmojiPicker(); closeSuggest();
   const node = h("div", { class: "emoji-picker", role: "dialog", "aria-label": "Choose an emoji" },
     h("p", { class: "hint", text: "Loading emoji …" }));
   // onPick: the emoji itself goes there (a reaction) instead of into a field
-  picker = { k, node, onPick, rect: button.getBoundingClientRect(), tab: recentEmoji().length ? "recent" : 0, q: "" };
+  picker = { k, node, onPick, stay, rect: button.getBoundingClientRect(), tab: recentEmoji().length ? "recent" : 0, q: "" };
   document.body.append(node);
   placePopover(node, picker.rect, 344);
   loadEmoji().then(() => { if (picker && picker.node === node) drawPicker(); },
@@ -132,6 +132,11 @@ function drawPicker() {
   const tabs = [...(recent.length ? [{ id: "recent", name: "Recently used", icon: "🕘", codes: recent }] : []),
     ...d.categories.map((c, i) => ({ id: i, name: c.name, icon: d.table[c.codes[0]], codes: c.codes }))];
   const pick = (code) => {
+    if (P.stay && P.onPick) {                    // open for the next one; the search keeps the focus
+      rememberEmoji(code); P.onPick(d.table[code]);
+      if (picker === P) search.focus();
+      return;
+    }
     closeEmojiPicker();
     if (P.onPick) { rememberEmoji(code); P.onPick(d.table[code]); } else insertEmoji(P.k, code);
   };
@@ -216,7 +221,8 @@ document.addEventListener("click", (e) => {
   if (EMOJI_FIELDS.has(e.target.dataset && e.target.dataset.k)) updateSuggest(e.target);
 }, true);
 document.addEventListener("mousedown", (e) => {                       // a click outside closes the picker
-  if (picker && !picker.node.contains(e.target) && !(e.target.closest && e.target.closest(".emoji-btn"))) closeEmojiPicker();
+  // the set being chosen (#179) is no "outside": taking a chip out keeps the picker open
+  if (picker && !picker.node.contains(e.target) && !(e.target.closest && e.target.closest(".emoji-btn, .own-set-box"))) closeEmojiPicker();
   if (reactPop && !reactPop.contains(e.target) && !(e.target.closest && e.target.closest(".react.add"))) closeReactions();
 }, true);
 window.addEventListener("resize", () => { closeEmojiPicker(); closeSuggest(); closeReactions(); });

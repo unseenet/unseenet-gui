@@ -7,7 +7,7 @@
 "use strict";
 
 // ---- dialogs ------------------------------------------------------------
-function closeDialog() { S.dialog = null; render(); }
+function closeDialog() { closeEmojiPicker(); S.dialog = null; render(); }   // a picker left open picks for nothing
 
 // A click outside a dialog closes it only when the click also began outside it,
 // so a click that starts on a button, or text you select, never closes it.
