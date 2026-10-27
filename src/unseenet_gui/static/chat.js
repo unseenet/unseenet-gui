@@ -37,8 +37,9 @@ function chatView(d) {
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
       isPost && !m.reported ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
       m.reported ? reportedNote(m) :                    // hidden by a report (UN-RFC 0045)
+        labelCovered(m) ? [warningFlags(m), labelVeil(m)] :   // a warning (UN-RFC 0053)
         m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
-      m.readable && !m.reported ? filesOf(m, true) : null,
+      m.readable && !m.reported && !labelCovered(m) ? filesOf(m, true) : null,
       reactionBar(m),
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },

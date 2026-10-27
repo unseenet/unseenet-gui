@@ -7,6 +7,17 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Tags and content warnings** (#186, UN-RFC 0052, 0053): warnings as square flags at the
+  top left of a post - a fixed colour each, always with the word and who set it - and
+  the post's text and pictures blurred behind *Show anyway*, or hidden as a quiet line,
+  as you chose, never silently; a rule's `blur` the same. In the threads list a stripe
+  in the warning's colour before the subject. Topics as quiet chips by the reactions:
+  the author's, the group's (dashed, in the feed and timeline; once in a group's head),
+  a labeller's (dotted); a click shows only the posts with that tag. Writing: warnings
+  to tick and tags as chips, and `#word` in the text shown as a tag at once. *Content
+  warnings and labels* in the palette: show, blur or hide per warning, and the
+  labellers. *Edit group*: the group's tags.
+
 - **`!` for groups** (unseenet#666): `!dk.snak` names a group and links to it, and `!`
   goes to a group the selected post names (was `#`); `#word` in what you write is a tag now.
 

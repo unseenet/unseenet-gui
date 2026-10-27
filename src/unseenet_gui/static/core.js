@@ -141,7 +141,9 @@ function fromRow(r) {
     // team inboxes (UN-RFC 0047): written on an inbox's behalf, and a team key handed to you
     team: r.team || null, team_invite: m.team_invite || null,
     // a report sent to you (#74): the post it names {id, group, author_key, reason}
-    report: r.report || null };
+    report: r.report || null,
+    // the author's tags (UN-RFC 0052), and warnings, topics and what to do (UN-RFC 0053)
+    tags: m.tags || [], labels: m.labels || null };
 }
 
 // UN-RFC 0049 section 5.1: "Imported from Facebook · originally 3 August 2026" - the
@@ -247,6 +249,8 @@ const ICON = {
   cmd: "M5 7l5 5-5 5M12 17h7",
   plus: "M12 5v14M5 12h14",
   flag: "M5 21V4M5 4h11l-2 4 2 4H5",                 // report a post
+  alert: "M12 3l9 16H3zM12 10v4M12 17v.01",           // a content warning (UN-RFC 0052)
+  tag: "M3 12V4h8l9 9-8 8zM7.5 7.5v.01",              // a topic
   send: "M5 12h14M13 6l6 6-6 6",
   check: "M20 6L9 17l-5-5",
   checks: "M2 13l4 4L16 7M10 15l2 2L22 7",

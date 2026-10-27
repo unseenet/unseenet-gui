@@ -102,7 +102,8 @@ function feedView(d) {
       h("div", { class: "etext", text: p.text }), p.state === "failed" ?
         h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ", h("button", { class: "link", onclick: () => retry(job) }, "Try again")) :
         pendingState(p))),
-    entries.length ? entries.map(e => entryCard(d, e)) :
+    tagFilterBar(),                                     // shown: only posts with a tag
+    entries.length ? entries.filter(e => passesTag(e.m)).map(e => entryCard(d, e)) :
       h("div", { class: "empty" }, h("h2", { text: timeline ? "Nothing yet" : "No entries yet" }),
         h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), and their entries come here." :
           note ? "Write the first note above." : "" }))));
@@ -152,6 +153,7 @@ function entryCard(d, e) {
   const pend = Object.entries(S.pending).filter(([, p]) => p.thread === m.id);
   const own = groupOf(m.group) || g;
   return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread") + (S.post === m.id ? " on" : ""), "data-id": m.id },
+    warningFlags(m),                                    // warnings at the top left (UN-RFC 0053)
     h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
       m.bot ? h("span", { class: "sm", text: "bot" }) : null,
       timeEl(m.date),
@@ -164,8 +166,8 @@ function entryCard(d, e) {
     entryBody(m),
     reactionBar(m),
     // Comment (with the count) and Reply with a post as icons with tooltips; Pin and Copy
-    // address are in the ⋯ menu (#120)
-    h("div", { class: "eact" },
+    // address are in the ⋯ menu (#120); topics as quiet chips at the end (UN-RFC 0052)
+    h("div", { class: "eact" }, h("span", { class: "eact-tags" }, tagChips(m, { groupTags: timeline })),
       cp.allowed ? iconAction(ICON.bubble, "Comment", () => focusLater(`[data-k="c:${m.id}"]`), {}, e.comments.length || null) :
         e.comments.length ? h("span", { class: "hint ccount", "aria-label": `${e.comments.length} comments` },
           svg(ICON.bubble, 16, 2), String(e.comments.length)) : null,
@@ -196,6 +198,7 @@ function entryCard(d, e) {
 // its picture (unseenet-gui#143). Whether it is long is measured after drawing (clipEntries).
 function entryBody(m) {
   if (m.reported) return h("div", { class: "ebody" }, reportedNote(m));   // UN-RFC 0045
+  if (labelCovered(m)) return h("div", { class: "ebody" }, labelVeil(m));   // UN-RFC 0053
   if (m.kind === "chat" && m.readable)
     return h("div", { class: "ebody" }, m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false));
   const [text, files] = messageBody(m);
@@ -249,7 +252,7 @@ function commentEl(c, entry, byId) {
       h("div", { class: "chd" }, whoEl(c), timeEl(c.date),
         parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null,
         moreMenu(c)),
-      h("div", { class: "ctext" }, c.reported ? reportedNote(c) : c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
+      h("div", { class: "ctext" }, c.reported ? reportedNote(c) : labelCovered(c) ? labelVeil(c) : c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
         [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
       // the reactions given stay; adding one and Answer show on hover or focus (#120)
       h("div", { class: "crow" }, reactionBar(c),

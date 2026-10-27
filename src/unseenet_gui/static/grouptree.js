@@ -344,6 +344,7 @@ function mainArea() {
       g.type === "inbox" ? "sealed to you" : g.type === "contact" ? "private · sealed to each of you" : "closed · end-to-end encrypted") :
       g.type ? h("span", { class: "chip", text: g.type }) : null,
     g.fast ? h("span", { class: "chip warn", text: "fast delivery" }) : null,
+    groupTagChips(g),                                   // the group's tags, once (UN-RFC 0052 5)
   ];
   const canSwitch = g.type && g.type !== "inbox" && g.type !== "contact";
   const head = h("header", { class: "ghead" },
