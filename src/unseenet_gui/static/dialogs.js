@@ -92,7 +92,15 @@ function openInfo() {
       (g.moderators || []).length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Moderators" }),
         h("p", { class: "muted", style: "margin:0", text: g.moderators.map(p => p.label).join(", ") })] : null,
       (g.posters || []).length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Posters" }),
-        h("p", { class: "muted", style: "margin:0", text: g.posters.map(p => p.label).join(", ") })] : null),
+        h("p", { class: "muted", style: "margin:0", text: g.posters.map(p => p.label).join(", ") })] : null,
+      // how to report here, and who can act (#74, UN-RFC 0045)
+      g.type !== "contact" && g.type !== "inbox" && g.id !== FOR_YOU ? [
+        h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Reporting" }),
+        h("p", { class: "muted", style: "margin:0", text: "A post that breaks the rules or the law: Report in its ⋯ menu. " +
+          "It goes to those who can act on it - the group's owner and moderators, the hierarchy's maintainer, " +
+          "your node's operator and the spam report issuers you follow - with what is wrong, your note and screenshots." }),
+        h("button", { class: "link", style: "align-self:flex-start", onclick: () => { closeDialog(); openReportIssuers(); } },
+          "Spam reports: the issuers that hide posts for you")] : null),
     // what you can do here: everyone may leave; the owner has the group's tools (as the TUI's Ctrl+P)
     h("div", { class: "df btns wrap" },
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: openInvite }, "Invite someone") : null,
