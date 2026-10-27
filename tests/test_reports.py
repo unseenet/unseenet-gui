@@ -96,7 +96,7 @@ class ReportsAPI:
             data = {"targets": [{"i": 0, "who": "The group's owner (@unseenet.net)"},
                                 {"i": 1, "who": "Report issuer Spamjægeren"}],
                     "reasons": [{"id": "spam", "label": "Spam"}, {"id": "illegal", "label": "Illegal"},
-                                {"id": "threats", "label": "Threats or harassment"},
+                                {"id": "harassment", "label": "Threats or harassment"},
                                 {"id": "other", "label": "Something else"}]}
         elif path == f"/api/groups/{GROUP}/report":
             data = {"job": "job9", "targets": len(body["targets"])}   # a job (unseenet#653)
@@ -269,7 +269,7 @@ async def test_the_report_window(reports_page, tmp_path):
     await page.evaluate("jobEvent({job: 'job9', state: 'sent', message_id: '1'})")
     await expect(page.locator(".toast").last).to_contain_text("Report sent to 1")
     [(path, body)] = [r for r in api.requests if r[0].endswith("/report")]
-    assert body["targets"] == [0] and body["reason"] == "threats" and body["note"].startswith("Se **")
+    assert body["targets"] == [0] and body["reason"] == "harassment" and body["note"].startswith("Se **")
     assert body["files"][0]["name"] == "skaerm.png" and body["files"][0]["alt"] == "Truslen"
 
 

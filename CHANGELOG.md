@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Report reasons from the core's one list** (unseenet#659): *Threats or harassment* is
+  `harassment`, readers can report *Phishing* and *Malware*; the names come from the core.
+
 - **Report under the post** (asked for by the maintainer): in a threads view the reader's
   bar has a *Report* button beside *Reply*, not only the ⋯ menu at the post's head.
 
