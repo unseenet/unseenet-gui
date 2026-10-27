@@ -30,7 +30,8 @@ PHONE.addEventListener?.("change", () => render());
 
 // Show a group (or a chat, For you, the timeline), loading it, and remember where you were.
 async function openGroup(gid, rerender = true) {
-  if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; S.moreTools = false; }
+  if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; S.moreTools = false;
+    S.showAll = null; }                               // Show all ends when you leave the view (0051 3)
   if (rerender) S.pane = "group";      // the first group opened by itself leaves a phone on the list
   S.gid = gid;
   revealGroup(gid);
@@ -47,7 +48,7 @@ async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
   try {
-    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid));
+    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + (S.showAll === gid ? "?all=1" : ""));
     let site = null;
     if (data.group.view === "pages") site = await loadSite(gid);   // a site: its pages (UN-RFC 0035)
     if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: writeOf(data), site };

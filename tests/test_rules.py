@@ -79,7 +79,17 @@ class RulesAPI:
             data = {"groups": [self.group()], "people": [],
                     "hierarchies": [{"name": "dk", "tree": None}], "inbox": {"id": "inbox:test"}}
         elif request.method == "GET" and path == f"/api/groups/{GROUP}":
-            data = {"group": self.group(), "rows": self.rows()}
+            self.asked = getattr(self, "asked", []) + [request.query_string]
+            if request.query.get("all") == "1":          # Show all: no scores (UN-RFC 0051 3)
+                data = {"group": {**self.group(), "show_all": True},
+                        "rows": [row("<k@x>", "kage"), row("<p@x>", "politik", minute=1)]}
+            else:
+                data = {"group": self.group(), "rows": self.rows()}
+        elif request.method == "GET" and path == "/api/groups/for-you:":
+            r = row("<m@x>", "Hej @me", score=0, actions=["quiet"])
+            data = {"group": {"id": "for-you:", "label": "For you", "view": "threads", "hierarchy": "",
+                              "description": "Replies to your posts and posts that name you, from all your groups",
+                              "may_post": False, "kinds": ["post"], "pins": []}, "rows": [r]}
         elif path == "/api/rules" and request.method == "GET":
             data = {"text": self.text, "on": self.on, "rules": 0, "problems": [], "suggestion": SUGGESTION,
                     "help": "YOUR RULES - IN SHORT\nOne rule a line."}
@@ -230,3 +240,28 @@ async def test_the_sidebar_top_stays_while_the_groups_scroll(rules_page):
     await expect(top).to_contain_text("For you")
     await page.locator("nav.side .side-scroll").evaluate("e => e.scrollTop = 99999")
     assert (await top.locator(".brand").bounding_box())["y"] < 60
+
+
+@pytest.mark.parametrize("rules_page", [True], indirect=True)
+async def test_show_all_is_a_look_not_a_setting(rules_page):
+    """#169, UN-RFC 0051 section 3: one action shows the view without your rules, plainly
+    marked, one action back; nothing is saved, and leaving the view ends it."""
+    page, api = rules_page
+    await page.get_by_role("button", name="Show all").click()
+    await expect(page.locator(".showall.on")).to_contain_text("your rules are paused here")
+    await expect(page.locator(".prow", has_text="politik")).to_have_count(1)     # hidden by a rule before
+    assert "all=1" in api.asked[-1]
+    assert not any(p == "/api/rules" for p, _ in api.requests)                    # never saved
+    await page.get_by_role("button", name="Back to my rules").click()
+    await expect(page.locator(".showall.on")).to_have_count(0)
+    assert "all=1" not in api.asked[-1]
+
+
+@pytest.mark.parametrize("rules_page", [True], indirect=True)
+async def test_for_you_quiet_and_seen(rules_page):
+    """#169, UN-RFC 0051 5.5: a quiet entry says so; what is shown in For you is seen."""
+    page, api = rules_page
+    await page.evaluate("openGroup('for-you:')")
+    await expect(page.locator(".prow .quiet")).to_contain_text("quiet")
+    await page.wait_for_timeout(300)
+    assert any(p == "/api/groups/for-you:/seen" for p, _ in api.requests)

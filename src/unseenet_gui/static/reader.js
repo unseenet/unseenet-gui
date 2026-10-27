@@ -183,6 +183,7 @@ function threadsView(d) {
   const pend = pendingIn(g, msgs, false);
   const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
     teamRemovedNote(g),                                 // removed from a team inbox (0047)
+    showAllBar(d),                                      // your rules paused here, for now (0051)
     tagFilterBar(),                                     // only posts with a tag (UN-RFC 0052)
     pinnedSection(d, msgs),
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
@@ -205,6 +206,8 @@ function threadsView(d) {
           h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
         m.origin ? h("span", { class: "muted origin", title: originText(m), text: "  ⇲ " + networkName(m.origin.network) }) : null,
         g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null,
+        (m.actions || []).includes("quiet") ? h("span", { class: "muted quiet", title: "Your [foryou] rules: listed, not counted, no notification",
+          text: "  · quiet" }) : null,
         ruled.folded[m.id] ? h("span", { class: "folded", role: "button", tabindex: "0", title: "Show them",
           onclick: (e) => { e.stopPropagation(); S.unfolded = { ...(S.unfolded || {}), [m.id]: true }; render(); },
           text: `  ▸ ${ruled.folded[m.id]} folded` }) : null,

@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **For you and Show all** (#169, unseenet#629): **Show all** over a view where your rules
+  act - the feed, a threaded group, For you - shows it without them, plainly marked
+  (*Showing all - your rules are paused here*), with *Back to my rules*; never saved, and
+  it ends when you leave the view. In For you, what is on the screen is seen (the count
+  drops, nothing disappears), and an entry your `[foryou]` rules quiet says *quiet*.
+
 - **Everything with a tag** (unseenet#672): a click on a tag shows every post with it in
   your groups and feeds, as a feed, each in its own group - not only the view you are in.
 - **Who reads on this device** (unseenet#674, UN-RFC 0053 6.1): an age guide - under 13,

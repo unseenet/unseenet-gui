@@ -1063,3 +1063,7 @@ time.ago { white-space: nowrap; }
 
 .check.age { align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .note-warn { margin: 4px 0 0; padding: 8px 10px; border-left: 3px solid var(--line-2); font-size: 13px; color: var(--muted); }
+
+/* Show all (UN-RFC 0051 section 3): your rules paused in this view, for now */
+.showall { padding: 4px 12px; font-size: 13px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.showall.on { background: var(--panel-2, transparent); color: inherit; }
