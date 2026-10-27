@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Report under the post** (asked for by the maintainer): in a threads view the reader's
+  bar has a *Report* button beside *Reply*, not only the ⋯ menu at the post's head.
+
 - **Publish as the issuer beside you** (unseenet#654): with an issuer beside your own
   identity in the vault - the project's in its maintainer's - a report sent to you
   says *Publish a spam report… as reports@unseenet*, and the dialog says the report is

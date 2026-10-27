@@ -305,6 +305,10 @@ function readerPane(g, m, msgs) {
         commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,
       teamInviteButton(m),
       reportedPostButtons(m),                           // a report sent to you: open, publish
+      // report it - here too, not only in the ⋯ menu, so it is found (asked for, 27 Oct)
+      !m.mine && !m.private && m.readable && g.id !== FOR_YOU ? h("button", { class: "btn report-btn",
+        title: "Report this post to those who can act on it", onclick: () => openReport(m) },
+        svg(ICON.flag, 14, 2), " Report") : null,
       g.id === FOR_YOU && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === FOR_YOU ? h("button", { class: "btn", onclick: async () => {
