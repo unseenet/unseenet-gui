@@ -59,6 +59,14 @@ async function loadReports() {
   return S.reports;
 }
 
+// Where an issuer hides posts for you: the hierarchies and groups whose maintainer or
+// owner named it (UN-RFC 0045 sections 7.1, 7.5), and everywhere if you follow it.
+function issuerWhere(i) {
+  const named = [...(i.hierarchies || []).map(x => x + ".*"), ...(i.groups || []).map(g => labelOf(g))];
+  if (!named.length) return "followed by you, in every group";
+  return "named for " + named.join(", ") + (i.yours ? ", and followed by you everywhere" : "");
+}
+
 // Spam reports: the issuers that hide posts for you - those your hierarchies name, which you
 // can turn off, and those you follow yourself - and following one by its key.
 async function openReportIssuers() {
@@ -83,8 +91,7 @@ async function openReportIssuers() {
           h("label", { class: "check" }, h("input", { type: "checkbox", checked: i.on, disabled: st.busy,
             "aria-label": (i.on ? "Stop following " : "Follow ") + i.label,
             onchange: (e) => set(i.key, e.target.checked, i.label) }), " ", h("b", { text: i.label })),
-          h("span", { class: "hint", text: i.hierarchies.length ? "named for " + i.hierarchies.map(x => x + ".*").join(", ") +
-            (i.yours ? ", and followed by you everywhere" : "") : "followed by you, in every group" }),
+          h("span", { class: "hint", text: issuerWhere(i) }),
           h("span", { class: "mono hint ikey", title: i.key, text: i.key })))) :
         h("p", { class: "muted", text: "You follow no issuers, and the hierarchies of your groups name none." }),
       h("h3", { class: "sub", text: "Follow an issuer" }),
