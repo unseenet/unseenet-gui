@@ -111,10 +111,10 @@ function groupTagChips(g) {
     text: t + " · the group's" })));
 }
 
-// Show only the posts with a tag in what is shown now, with a bar to clear it.
-function filterByTag(tag) {
-  S.tagFilter = S.tagFilter === tag ? null : tag;
-  render();
+// Everything with a tag in your groups and feeds, as a feed (UN-RFC 0052 section 7).
+async function filterByTag(tag) {
+  S.tagFilter = null;
+  await openGroup(TAGGED + tag);
 }
 
 // Whether a post passes the tag filter: its own, its group's, or a labeller's topic.

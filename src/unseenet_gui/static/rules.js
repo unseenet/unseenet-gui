@@ -203,7 +203,7 @@ function ruleClass(m) {
 // 0044 4.5) - only while you have rules on (the rows have scores), since only rules use
 // it: without them nothing is sent. Pseudo-groups (For you, the timeline, chats) keep none.
 function markSeen(g, msgs) {
-  if (!g || !g.type || g.id === FOR_YOU || g.id === TIMELINE || String(g.id).startsWith("contact:")) return;
+  if (!g || !g.type || g.id === FOR_YOU || isMixed(g) || String(g.id).startsWith("contact:")) return;
   if (!msgs.some(m => m.score !== undefined)) return;
   const newest = msgs.reduce((a, m) => (m.date && (!a || m.date > a) ? m.date : a), "");
   if (!newest || (S.seenSent || {})[g.id] === newest) return;
