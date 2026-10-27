@@ -26,12 +26,24 @@ function openEditGroup() {
   // a site: whether search engines may index it through its web form (UN-RFC 0035 section 3)
   const site = S.data && S.data.site;
   let index = site ? (site.index || "no") : null;
+  // spam report issuers the group's readers follow by default (UN-RFC 0045 7.5); each
+  // reader can still turn them off
+  const issuers = (g.report_issuers || []).map(i => ({ ...i }));
+  const startIssuers = issuers.map(i => i.key).join(" ");
+  const follows = ((S.reports && S.reports.issuers) || []).filter(i => i.on);
+  const addIssuer = (key, label) => {
+    key = (key || "").trim();
+    if (!key || issuers.some(i => i.key === key)) return;
+    issuers.push({ key, label: label || key.slice(0, 20) + "…" });
+    redrawDialog();
+  };
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
     onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value;
       else if (name === "reactions") reacts = value; else if (name === "index") index = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
     values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
+      team_name: g.team_name || "",
       reaction_set: Array.isArray(rset) ? rset.join(" ") : "",
       // Markdown if the rules already are, or - for new rules - if you write posts in Markdown
       markdown: g.rules ? !!g.rules_markdown : !(S.sidebar && S.sidebar.markdown === false) },
@@ -65,6 +77,24 @@ function openEditGroup() {
         pick("index", "yes", index, "May be indexed", "search engines may list its pages")) : null,
       site && index === "yes" ? h("p", { class: "hint", style: "margin:0",
         text: "Copies in search engines are outside Unseenet: they can outlive the pages here, even after they expire or you withdraw them." }) : null,
+      g.type !== "inbox" ? [
+        h("label", { text: "Spam reports here" }),
+        h("p", { class: "hint", style: "margin:0", text: "Issuers your readers follow here by default, so spam is hidden " +
+          "from the start. Each reader can turn them off; a hidden post always says who hid it." }),
+        issuers.length ? h("div", { class: "issuers" }, issuers.map((i, n) => h("div", { class: "rrow" },
+          h("b", { text: i.label }), h("span", { class: "mono hint", text: i.key }),
+          h("button", { class: "btn small", type: "button", onclick: () => { issuers.splice(n, 1); redrawDialog(); } }, "Remove")))) :
+          h("p", { class: "muted", style: "margin:0", text: "None: only the issuers your readers choose, or the hierarchy names." }),
+        follows.filter(f => !issuers.some(i => i.key === f.key)).length ? h("div", { class: "chips" },
+          follows.filter(f => !issuers.some(i => i.key === f.key)).map(f =>
+            h("button", { type: "button", class: "chip", title: "Add " + f.key, onclick: () => addIssuer(f.key, f.label) }, "+ " + f.label))) : null,
+        h("div", { class: "row-in" },
+          h("input", { id: "eissuer", class: "in mono", "aria-label": "Add an issuer by its key", placeholder: "Add an issuer: ed25519:…",
+            onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); addIssuer(e.target.value); } } }),
+          h("button", { class: "btn", type: "button", onclick: () => addIssuer(document.querySelector("#eissuer").value) }, "Add"))] : null,
+      g.type === "inbox" ? [h("label", { for: "eteam", text: "The name replies go out as (a team inbox)" }),
+        h("input", { id: "eteam", name: "team_name", class: "in", maxlength: 64, "data-k": "eteam",
+          placeholder: "e.g. Example (operator)", value: vals.team_name || "" })] : null,
       h("label", { for: "erules", text: "Rules - shown to people before they post" }),
       h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules }),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
@@ -75,7 +105,9 @@ function openEditGroup() {
         { title: v.title.trim(), description: v.description.trim(), rules,
           rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds,
           reactions: reacts === "own" ? [...new Set((v.reaction_set || "").split(/[\s,]+/).filter(Boolean))] : reacts,
-          ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}) });
+          ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}),
+          ...(issuers.map(i => i.key).join(" ") !== startIssuers ? { report_issuers: issuers.map(i => i.key) } : {}),
+          ...(g.type === "inbox" && (v.team_name || "") !== (g.team_name || "") ? { team_name: (v.team_name || "").trim() } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
 }
