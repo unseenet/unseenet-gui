@@ -280,6 +280,9 @@ function readerPane(g, m, msgs) {
   if (m.encrypted) marks.push(h("span", { class: "sm lock" }, svg(ICON.lock, 12, 2.5), " encrypted"));
   else if (m.private && m.verified) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " verified sender"));
   else if (!m.private) marks.push(h("span", { class: "sm ok" }, svg(ICON.check, 13, 2.5), " signed"));
+  if (m.team) marks.push(h("span", { class: "sm" + (m.team.verified ? " ok" : " bad"),
+    title: "Written by one of the inbox's readers; who is not said (UN-RFC 0047)",
+    text: m.team.verified ? "on the inbox's behalf" : "claims to write for an inbox - not verified" }));
   const parent = m.references.length ? msgs.find(x => x.id === m.references[m.references.length - 1]) : null;
   const rp = mayReply(S.data, m), canReply = rp.code !== "none";
   const pos = msgs.indexOf(m);
@@ -300,6 +303,7 @@ function readerPane(g, m, msgs) {
     h("div", { class: "pbar" },
       canReply ? h("button", offProps(rp, { class: "btn primary", onclick: () => openReply(m, g) }),
         commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,
+      teamInviteButton(m),
       g.id === FOR_YOU && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === FOR_YOU ? h("button", { class: "btn", onclick: async () => {
@@ -354,6 +358,7 @@ function subjectOf(m) {
 
 // The terminal client's compose window: subject, the post quoted, your signature below "-- ".
 async function openReply(m, g) {
+  if (g.team) return openTeamReply(m, g);             // on a team inbox's behalf (UN-RFC 0047)
   if (m.private && m.kind === "chat" && m.key) { await openGroup("contact:" + m.key); return; }   // answer a chat in the chat
   const subject = /^re:/i.test(m.subject) ? m.subject : "Re: " + m.subject;
   const quoted = m.text.trimEnd().split("\n").map(ln => "> " + ln).join("\n");
@@ -367,6 +372,17 @@ async function openReply(m, g) {
         ...(files && files.length ? { files } : {}) }, { text }) :
       doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify,
         ...(files && files.length ? { files } : {}) }, { text }) });
+}
+
+// Reply in a team inbox: as the team, sealed to the writer - without your signature,
+// which would say who you are (UN-RFC 0047 section 8).
+function openTeamReply(m, g) {
+  const subject = /^re:/i.test(m.subject) ? m.subject : "Re: " + m.subject;
+  const quoted = m.text.trimEnd().split("\n").map(ln => "> " + ln).join("\n");
+  const top = `${m.who} wrote:\n${quoted}\n\n`;
+  openComposeWindow({ g, title: "Reply as " + g.team.name, subject, body: top, cursor: top.length, private: true,
+    send: (subject, text, _notify, files) => doSend("/api/private", g.id, { key: m.key, subject, body: text,
+      reply_to: m.id, as_team: g.id, ...(files && files.length ? { files } : {}) }, { text }) });
 }
 
 // Edit your own post (UN-RFC 0042): a new version, in the same place in its thread.

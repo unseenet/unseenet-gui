@@ -994,3 +994,7 @@ time.ago { white-space: nowrap; }
 .report-dlg .rtargets { display: flex; flex-direction: column; gap: 4px; }
 .report-dlg .rnote, .dialog.report-dlg textarea.in { min-height: 140px; height: 160px; resize: vertical; line-height: 1.5; }
 .report-dlg .label-row { margin-top: 4px; }
+
+/* team inboxes (UN-RFC 0047, #68) */
+.team-removed { margin: 8px 12px; }
+.sm.bad { color: var(--red); }
