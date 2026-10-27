@@ -334,7 +334,7 @@ function commands() {
     { name: "Copy the web address of this group (https://…)", key: "", when: g && g.address, run: () => copyWeb(g.address, "group") },
     { name: "Copy the web address of the selected post (https://…)", key: "", when: selectedPost() && selectedPost().address && !selectedPost().private,
       run: () => copyWeb(selectedPost().address, "post") },
-    { name: "Go to a #group in the selected post", key: "#", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
+    { name: "Go to a !group in the selected post", key: "!", when: selectedPost() && (selectedPost().groups || []).length, run: () => groupsInPost(selectedPost()) },
     { net: true, name: "Report the selected post", key: "", when: selectedPost() && !selectedPost().mine && !selectedPost().private, run: () => openReport(selectedPost()) },
     { name: "Add a contact", key: "", run: () => openAddContact("", "") },
     { name: "Close this chat", key: "", also: "hide archive remove luk skjul", when: g && g.type === "contact",

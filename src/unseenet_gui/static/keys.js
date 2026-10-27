@@ -35,7 +35,7 @@ document.addEventListener("keydown", (e) => {
       " ": () => { if (sc && sc.scrollTop + sc.clientHeight < sc.scrollHeight - 4) sc.scrollBy({ top: sc.clientHeight * 0.9 }); else nextUnread(); },
       r: () => { if (cur) tryReply(cur, g); },
       m: () => { if (cur && !cur.mine && cur.key) { S.full = false; openGroup("contact:" + cur.key); } },
-      "#": () => groupsInPost(cur),
+      "!": () => groupsInPost(cur),
     }[key];
     if (k) { e.preventDefault(); k(); }
     return;
@@ -71,5 +71,5 @@ document.addEventListener("keydown", (e) => {
   else if (key === "Enter" || key === "f") { e.preventDefault(); S.full = true; render(); }
   else if (key === "r" && cur) { e.preventDefault(); tryReply(cur, g); }
   else if (e.key === "D" && cur && cur.may_withdraw) { e.preventDefault(); openWithdraw(cur); }   // as the TUI's shift+d
-  else if (e.key === "#" && cur) { e.preventDefault(); groupsInPost(cur); }
+  else if (e.key === "!" && cur) { e.preventDefault(); groupsInPost(cur); }
 });

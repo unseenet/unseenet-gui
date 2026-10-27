@@ -175,7 +175,7 @@ async function openMentioned(m) {
 // # on a post: its group, or a choice when it names several
 function groupsInPost(m) {
   const refs = (m && m.groups) || [];
-  if (!refs.length) { toast("This post names no group. Write e.g. #dk.snak to name one."); return; }
+  if (!refs.length) { toast("This post names no group. Write e.g. !dk.snak to name one."); return; }
   if (refs.length === 1) { goToGroup(refs[0]); return; }
   S.dialog = { focus: "[data-k='ref:0']", render: () => dialogShell({ label: "Groups in this post" },
     h("div", { class: "dh" }, h("h2", {}, "Groups in this post"),
