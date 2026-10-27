@@ -50,6 +50,7 @@ builds, and - inlined into one file - the browser build (unseenet-entrance).
 | `export.js` | Export my data (#141, on the core's export, unseenet#577 and UN-RFC 0049 section 7) |
 | `rules.js` | your own rules for your feed and groups (UN-RFC 0051, unseenet#615) |
 | `reports.js` | spam reports: posts hidden by a report shown as hidden, the issuers you follow, being an issuer (UN-RFC 0045, #70) |
+| `teams.js` | team inboxes: accepting an invitation, replying on the inbox's behalf, who reads an inbox you own (UN-RFC 0047, #68) |
 
 ## Words
 

@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Team inboxes** (#68, unseenet#341, UN-RFC 0047): the post that adds you as a
+  reader has *Read this inbox with the team*; a team inbox is a mailbox of its own
+  under its name; *Reply* there answers as the team - "Reply as Unseenet
+  (operator)" - and never with your signature, which would say who wrote it. A
+  message written on an inbox's behalf says so, or that it is not verified. A
+  reader the owner removed is told, with *Forget it*. The owner of an inbox has
+  *Who reads this inbox* in the palette: readers' team keys, add one by their key
+  (a new team key goes to their inbox), remove one, and the name replies go out as.
+
 - **Spam reports** (#70, unseenet#122, UN-RFC 0045): a post hidden by a report keeps
   its place and says so - "Hidden by Spamjægeren: spam", in the list, the reader, a
   feed, a comment and a chat - with *Show anyway* and *Stop following*; never hidden

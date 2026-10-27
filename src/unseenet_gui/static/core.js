@@ -137,7 +137,9 @@ function fromRow(r) {
     score: r.score, actions: r.actions || [], hidden: !!r.hidden, why: r.why || "",
     thread_mark: r.thread_mark || "",
     // hidden by a spam report from an issuer you follow (UN-RFC 0045): who, why, which report
-    reported: m.reported || null };
+    reported: m.reported || null,
+    // team inboxes (UN-RFC 0047): written on an inbox's behalf, and a team key handed to you
+    team: r.team || null, team_invite: m.team_invite || null };
 }
 
 // UN-RFC 0049 section 5.1: "Imported from Facebook · originally 3 August 2026" - the

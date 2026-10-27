@@ -180,6 +180,7 @@ function threadsView(d) {
   markSeen(g, shown);
   const pend = pendingIn(g, msgs, false);
   const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
+    teamRemovedNote(g),                                 // removed from a team inbox (0047)
     pinnedSection(d, msgs),
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
       h("span", { text: "From" }), h("span", { text: "Date" })),
