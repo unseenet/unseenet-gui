@@ -368,33 +368,73 @@ function openWithdraw(m) {
     } });
 }
 
-// Report a post to the people who can act on it (#74).
+// Report a post to those who can act on it - the group's owner and moderators, the
+// hierarchy's maintainer, the node's operator, the spam report issuers you follow - with
+// why, what you want to tell them in Markdown, and screenshots, sent encrypted to each
+// (unseenet#74, #70). The post is shown small at the top, so the title stays short.
 function openReport(m) {
   const g = S.data && S.data.group;
   if (!g || !m) return;
-  let targets = null, err = "", dialog = null;
-  const chosen = new Set();
-  // the form is kept on screen (#85): it is built again when the list arrives
+  const st = { targets: null, reasons: [], reason: "", chosen: new Set(), err: "", busy: false, anonymous: false };
+  const dialog = { focus: "#rnote", node: null, files: [] };
   api("GET", `/api/groups/${encodeURIComponent(g.id)}/report?id=${encodeURIComponent(m.id)}`)
-    .then(r => { const t = r.targets; targets = t; t.forEach(x => chosen.add(x.i)); })
-    .catch(e => { err = e.message; })
-    .then(() => { if (dialog) dialog.refresh(); });
-  dialog = formDialog({ label: "Report post", title: "Report “" + subjectOf(m) + "”", focus: "#rnote", button: "Report",
-    note: "For posts that break the group's rules or the law. In an emergency, contact the police: nobody on Unseenet can see who anyone is.",
-    fields: (vals) => [
-      targets === null ? h("p", { class: "muted", text: err || "Finding who can act on it …" }) :
-        targets.map(t => h("label", { class: "check" }, h("input", { type: "checkbox", checked: chosen.has(t.i),
-          onchange: (e) => { if (e.target.checked) chosen.add(t.i); else chosen.delete(t.i); } }), " " + t.who)),
-      h("label", { for: "rnote", text: "What is wrong with it? (optional)" }),
-      h("input", { id: "rnote", name: "note", class: "in", "data-k": "rnote", value: vals.note || "" }),
-      h("label", { class: "check" }, h("input", { type: "checkbox", name: "anonymous", checked: !!vals.anonymous }),
-        " Anonymous - they cannot see who reported it or answer you")],
-    submit: async (v) => {
-      if (!chosen.size) throw new Error("Choose at least one.");
+    .then(r => { st.targets = r.targets; st.reasons = r.reasons || []; r.targets.forEach(x => st.chosen.add(x.i)); })
+    .catch(e => { st.err = e.message; st.targets = []; })
+    .then(() => { if (S.dialog === dialog) redraw(); });
+  const keepNote = () => { const t = dialog.node && dialog.node.querySelector("#rnote"); if (t) S.drafts["rnote:" + m.id] = t.value; };
+  const redraw = () => { keepNote(); const old = dialog.node; dialog.node = build(); if (old && old.parentNode) old.replaceWith(dialog.node); };
+  const go = async (e) => {
+    e && e.preventDefault();
+    keepNote();
+    if (!st.chosen.size) { st.err = "Choose who gets it."; redraw(); return; }
+    const files = dialog.files.map(f => ({ name: f.name, data: f.data, alt: (f.alt || "").trim() }));
+    st.busy = true; st.err = ""; redraw();
+    try {
       const { sent } = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/report`,
-        { id: m.id, targets: [...chosen], note: (v.note || "").trim(), anonymous: !!v.anonymous });
+        { id: m.id, targets: [...st.chosen], reason: st.reason, note: (S.drafts["rnote:" + m.id] || "").trim(),
+          files, anonymous: st.anonymous });
+      delete S.drafts["rnote:" + m.id];
       closeDialog(); toast(`Reported to ${sent}.`);
-    } });
+    } catch (x) { st.busy = false; st.err = x.message; redraw(); }
+  };
+  // screenshots: pictures, encrypted to each receiver as on a private post
+  const fg = { files: { max_size: 4194304 - 40, types: ["image/*"] }, node_files: true };
+  const build = () => dialogShell({ label: "Report a post", wide: true, cls: "report-dlg" },
+    h("div", { class: "dh" }, h("h2", { text: "Report a post" }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "Enter") go(e); } },
+      h("div", { class: "rpost", "aria-label": "The post" },
+        h("div", { class: "rphd" }, h("b", { text: m.who || "" }), timeEl(m.date, "hint")),
+        h("div", { class: "rpsub", text: m.kind === "chat" ? "" : (m.subject || "(no subject)") }),
+        h("div", { class: "rptext", text: (m.text || "").slice(0, 400) })),
+      h("fieldset", { class: "rfs" }, h("legend", { text: "What is wrong with it?" }),
+        h("div", { class: "chips", role: "radiogroup" }, st.reasons.map(r => h("button", { type: "button",
+          class: "chip" + (st.reason === r.id ? " on" : ""), role: "radio", "aria-checked": String(st.reason === r.id),
+          onclick: () => { st.reason = st.reason === r.id ? "" : r.id; redraw(); } }, r.label)))),
+      h("fieldset", { class: "rfs" }, h("legend", { text: "Send it to" }),
+        st.targets === null ? h("p", { class: "muted", text: "Finding who can act on it …" }) :
+          st.targets.length ? h("div", { class: "rtargets" }, st.targets.map(t => h("label", { class: "check rtarget" },
+            h("input", { type: "checkbox", checked: st.chosen.has(t.i),
+              onchange: (e) => { if (e.target.checked) st.chosen.add(t.i); else st.chosen.delete(t.i); } }), " " + t.who))) :
+          h("p", { class: "muted", text: "Nobody here can be reached about it." })),
+      h("div", { class: "label-row" }, h("label", { for: "rnote", text: "Tell them more (optional)" }), emojiButton("rnote")),
+      h("textarea", { id: "rnote", class: "in rnote", "data-k": "rnote", rows: 7, spellcheck: "true",
+        placeholder: "What happened, and anything that helps them act: links, what you have done already …",
+        value: S.drafts["rnote:" + m.id] || "", oninput: (e) => { S.drafts["rnote:" + m.id] = e.target.value; } }),
+      h("p", { class: "hint", style: "margin:0", text: "Markdown: *emphasis*, **strong**, - lists, > quotes, links." }),
+      filePicker(dialog, fg, true, "Add screenshots"),
+      h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.anonymous,
+        onchange: (e) => { st.anonymous = e.target.checked; } }), " Anonymous - they cannot see who reported it or answer you"),
+      h("p", { class: "hint", style: "margin:0", text: "For posts that break the group's rules or the law. In an emergency, " +
+        "contact the police: nobody on Unseenet can see who anyone is. Screenshots are saved again without " +
+        "where and when they were taken." }),
+      st.err ? h("p", { class: "error", role: "alert", text: st.err }) : null),
+    h("div", { class: "df btns" }, h("button", { class: "btn", type: "button", onclick: closeDialog }, "Cancel"),
+      h("button", { class: "btn primary", type: "button", disabled: st.busy || !st.targets, onclick: go },
+        st.busy ? "Sending …" : "Report", h("kbd", { text: "Ctrl Enter" }))));
+  dialog.node = build();
+  S.dialog = dialog;
+  render();
 }
 
 // N: write a new post here - a thread, or in a chat a private post to that person.

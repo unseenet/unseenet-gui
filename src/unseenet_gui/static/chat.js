@@ -35,9 +35,10 @@ function chatView(d) {
       moreMenu(m),
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN + " " }) : null,
       quoted ? h("span", { class: "quote" }, h("span", { class: "mono", text: quoted.who }), " · " + (subjectOf(quoted) || quoted.text.slice(0, 80))) : null,
-      isPost ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
-      m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
-      m.readable ? filesOf(m, true) : null,
+      isPost && !m.reported ? h("div", { class: "lsub", text: "≡ " + (m.subject || "(no subject)") }) : null,
+      m.reported ? reportedNote(m) :                    // hidden by a report (UN-RFC 0045)
+        m.readable ? (m.markdown ? renderChatLine(m) : linkGroups(m.text)) : h("i", { text: m.error || "Could not be read." }),
+      m.readable && !m.reported ? filesOf(m, true) : null,
       reactionBar(m),
       isPost && g.type !== "contact" && mayReply(d, m).allowed && (g.kinds || []).includes("post") ?
         h("div", { class: "lact" }, h("button", { class: "link", onclick: () => openReply(m, g) },

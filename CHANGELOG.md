@@ -7,6 +7,20 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Spam reports** (#70, unseenet#122, UN-RFC 0045): a post hidden by a report keeps
+  its place and says so - "Hidden by Spamjægeren: spam", in the list, the reader, a
+  feed, a comment and a chat - with *Show anyway* and *Stop following*; never hidden
+  silently, and never your own or a contact's. *Spam reports* in the palette shows the
+  issuers that hide posts for you (those your hierarchies name, on or off, and your
+  own) and follows one by its key. As an issuer: start your reports group, *Publish a
+  spam report…* from a post's ⋯ menu (also its author, for up to a year), and the
+  reports people sent you, ready to publish, and those you published, to withdraw.
+- **A report window that is one** (#70, asked for by the maintainer): the post small
+  at the top instead of its whole subject as the title, what is wrong as a choice
+  (spam, illegal, threats or harassment, something else), who gets it, a real text
+  field in Markdown, and screenshots, sent encrypted to each receiver. Needs the
+  core's reports with files (unseenet#631).
+
 - **A ⋯ menu on groups in the sidebar** (#167), on hover, on a right click, and
   always visible on a touch screen: About this group, Mark all read, Copy address,
   Edit group (the owner) and Unsubscribe. A hierarchy's heading has Mark all read
