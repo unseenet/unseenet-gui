@@ -384,6 +384,9 @@ async def test_the_language_is_suggested_and_chosen(compose_page):
     await open_compose(page)
     await expect(page.locator("#clang")).to_have_value("da")
     await expect(page.locator(".langrow")).to_contain_text("the group's")
+    # under the text, by the tags - you choose it after writing
+    order = await page.evaluate("[...document.querySelectorAll('#body, #clang')].map(e => e.id)")
+    assert order == ["body", "clang"]
     await page.locator("#subject").fill("Hello")
     await page.locator("#clang").fill("en")
     await page.locator("#body").fill("In English\n")

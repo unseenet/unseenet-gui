@@ -106,6 +106,7 @@ function chatView(d) {
           oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; growField(e.target); },
           onkeydown: (e) => sendOnEnter(e, send) }),
         ...attach,
+        languageChip(g.id),                               // what you write in here (0052 5a)
         emojiButton("chat"),
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
       chips,

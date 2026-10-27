@@ -526,12 +526,6 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       h("button", { class: "btn primary dh-send", onclick: go }, priv ? "Send" : "Post"),   // phones: above the keyboard
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
-      (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
-        h("label", { for: "clang", text: "Language" }),
-        h("input", { id: "clang", name: "clang", class: "in lang-in", "data-k": "clang", autocomplete: "off",
-          value: (g.suggested_languages.codes || []).join(", "), placeholder: "none - e.g. da or en",
-          title: "What you write in here; remembered for this group" }),
-        h("span", { class: "hint", text: languageWhy(g.suggested_languages.from) })) : null,
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
       h("div", { class: "label-row" }, h("label", { for: "body", text: "Text" }), emojiButton("cbody")),
@@ -541,6 +535,12 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
       takes ? filePicker(dialog, fg, carries) : null,
+      (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
+        h("label", { for: "clang", text: "Language" }),
+        h("input", { id: "clang", name: "clang", class: "in lang-in", "data-k": "clang", autocomplete: "off",
+          value: (g.suggested_languages.codes || []).join(", "), placeholder: "none - e.g. da or en",
+          title: "What you write in here; remembered for this group" }),
+        h("span", { class: "hint", text: languageWhy(g.suggested_languages.from) })) : null,
       !priv && !edit ? (tagBox = tagField(dialog, () => {
         const f = dialog.node && dialog.node.querySelector("form");
         return f ? f.subject.value + "\n" + f.body.value : "";
