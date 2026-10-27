@@ -100,13 +100,86 @@ first post waits a few minutes more, once, while your new key
 - People: names (`@you`), profiles (an author's name opens theirs; *Your
   profile* writes yours), ignoring people, hiding bots.
 - Groups you run: create open, moderated, channel or closed groups, invite
-  to closed ones, moderators and posters, bans, approving posts, reporting.
+  to closed ones, moderators and posters, bans, approving posts, the spam
+  report issuers your readers follow there.
+- Spam and reports: report any post with notes and screenshots, see why a
+  post is hidden, choose the issuers you follow, handle reports sent to you,
+  team inboxes (see below).
 - What you may not write, it says before you write: in a channel's comments,
   under a ban, in a closed group you are not in.
 - Your vault: change its passphrase (copies elsewhere keep the old one).
 - Recovery words and copying (from 0.3, see below).
 - A light and a dark theme, and phones and other narrow screens. On the
   bootable image also the network, Wi-Fi, the keyboard, restart and shut down.
+
+## Spam and reports
+
+How it works, and why nobody gets power over anyone by it, is in the guide:
+[Spam and reports](https://unseenet.org/guide/spam/). In the graphical client:
+
+**A post hidden by a report** keeps its place and says who hid it and why -
+*⊘ Hidden by reports@unseenet: spam* - with **Show anyway** and **Stop
+following …** right there. It is never your own post or a contact's. The
+group's title says how many posts reports hide there.
+
+**Reporting a post.** In the post's ⋯ menu - in a discussion, a feed, a
+comment or a chat line - choose **Report**. The window shows the post; choose
+what is wrong, tick who gets it (the group's owner and moderators, the
+hierarchy's maintainer, your node's operator, the spam report issuers that
+apply here), write what you want them to know in Markdown, and add
+screenshots or PDFs with **Add screenshots or PDFs**. **Anonymous** hides who
+you are, and then nobody can answer you. **Report** closes the window at once;
+each receiver gets a sealed copy, which takes a minute or two of postage, and
+a note tells you when they all have it.
+
+**The issuers that hide posts for you.** **Spam reports** in the command
+palette (++ctrl+k++) lists them, each with where it is named - *named for
+unseenet.\**, *named for alt.space.nasa*, or *followed by you* - and a box to
+turn it off or on. Paste a key under **Follow an issuer** to follow one for
+every group.
+
+**A report sent to you** is a private post, in **Private posts** or in a team
+inbox you read. It has **Open the reported post**, and if you are an issuer -
+or an issuer is beside you in your vault - **Publish a spam report… as …**,
+with the reporter's reason filled in. Tick **Also its author** to report their
+key for up to a year. What you publish is public and signed by the issuer; the
+person who told you is never named in it.
+
+**Becoming an issuer.** **Become a spam report issuer** in the command palette.
+Choose **as whom**:
+
+- **You** - reports are signed with your own identity. Simplest for one person.
+- **A separate issuer identity in this vault** - for an organisation, a
+  hierarchy or a group of volunteers. The client makes a new identity beside
+  yours, with the name you give it; you stay you for everything else, and the
+  issuer's reports never look like yours.
+
+Then say what you report and how, and choose **where reports sent to you
+land** - your own inbox, or a team inbox you read, so that others handle them
+with you. **Your spam reports** then lists the reports sent to you, to publish,
+and those you published, to withdraw.
+
+**Sharing an issuer with a colleague.** Choose **Copy to another device** (your
+profile menu), tick **only the issuer's identity**, and do the copy with them
+on their device (UN-RFC 0050: a code, a QR and check words, end to end over Tor).
+Their client finds by itself that the identity is an issuer, keeps their own
+identity the one in use, and from then on offers *Publish a spam report… as …*
+on the reports they read. To stop sharing it, make a new issuer and have the
+groups and hierarchies name that one instead.
+
+**For a group you own.** **Edit group** has **Spam reports here**: the issuers
+the group's readers follow by default - *Remove*, a key to *Add*, or one of the
+issuers you follow with a click. Each reader can still turn them off.
+
+**Team inboxes.** The post that adds you as a reader has **Read this inbox
+with the team**. The inbox is then a mailbox of its own under its name;
+**Reply** there answers as the team - *Reply as Unseenet (operator)* - and
+never with your signature. If the owner removes you, the inbox says so, with
+**Forget it**. As the owner of an inbox, **Who reads this inbox** in the
+palette adds readers by their key, removes them, and sets the name replies go
+out as.
+
+In an emergency, contact the police. Nobody on Unseenet can see who anyone is.
 
 ## Recovery words and other devices
 

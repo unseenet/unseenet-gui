@@ -130,7 +130,10 @@ function redrawDialog() {
 function formDialog({ label, title, focus, fields, submit, button, note, values }) {
   let err = "";
   const vals = { ...(values || {}) };       // what you entered, also across a refresh()
-  const keep = (e) => { if (e.target.name) vals[e.target.name] = e.target.type === "checkbox" ? e.target.checked : e.target.value; };
+  const keep = (e) => {
+    if (!e.target.name || (e.target.type === "radio" && !e.target.checked)) return;   // the chosen radio only
+    vals[e.target.name] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+  };
   const dialog = { focus };
   const showError = (msg) => {
     err = msg || "";
