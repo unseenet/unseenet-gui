@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Choosing a language, nicely** (asked for by the maintainer): one small button - the
+  code in a badge and the language's own name, *EN English ▾* - and a list to pick from:
+  suggested, the group's, the languages a text can be told in, more, and None, with a
+  search that finds "da", "dansk" and "danish". In the compose window and by the chat
+  and comment inputs; the core's list (unseenet#694), no flags.
+
 - **The language from your text** (unseenet#686): while you write, at pauses, the core tells
   the language from the text - the *Language* field follows it (*from your text*), until
   you change the field yourself; a reply starts from the post it answers. The chat chip

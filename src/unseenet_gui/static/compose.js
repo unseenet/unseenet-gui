@@ -158,24 +158,16 @@ function languageChip(gid) {
   const g = S.data && S.data.group;
   if (!g || g.id !== gid || !g.suggested_languages) return null;
   const codes = g.suggested_languages.codes || [];
-  return h("button", { type: "button", class: "langchip" + (codes.length ? "" : " none"),
-    title: "Written in: " + (codes.join(", ") || "not said") + " - " + languageWhy(g.suggested_languages.from) + ". Click to change.",
-    "aria-label": "Language: " + (codes.join(", ") || "none") + ", change",
-    onclick: () => formDialog({ label: "Language", title: "What you write in here", focus: "#chlang", button: "Use",
-      values: { codes: codes.join(", ") },
-      note: "Remembered for this group; empty sends none. Posts let you choose each time.",
-      fields: (v) => [h("label", { for: "chlang", text: "Language codes, e.g. da or en" }),
-        h("input", { id: "chlang", name: "codes", class: "in", value: v.codes || "" })],
-      submit: async (v) => {
-        const chosen = languageCodes(v.codes);
-        // kept by the core for your lines here, in every client (unseenet#692)
-        let r = { codes: chosen, from: chosen.length ? "chosen" : "" };
-        try { r = await api("POST", `/api/groups/${encodeURIComponent(gid)}/language/choose`, { languages: chosen }); }
-        catch (_) { /* this page still uses it */ }
-        g.suggested_languages = { codes: r.codes || [], from: r.from || "" };
-        S.langChosen = { ...(S.langChosen || {}), [gid]: chosen.length ? chosen : null };
-        closeDialog(); render();
-      } }) }, codes.length ? codes.join(" ") : "—");
+  return h("span", { class: "langchip-slot" }, languageButton(codes, async (chosen) => {
+    // kept by the core for your lines here, in every client (unseenet#692)
+    let r = { codes: chosen, from: chosen.length ? "chosen" : "" };
+    try { r = await api("POST", `/api/groups/${encodeURIComponent(gid)}/language/choose`, { languages: chosen }); }
+    catch (_) { /* this page still uses it */ }
+    g.suggested_languages = { codes: r.codes || [], from: r.from || "" };
+    S.langChosen = { ...(S.langChosen || {}), [gid]: chosen.length ? chosen : null };
+    render();
+  }, { small: true, why: languageWhy(g.suggested_languages.from), group: g.languages || [],
+       suggested: codes, suggestedWhy: languageWhy(g.suggested_languages.from) }));
 }
 
 
@@ -194,8 +186,10 @@ function chatLanguage(gid, text) {
       const r = await api("POST", `/api/groups/${encodeURIComponent(gid)}/language`, { text, kind: "chat" });
       const before = (g.suggested_languages.codes || []).join(" ");
       g.suggested_languages = { codes: r.codes || [], from: r.from || "" };
-      const chip = document.querySelector(".chatbar .langchip");
-      if (chip && before !== (r.codes || []).join(" ")) chip.textContent = (r.codes || []).join(" ") || "—";
+      if (before !== (r.codes || []).join(" ")) {
+        const slot = document.querySelector(".chatbar .langchip-slot");
+        if (slot) slot.replaceWith(languageChip(gid));
+      }
     } catch (_) { /* keep it */ }
   }, 700);
 }

@@ -55,6 +55,12 @@ class LabelsAPI(ReportsAPI):
             return web.json_response({"codes": body["languages"], "from": "chosen"})
         if request.path.endswith("/language"):
             return web.json_response({"codes": ["da"], "from": "conversation"})
+        if request.path == "/api/languages":
+            return web.json_response({"languages": [
+                {"code": "da", "name": "Dansk", "english": "Danish", "recognised": True},
+                {"code": "en", "name": "English", "english": "English", "recognised": True},
+                {"code": "es", "name": "Español", "english": "Spanish", "recognised": True},
+                {"code": "fi", "name": "Suomi", "english": "Finnish", "recognised": False}]})
         if request.path == "/api/labels/profile":
             body = await request.json()
             self.requests.append((request.path, body))
@@ -198,12 +204,13 @@ async def test_languages_in_the_info_and_by_the_chat(page_with):
     await page.evaluate("openInfo()")
     await expect(page.locator(".dialog")).to_contain_text("da, en (da first)")
     await page.keyboard.press("Escape")
-    chip = page.locator(".chatbar .langchip")
-    await expect(chip).to_have_text("da")
+    chip = page.locator(".chatbar .langbtn")
+    await expect(chip).to_contain_text("Dansk")
     await chip.click()
-    await page.locator("#chlang").fill("en")
-    await page.locator(".dialog .btn.primary").click()
-    await expect(chip).to_have_text("en")
+    await expect(page.locator(".langpop")).to_contain_text("This group")      # a list, not a dialog
+    await page.locator(".langpop .lsearch").fill("english")
+    await page.locator(".langpop .lsearch").press("Enter")
+    await expect(page.locator(".chatbar .langbtn")).to_contain_text("English")
     assert any(r[0].endswith("/language/choose") and r[1] == {"languages": ["en"]} for r in api.requests)
     await page.locator("#chat").fill("Hello")
     await page.locator("#chat").press("Enter")

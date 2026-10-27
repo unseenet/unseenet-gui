@@ -35,6 +35,7 @@ async function openGroup(gid, rerender = true) {
   if (rerender) S.pane = "group";      // the first group opened by itself leaves a phone on the list
   S.gid = gid;
   revealGroup(gid);
+  languageList();                                      // the names for choosing a language (once)
   await loadGroup();
   if (rerender) render();
   const g = S.data && S.data.group;
