@@ -38,7 +38,8 @@ class LabelsAPI(ReportsAPI):
         return [a, b, c]
 
     def group(self):
-        return {**super().group(), "tags": ["film"]}
+        return {**super().group(), "tags": ["film"], "languages": ["da", "en"],
+                "suggested_languages": {"codes": ["da"], "from": "group"}}
 
     async def handle(self, request):
         if request.path.startswith("/api/groups/tag:"):           # everything with a tag (0052)
@@ -181,3 +182,24 @@ async def test_the_age_guide(page_with):
     await dlg.get_by_role("button", name="Use these settings").click()
     await page.wait_for_timeout(300)
     assert ("/api/labels/profile", {"profile": "under-13"}) in api.requests
+
+
+@pytest.mark.parametrize("page_with", [{"view": "chat"}], indirect=True)
+async def test_languages_in_the_info_and_by_the_chat(page_with):
+    """The group's languages in its info; a chat line's language as a chip by the input,
+    changed with a click and sent with the next line (UN-RFC 0052 5a)."""
+    page, api = page_with
+    await page.evaluate("openInfo()")
+    await expect(page.locator(".dialog")).to_contain_text("da, en (da first)")
+    await page.keyboard.press("Escape")
+    chip = page.locator(".chatbar .langchip")
+    await expect(chip).to_have_text("da")
+    await chip.click()
+    await page.locator("#chlang").fill("en")
+    await page.locator(".dialog .btn.primary").click()
+    await expect(chip).to_have_text("en")
+    await page.locator("#chat").fill("Hello")
+    await page.locator("#chat").press("Enter")
+    await page.wait_for_timeout(300)
+    [(_, body)] = [r for r in api.requests if r[0].endswith("/post")]
+    assert body["languages"] == ["en"]

@@ -80,6 +80,9 @@ function openInfo() {
         h("dt", { text: "Delivery" }), h("dd", { text: g.fast ? "fast: nodes pass it on at once" : "normal: nodes wait a random time" }),
         h("dt", { text: "Owner" }), h("dd", { text: g.owner ? "you" : "the key after @ in the ID" }),
         h("dt", { text: "ID" }), h("dd", { class: "mono", text: g.id }),
+        (g.languages || []).length ? [h("dt", { text: "Languages" }),        // UN-RFC 0052 5a
+          h("dd", { text: g.languages.join(", ") + (g.languages.length > 1 ? " (" + g.languages[0] + " first)" : "") })] : null,
+        (g.tags || []).length ? [h("dt", { text: "Tags" }), h("dd", { text: g.tags.join(", ") })] : null,
         g.address ? [h("dt", { text: "Address" }), h("dd", { class: "mono", text: g.address })] : null),
       g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }),
         g.rules_markdown ? h("div", { class: "md rules" }, renderTree(g.rules_tree || []))

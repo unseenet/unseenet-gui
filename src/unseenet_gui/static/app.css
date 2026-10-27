@@ -1072,3 +1072,7 @@ time.ago { white-space: nowrap; }
 .langrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .langrow .lang-in { width: 9em; flex: 0 0 auto; }
 .sm.lang { text-transform: lowercase; letter-spacing: 0.02em; }
+
+.langchip { font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
+  background: transparent; color: var(--muted); cursor: pointer; align-self: center; text-transform: lowercase; }
+.langchip.none { opacity: 0.6; }

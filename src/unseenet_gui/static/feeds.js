@@ -191,6 +191,7 @@ function entryCard(d, e) {
           title: "Enter sends · Shift+Enter new line",
           oninput: (ev) => { S.drafts["c:" + m.id] = ev.target.value; growField(ev.target); },
           onkeydown: (ev) => sendOnEnter(ev, send) }),
+        timeline ? null : languageChip(m.group),            // what you write in here (0052 5a)
         h("button", { class: "send", type: "submit", "aria-label": "Send the comment" }, svg(ICON.send, 16, 2.5))) :
       cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
 }

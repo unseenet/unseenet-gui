@@ -11,8 +11,10 @@ function doPost(gid, body, local) {
   // the language: as chosen in the compose window, else what the core suggests for the
   // group - chat lines and comments too; nothing when it suggests nothing (UN-RFC 0052 5a)
   if (body.languages === undefined) {
+    const chosen = S.langChosen && S.langChosen[gid];
     const sug = S.data && S.data.group && S.data.group.id === gid && S.data.group.suggested_languages;
-    if (sug && sug.codes && sug.codes.length) body = { ...body, languages: sug.codes };
+    if (chosen) body = { ...body, languages: chosen };          // [] too: forget it here
+    else if (sug && sug.codes && sug.codes.length) body = { ...body, languages: sug.codes };
   }
   return doSend(`/api/groups/${encodeURIComponent(gid)}/post`, gid, body, local);
 }
@@ -146,4 +148,28 @@ async function copyWeb(address, what = "address") {
   catch (x) { toast(x.message); return; }
   if (!a.web) { toast("No web entrance is known to write it on - copy the unseenet: address instead."); return; }
   copy(a.web, `The ${what}'s web address is copied - anyone can open it in a browser.`);
+}
+
+
+// The language of chat lines and comments here, as a small chip by the input: what the
+// core suggests (your last choice here, else the group's); a click changes it, and the
+// core remembers it for the group with the next line you send (UN-RFC 0052 5a).
+function languageChip(gid) {
+  const g = S.data && S.data.group;
+  if (!g || g.id !== gid || !g.suggested_languages) return null;
+  const codes = g.suggested_languages.codes || [];
+  return h("button", { type: "button", class: "langchip" + (codes.length ? "" : " none"),
+    title: "Written in: " + (codes.join(", ") || "not said") + " - " + languageWhy(g.suggested_languages.from) + ". Click to change.",
+    "aria-label": "Language: " + (codes.join(", ") || "none") + ", change",
+    onclick: () => formDialog({ label: "Language", title: "What you write in here", focus: "#chlang", button: "Use",
+      values: { codes: codes.join(", ") },
+      note: "Remembered for this group; empty sends none. Posts let you choose each time.",
+      fields: (v) => [h("label", { for: "chlang", text: "Language codes, e.g. da or en" }),
+        h("input", { id: "chlang", name: "codes", class: "in", value: v.codes || "" })],
+      submit: async (v) => {
+        const chosen = languageCodes(v.codes);
+        g.suggested_languages = { codes: chosen, from: chosen.length ? "you" : "" };
+        S.langChosen = { ...(S.langChosen || {}), [gid]: chosen };   // sent with the next line
+        closeDialog(); render();
+      } }) }, codes.length ? codes.join(" ") : "—");
 }

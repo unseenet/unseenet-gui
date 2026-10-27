@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Languages where they belong** (unseenet#671): a group's languages (and tags) in its
+  *?* window; the *Language* field under the text, by the tags - chosen after writing,
+  not before; and a small language chip by the chat and comment inputs - what the core
+  suggests, a click to change it, remembered for the group with the next line.
+
 - **Proven from an older key** (unseenet#684, UN-RFC 0049 7.3): a post brought from an
   Unseenet export with a proof that holds says *proven from the key …* by its origin.
 
