@@ -1076,3 +1076,22 @@ time.ago { white-space: nowrap; }
 .langchip { font: inherit; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line);
   background: transparent; color: var(--muted); cursor: pointer; align-self: center; text-transform: lowercase; }
 .langchip.none { opacity: 0.6; }
+
+/* Choosing a language (UN-RFC 0052 5a): a small button, and a list to pick or search */
+.langbtn { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 13px; padding: 4px 10px;
+  border: 1px solid var(--line-2); border-radius: 999px; background: transparent; color: inherit; cursor: pointer; }
+.langbtn.small { font-size: 12px; padding: 2px 8px; align-self: center; }
+.langbtn .caret { opacity: 0.6; font-size: 10px; }
+.lbadge { font-size: 10px; font-weight: 600; letter-spacing: 0.04em; padding: 1px 5px; border-radius: 4px;
+  border: 1px solid var(--line-2); color: var(--muted); }
+.langrow .llabel { font-weight: 500; }
+.langpop { position: fixed; z-index: 60; width: 290px; max-height: 320px; display: flex; flex-direction: column;
+  background: var(--panel, #0f2a25); border: 1px solid var(--line-2); border-radius: 10px; box-shadow: 0 8px 28px rgba(0,0,0,0.35); }
+.langpop .lsearch { margin: 8px; }
+.langpop .lscroll { overflow: auto; padding: 0 4px 6px; }
+.langpop .lsec { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 8px 8px 4px; }
+.langpop .lpick { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; font: inherit; font-size: 13px;
+  padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; cursor: pointer; }
+.langpop .lpick:hover, .langpop .lpick:focus { background: var(--line); }
+.langpop .lpick.on { font-weight: 600; }
+.langpop .lhint { margin-left: auto; font-size: 11px; color: var(--muted); }

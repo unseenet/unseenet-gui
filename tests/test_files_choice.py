@@ -56,6 +56,8 @@ class LocalAPI:
                     "identity": {"display": "Me", "label": "Me", "key": "ed25519:me"}}
         elif path == "/x/gui/state":
             data = {"bootable": False, "web": False}
+        elif path == "/api/languages":                  # the core's list (unseenet#694)
+            data = {"languages": [{"code": "da", "name": "Dansk", "english": "Danish", "recognised": True}]}
         elif path == "/api/settings":
             data = {"signature_preview": "", "notices": {"send": True}}
         elif path == "/api/settings/clients/gui":

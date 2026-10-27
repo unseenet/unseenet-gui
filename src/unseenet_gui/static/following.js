@@ -479,6 +479,19 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
   // the language, from the text as you write (unseenet#686): asked at pauses; never over
   // what you typed in the field yourself
   let langTimer = null, langTouched = false;
+  // the picker's suggestions: what the core suggests now, and the group's languages
+  const langOpts = () => ({ suggested: (g && g.suggested_languages && g.suggested_languages.codes) || [],
+    suggestedWhy: "suggested", group: (g && g.languages) || [] });
+  // put codes in the form and on the button; by hand, they are yours from then on
+  const setLanguage = (codes, why, byHand) => {
+    if (byHand) langTouched = true;
+    const node = dialog.node;
+    if (!node) return;
+    const field = node.querySelector("#clang"), slot = node.querySelector(".langslot"), hint = node.querySelector(".langrow .hint");
+    if (field) field.value = codes.join(", ");
+    if (slot) slot.replaceChildren(languageButton(codes, (c) => setLanguage(c, "you chose it", true), langOpts()));
+    if (hint) hint.textContent = why;
+  };
   const askLanguage = () => {
     clearTimeout(langTimer);
     if (priv || edit || !g || !g.suggested_languages) return;
@@ -490,9 +503,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
         const r = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/language`,
           { text: f.subject.value + "\n" + f.body.value, ...(replyTo ? { reply_to: replyTo } : {}) });
         if (langTouched || S.dialog !== dialog) return;
-        field.value = (r.codes || []).join(", ");
-        const why = dialog.node.querySelector(".langrow .hint");
-        if (why) why.textContent = r.from === "text" ? "from your text" : r.from === "answered" ? "the post you answer" : languageWhy(r.from);
+        setLanguage(r.codes || [], r.from === "text" ? "from your text" : r.from === "answered" ? "the post you answer" : languageWhy(r.from), false);
       } catch (_) { /* keep what it says */ }
     }, 600);
   };
@@ -557,11 +568,11 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
       takes ? filePicker(dialog, fg, carries) : null,
       (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
-        h("label", { for: "clang", text: "Language" }),
-        h("input", { id: "clang", name: "clang", class: "in lang-in", "data-k": "clang", autocomplete: "off",
-          oninput: () => { langTouched = true; },         // yours from now on
-          value: (g.suggested_languages.codes || []).join(", "), placeholder: "none - e.g. da or en",
-          title: "What you write in here; remembered for this group" }),
+        h("span", { class: "llabel", text: "Language" }),
+        // the codes as sent, kept in the form; the button shows and changes them
+        h("input", { type: "hidden", id: "clang", name: "clang", value: (g.suggested_languages.codes || []).join(", ") }),
+        h("span", { class: "langslot" }, languageButton(g.suggested_languages.codes || [],
+          (codes) => setLanguage(codes, "you chose it", true), langOpts())),
         h("span", { class: "hint", text: languageWhy(g.suggested_languages.from) })) : null,
       !priv && !edit ? (tagBox = tagField(dialog, () => {
         const f = dialog.node && dialog.node.querySelector("form");

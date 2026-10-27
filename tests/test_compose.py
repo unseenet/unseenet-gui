@@ -97,6 +97,9 @@ class LocalAPI:
             data = {"group": group(gid), "rows": [row("other", gid), row("mine", gid, True)]}
             if self.updated:
                 data["rows"].append(row("incoming", gid))
+        elif path == "/api/languages":                    # the core's list (core.languages)
+            data = {"languages": [{"code": "da", "name": "Dansk", "english": "Danish", "recognised": True},
+                                  {"code": "en", "name": "English", "english": "English", "recognised": True}]}
         elif path.endswith("/language"):                 # from the text (unseenet#686)
             asked = await request.json()
             english = " the " in " " + asked.get("text", "").replace("\n", " ") + " "
@@ -389,17 +392,21 @@ async def test_the_language_is_suggested_and_chosen(compose_page):
     await expect(page.locator("#clang")).to_have_value("da")
     await expect(page.locator(".langrow")).to_contain_text("the group's")
     # under the text, by the tags - you choose it after writing
-    order = await page.evaluate("[...document.querySelectorAll('#body, #clang')].map(e => e.id)")
+    order = await page.evaluate("[...document.querySelectorAll('#body, #clang')].map(e => e.id)")  # under the text
     assert order == ["body", "clang"]
     await page.locator("#subject").fill("Hello")
-    await page.locator("#clang").fill("en")
+    await page.locator(".langrow .langbtn").click()                 # the list
+    await page.locator(".langpop .lsearch").fill("engl")
+    await page.locator(".langpop .lsearch").press("Enter")
+    await expect(page.locator(".langrow .langbtn")).to_contain_text("English")
     await page.locator("#body").fill("In English\n")
     await page.locator("#body").press("Control+s")
     await expect(page.get_by_role("dialog")).to_have_count(0)
     assert api.sent[-1][1]["languages"] == ["en"]
     await open_compose(page)
     await page.locator("#subject").fill("Uden")
-    await page.locator("#clang").fill("")
+    await page.locator(".langrow .langbtn").click()
+    await page.locator(".langpop .lpick.none").click()               # None
     await page.locator("#body").fill("x\n")
     await page.locator("#body").press("Control+s")
     await expect(page.get_by_role("dialog")).to_have_count(0)
@@ -409,7 +416,7 @@ async def test_the_language_is_suggested_and_chosen(compose_page):
 async def test_no_suggestion_sends_no_language(compose_page):
     page, api = compose_page
     await open_compose(page)
-    await expect(page.locator("#clang")).to_have_count(0)        # nothing suggested: no field
+    await expect(page.locator(".langrow")).to_have_count(0)      # nothing suggested: no field
     await page.locator("#subject").fill("Hej")
     await page.locator("#body").fill("x\n")
     await page.locator("#body").press("Control+s")
@@ -427,7 +434,8 @@ async def test_the_language_follows_the_text_until_you_choose(compose_page):
     await page.locator("#body").fill("This is the text in English\n")
     await expect(page.locator("#clang")).to_have_value("en", timeout=4000)
     await expect(page.locator(".langrow")).to_contain_text("from your text")
-    await page.locator("#clang").fill("da")                   # yours now
+    await page.locator(".langrow .langbtn").click()          # yours now
+    await page.locator(".langpop .lpick[data-code=da]").first.click()
     await page.locator("#body").fill("Still the English text, more of it\n")
     await page.wait_for_timeout(1200)
     await expect(page.locator("#clang")).to_have_value("da")
