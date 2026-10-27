@@ -397,8 +397,8 @@ function openReport(m) {
       closeDialog(); toast(`Reported to ${sent}.`);
     } catch (x) { st.busy = false; st.err = x.message; redraw(); }
   };
-  // screenshots: pictures, encrypted to each receiver as on a private post
-  const fg = { files: { max_size: 4194304 - 40, types: ["image/*"] }, node_files: true };
+  // screenshots and documents: pictures and PDFs, encrypted to each receiver (unseenet#637)
+  const fg = { files: { max_size: 4194304 - 40, types: ["image/*", "application/pdf"] }, node_files: true };
   const build = () => dialogShell({ label: "Report a post", wide: true, cls: "report-dlg" },
     h("div", { class: "dh" }, h("h2", { text: "Report a post" }),
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
@@ -422,7 +422,7 @@ function openReport(m) {
         placeholder: "What happened, and anything that helps them act: links, what you have done already …",
         value: S.drafts["rnote:" + m.id] || "", oninput: (e) => { S.drafts["rnote:" + m.id] = e.target.value; } }),
       h("p", { class: "hint", style: "margin:0", text: "Markdown: *emphasis*, **strong**, - lists, > quotes, links." }),
-      filePicker(dialog, fg, true, "Add screenshots"),
+      filePicker(dialog, fg, true, "Add screenshots or PDFs"),
       h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.anonymous,
         onchange: (e) => { st.anonymous = e.target.checked; } }), " Anonymous - they cannot see who reported it or answer you"),
       h("p", { class: "hint", style: "margin:0", text: "For posts that break the group's rules or the law. In an emergency, " +
