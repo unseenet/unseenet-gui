@@ -1060,3 +1060,6 @@ time.ago { white-space: nowrap; }
 .tagin { font: inherit; font-size: 13px; border: 0; border-bottom: 1px solid var(--line); background: transparent;
   color: inherit; min-width: 14em; padding: 2px 0; }
 .wrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.check.age { align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.note-warn { margin: 4px 0 0; padding: 8px 10px; border-left: 3px solid var(--line-2); font-size: 13px; color: var(--muted); }

@@ -48,6 +48,10 @@ class LabelsAPI(ReportsAPI):
             return web.json_response({"group": {"id": "tag:serier", "label": "#serier", "view": "feed",
                                                 "tag": "serier", "hierarchy": "", "may_post": False,
                                                 "kinds": ["post"], "pins": []}, "rows": [r]})
+        if request.path == "/api/labels/profile":
+            body = await request.json()
+            self.requests.append((request.path, body))
+            return web.json_response(self.labels())
         if request.path == "/api/labels/warning":
             body = await request.json()
             self.requests.append((request.path, body))
@@ -59,7 +63,9 @@ class LabelsAPI(ReportsAPI):
 
     def labels(self):
         words = ["profanity", "sexual", "nudity", "violence", "gore", "spoiler"]
-        return {"labellers": [{"key": "ed25519:lab", "label": "Filmfolk", "yours": False, "topics": False,
+        return {"profiles": [{"id": "under-13", "label": "Under 13", "choices": {w: "hide" for w in words}},
+                             {"id": "adult", "label": "An adult", "choices": {w: "blur" for w in words}}],
+                "labellers": [{"key": "ed25519:lab", "label": "Filmfolk", "yours": False, "topics": False,
                                "hierarchies": [], "groups": [GROUP], "on": True}],
                 "warnings": [{"warning": w, "label": w.title(), "choice": self.choices.get(w, "blur")} for w in words],
                 "mine": None}
@@ -159,3 +165,19 @@ async def test_the_settings(page_with):
     await dlg.locator("input[name=w-spoiler][type=radio]").nth(2).check()          # hide
     await page.wait_for_timeout(300)
     assert ("/api/labels/warning", {"warning": "spoiler", "choice": "hide"}) in api.requests
+
+
+@pytest.mark.parametrize("page_with", [{}], indirect=True)
+async def test_the_age_guide(page_with):
+    """UN-RFC 0053 6.1: choose who reads here; only the settings are sent, and it says
+    plainly what it cannot do."""
+    page, api = page_with
+    await page.evaluate("openAgeGuide()")
+    dlg = page.locator(".dialog")
+    await expect(dlg).to_contain_text("It can only cover what is marked")
+    await dlg.get_by_role("button", name="Use these settings").click()
+    await expect(dlg).to_contain_text("Choose who reads here first")            # not without a choice
+    await dlg.locator("input[name=age][value=under-13]").check()
+    await dlg.get_by_role("button", name="Use these settings").click()
+    await page.wait_for_timeout(300)
+    assert ("/api/labels/profile", {"profile": "under-13"}) in api.requests

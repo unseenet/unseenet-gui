@@ -200,7 +200,10 @@ async function openContentWarnings() {
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("div", { class: "db list" },
       h("p", { class: "hint", style: "margin:0", text: "Labels only describe: they hide nothing for anyone who did not choose it, and what is blurred or hidden always says why. Your own posts and your contacts' are never covered." }),
-      h("h3", { style: "margin:4px 0 0;font-size:14px", text: "What to do with each warning" }),
+      h("div", { style: "display:flex;align-items:center;gap:8px" },
+        h("h3", { style: "margin:4px 0 0;font-size:14px", text: "What to do with each warning" }),
+        h("span", { class: "grow" }),
+        h("button", { class: "link", onclick: () => { closeDialog(); openAgeGuide(); } }, "Set up for who reads here …")),
       d.warnings.map(w => h("div", { class: "wrow" },
         h("span", { class: "wflag w-" + w.warning }, w.warning),
         h("span", { class: "grow", text: w.label }),
@@ -227,5 +230,38 @@ async function openContentWarnings() {
     h("div", { class: "df btns" },
       h("button", { class: "btn", onclick: closeDialog }, "Close"),
       h("button", { class: "btn primary", onclick: () => { if (key.trim()) reload(api("POST", "/api/labels/follow", { key: key.trim(), label, topics })); } }, "Follow"))) };
+  render();
+}
+
+// ---- the age guide (UN-RFC 0053 section 6.1) ----
+// Who reads on this device: the core's suggestions per warning, taken as your own
+// choices. The age group itself is never kept, sent or shown - only the choices, which
+// can be changed afterwards. Honest about what it cannot do while few posts are marked.
+async function openAgeGuide() {
+  let d;
+  try { d = await api("GET", "/api/labels"); } catch (x) { toast(x.message); return; }
+  const profiles = d.profiles || [];
+  let pick = "", err = "";
+  S.dialog = { render: () => dialogShell({ label: "Who reads here" },
+    h("div", { class: "dh" }, h("h2", { text: "Who reads on this device?" }),
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    h("div", { class: "db" },
+      h("p", { class: "hint", style: "margin:0", text: "This sets what is blurred and hidden. Nothing about the answer is saved or sent anywhere - only the settings it gives, which you can change later under Content warnings and labels." }),
+      profiles.map(p => h("label", { class: "check age" },
+        h("input", { type: "radio", name: "age", value: p.id, checked: pick === p.id, onchange: () => { pick = p.id; redrawDialog(); } }),
+        " ", h("b", { text: p.label }), " ",
+        h("span", { class: "hint", text: WARNINGS.map(w => w + ": " + p.choices[w]).join(" · ") }))),
+      h("p", { class: "note-warn", role: "note", text: "It can only cover what is marked. Today few posts are: authors warn about their own, and labellers - people or programs that mark others' posts - are still few. It is not a filter that finds everything, so for a child, stay near and use groups you know." }),
+      err ? h("p", { class: "bad", role: "alert", text: err }) : null),
+    h("div", { class: "df btns" },
+      h("button", { class: "btn", onclick: closeDialog }, "Not now"),
+      h("button", { class: "btn primary", onclick: async () => {
+        if (!pick) { err = "Choose who reads here first."; redrawDialog(); return; }
+        try { await api("POST", "/api/labels/profile", { profile: pick }); }
+        catch (x) { err = x.message; redrawDialog(); return; }
+        closeDialog(); toast("Set. Change it any time under Content warnings and labels.");
+        if (S.gid) await loadGroup();
+        render();
+      } }, "Use these settings"))) };
   render();
 }
