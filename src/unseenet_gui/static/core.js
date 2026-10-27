@@ -163,7 +163,9 @@ function originText(m) {
   if (!m.origin) return "";
   return "Imported from " + networkName(m.origin.network) +
     (m.origin.date ? " · originally " + new Date(m.origin.date).toLocaleDateString(undefined,
-      { day: "numeric", month: "long", year: "numeric" }) : "");
+      { day: "numeric", month: "long", year: "numeric" }) : "") +
+    // brought from an older key, and proven to be its (UN-RFC 0049 7.3) - only when it holds
+    (m.origin.proven ? " · proven from the key " + m.origin.proven.slice(0, 20) + "…" : "");
 }
 
 // The sidebar's data from the local API -> groups by hierarchy, people, For you's counts
