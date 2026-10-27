@@ -35,12 +35,17 @@ def row(mid, subject, reported=None, kind="post", minute=0):
 
 
 class ReportsAPI:
-    def __init__(self, view="threads", issuer=False):
-        self.view, self.issuer = view, issuer
+    def __init__(self, view="threads", issuer=False, received=False):
+        self.view, self.issuer, self.received = view, issuer, received
         self.shown, self.following = set(), True
         self.requests = []
 
     def rows(self):
+        if self.received:                                   # a report sent to you (#74)
+            r = row("<rep@x>", "Report: Billige ure", None)
+            r["message"].update(private=True, text="**Report of a post**")
+            r["report"] = {"id": "<s@x>", "group": GROUP, "author_key": "ed25519:other", "reason": "other"}
+            return [r]
         hit = HIT if self.following else None
         return [row("<s@x>", "Billige ure", None if "<s@x>" in self.shown else hit,
                     kind="chat" if self.view == "chat" else "post"),
@@ -102,6 +107,8 @@ class ReportsAPI:
             data = {"received": [{"message": "<m@x>", "subject": "Report: Billige ure",
                                   "date": "2026-10-27T09:05:00Z", "id": "<s@x>", "group": GROUP,
                                   "author_key": "ed25519:other"}]}
+        elif path == "/api/teams":
+            data = {"teams": [{"group": "operator@proj", "name": "Unseenet (operator)", "reader": True}]}
         elif path == "/api/reports/mine":
             data = {"reports": []}
         elif path == "/api/reports/publish":
@@ -277,3 +284,27 @@ async def test_the_group_info_says_how_to_report(reports_page):
     page, _ = reports_page
     await page.evaluate("openInfo()")
     await expect(page.locator(".dialog")).to_contain_text("Report in its ⋯ menu")
+
+
+@pytest.mark.parametrize("reports_page", [{"received": True, "issuer": True}], indirect=True)
+async def test_a_report_sent_to_you_opens_and_publishes(reports_page):
+    page, api = reports_page
+    await page.locator(".prow", has_text="Report: Billige ure").click()
+    await expect(page.get_by_role("button", name="Open the reported post")).to_be_visible()
+    await page.get_by_role("button", name="Publish a spam report…").click()
+    await expect(page.locator("select[name=reason]")).to_have_value("other")   # the reporter's reason
+    await page.locator(".dialog .btn.primary").click()
+    await page.wait_for_timeout(300)
+    assert ("/api/reports/publish", {"posts": [{"id": "<s@x>", "group": GROUP, "reason": "other"}], "note": ""}) in api.requests
+
+
+@pytest.mark.parametrize("reports_page", [{}], indirect=True)
+async def test_an_issuer_chooses_where_reports_land(reports_page):
+    page, api = reports_page
+    await page.evaluate("openIssuing()")
+    land = page.locator("select[name=land]")
+    await expect(land.locator("option")).to_have_count(2)
+    await land.select_option(label="Unseenet (operator) - a team inbox you read")
+    await page.locator(".dialog .btn.primary").click()
+    await page.wait_for_timeout(300)
+    assert ("/api/reports/start", {"policy": "", "contact": "operator@proj"}) in api.requests

@@ -304,6 +304,7 @@ function readerPane(g, m, msgs) {
       canReply ? h("button", offProps(rp, { class: "btn primary", onclick: () => openReply(m, g) }),
         commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,
       teamInviteButton(m),
+      reportedPostButtons(m),                           // a report sent to you: open, publish
       g.id === FOR_YOU && m.notice ? h("button", { class: "btn primary", onclick: () => openMentioned(m) },
         m.notice.followed ? "Open the post" : "Go to " + m.notice.label) :
       g.id === FOR_YOU ? h("button", { class: "btn", onclick: async () => {
