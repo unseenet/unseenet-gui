@@ -60,9 +60,10 @@ function pendingIn(g, msgs, chat) {
 
 // A job's progress from the core: postage, sent, reached the node, or not sent and why.
 async function jobEvent(e, draw = true) {                   // a post on its way (section 5)
-  if (S.reportJobs && e.job in S.reportJobs) {               // a report, sent in the background
-    if (e.state === "sent") toast(`Report sent to ${e.message_id || S.reportJobs[e.job]}.`);
-    if (e.state === "failed") toast("The report was not sent: " + (e.error || "unknown error"));
+  if (S.reportJobs && e.job in S.reportJobs) {               // a report, sent or published in the background
+    const publish = S.reportJobs[e.job] === "publish";
+    if (e.state === "sent") toast(publish ? "Spam report published." : `Report sent to ${e.message_id || S.reportJobs[e.job]}.`);
+    if (e.state === "failed") toast((publish ? "The spam report was not published: " : "The report was not sent: ") + (e.error || "unknown error"));
     if (e.state === "sent" || e.state === "failed") delete S.reportJobs[e.job];
     return;
   }

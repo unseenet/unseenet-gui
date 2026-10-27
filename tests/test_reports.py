@@ -61,7 +61,8 @@ class ReportsAPI:
         return {"reasons": ["spam", "flood", "phishing", "malware", "illegal", "other"],
                 "issuers": [{"key": ISSUER, "label": "Spamjægeren", "yours": False, "hierarchies": ["dk"],
                              "groups": [GROUP], "on": self.following}],
-                "mine": {"group": "reports@me", "policy": "Spam i dk.*", "contact": "", "automatic": False}
+                "mine": {"group": "reports@me", "policy": "Spam i dk.*", "contact": "", "automatic": False,
+                         "identity": "reports", "label": "reports@unseenet"}
                 if self.issuer else None}
 
     async def events(self, request):
@@ -113,7 +114,7 @@ class ReportsAPI:
         elif path == "/api/reports/mine":
             data = {"reports": []}
         elif path == "/api/reports/publish":
-            data = {"id": "<new@x>"}
+            data = {"job": "job7"}                                  # a job (unseenet#655)
         elif path == "/api/pictures":
             data = {"pictures": {}}
         else:
@@ -207,7 +208,7 @@ async def test_a_hidden_feed_entry(reports_page):
 async def test_an_issuer_publishes_a_report(reports_page):
     page, api = reports_page
     await page.locator(".prow", has_text="Velkommen").click()
-    await post_menu(page, "Publish a spam report…")
+    await post_menu(page, "Publish a spam report… as reports@unseenet")
     await page.locator("select[name=reason]").select_option("flood")
     await page.locator("input[name=key]").check()
     await page.locator("input[name=days]").fill("30")
@@ -215,6 +216,9 @@ async def test_an_issuer_publishes_a_report(reports_page):
     await page.wait_for_timeout(300)
     assert ("/api/reports/publish", {"posts": [{"id": "<ok@x>", "group": GROUP, "reason": "flood"}], "note": "",
             "keys": [{"key": "ed25519:other", "reason": "flood", "days": 30}]}) in api.requests
+    await expect(page.locator(".toast").last).to_contain_text("Publishing the report")    # closed, in the background
+    await page.evaluate("jobEvent({job: 'job7', state: 'sent', message_id: '<r@x>'})")
+    await expect(page.locator(".toast").last).to_contain_text("Spam report published")
     # the reports people sent you, ready to publish
     await page.evaluate("openIssuing()")
     await expect(page.locator(".rrow", has_text="Report: Billige ure")).to_have_count(1)
@@ -295,7 +299,9 @@ async def test_a_report_sent_to_you_opens_and_publishes(reports_page):
     page, api = reports_page
     await page.locator(".prow", has_text="Report: Billige ure").click()
     await expect(page.get_by_role("button", name="Open the reported post")).to_be_visible()
-    await page.get_by_role("button", name="Publish a spam report…").click()
+    await expect(page.get_by_role("button", name="Publish a spam report… as reports@unseenet")).to_be_visible()
+    await page.get_by_role("button", name="Publish a spam report… as reports@unseenet").click()
+    await expect(page.locator(".dialog")).to_contain_text("signed by the issuer reports@unseenet")
     await expect(page.locator("select[name=reason]")).to_have_value("other")   # the reporter's reason
     await page.locator(".dialog .btn.primary").click()
     await page.wait_for_timeout(300)
@@ -330,3 +336,17 @@ async def test_the_owner_chooses_the_issuers_readers_follow_here(reports_page):
     await page.wait_for_timeout(300)
     [(_, body)] = [r for r in api.requests if r[0].endswith("/settings")]
     assert body["report_issuers"] == ["ed25519:another"]
+
+
+@pytest.mark.parametrize("reports_page", [{}], indirect=True)
+async def test_an_issuer_as_a_separate_identity(reports_page):
+    """For an organisation (27 Oct): the issuer is a new identity beside yours."""
+    page, api = reports_page
+    await page.evaluate("openIssuing()")
+    await page.locator("input[name=as][value=separate]").check()
+    await page.locator("#rsdisplay").fill("Example spam reports")
+    await expect(page.locator(".dialog")).to_contain_text("Copy to another device")
+    await page.locator(".dialog .btn.primary").click()
+    await page.wait_for_timeout(300)
+    [(_, body)] = [r for r in api.requests if r[0] == "/api/reports/start"]
+    assert body["separate"] == {"name": "reports", "display": "Example spam reports"}

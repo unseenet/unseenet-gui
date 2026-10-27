@@ -119,9 +119,21 @@ async function openIssuing() {
   if (!r.mine) {
     let teams = [];
     try { teams = (await api("GET", "/api/teams")).teams.filter(t => t.reader); } catch (_) { /* none */ }
-    formDialog({ label: "Become an issuer", title: "Become a spam report issuer", focus: "#rpolicy", button: "Start",
+    let dlg = null;
+    const again = () => setTimeout(() => dlg && dlg.refresh(), 0);   // after the choice is kept
+    dlg = formDialog({ label: "Become an issuer", title: "Become a spam report issuer", focus: "#rpolicy", button: "Start",
       note: "Your reports are public and signed with your key. They hide posts only for those who choose to follow you.",
+      values: { as: "me", sname: "reports", sdisplay: "" },
       fields: (v) => [
+        h("label", { text: "Issue reports as" }),
+        h("label", { class: "check" }, h("input", { type: "radio", name: "as", value: "me", checked: v.as !== "separate", onchange: again }),
+          " You - reports are signed with your own identity"),
+        h("label", { class: "check" }, h("input", { type: "radio", name: "as", value: "separate", checked: v.as === "separate", onchange: again }),
+          " A separate issuer identity in this vault - for an organisation or a hierarchy; you stay you, and you can copy it to others"),
+        v.as === "separate" ? [
+          h("label", { for: "rsdisplay", text: "Its name, as people see it" }),
+          h("input", { id: "rsdisplay", name: "sdisplay", class: "in", placeholder: "e.g. Example spam reports", value: v.sdisplay || "" }),
+          h("p", { class: "hint", style: "margin:0", text: "To let a colleague publish too: Copy to another device, and choose only this identity." })] : null,
         h("label", { for: "rpolicy", text: "What you report, and how" }),
         h("textarea", { id: "rpolicy", name: "policy", class: "in", rows: 3, value: v.policy || "" }),
         h("label", { for: "rland", text: "Where reports sent to you land" }),
@@ -134,7 +146,9 @@ async function openIssuing() {
         h("input", { id: "rcontact", name: "contact", class: "in", value: v.contact || "" })],
       submit: async (v) => {
         const contact = (v.land || "").trim() || (v.contact || "").trim();
-        S.reports = await api("POST", "/api/reports/start", { policy: (v.policy || "").trim(), contact });
+        const body = { policy: (v.policy || "").trim(), contact };
+        if (v.as === "separate") body.separate = { name: (v.sname || "reports").trim(), display: (v.sdisplay || "").trim() || "Spam reports" };
+        S.reports = await api("POST", "/api/reports/start", body);
         closeDialog(); toast("Your reports group is started."); openIssuing();
       } });
     return;
@@ -174,8 +188,10 @@ async function openIssuing() {
 // (UN-RFC 0045 section 4). ``p``: {id, group, key, subject}.
 function openPublish(p) {
   const reasons = (S.reports && S.reports.reasons) || Object.keys(REASON_TEXT);
+  const mine = S.reports && S.reports.mine;
+  const as = mine && mine.label && mine.label !== "you" ? mine.label : "you";
   formDialog({ label: "Publish a spam report", title: "Report “" + (p.subject || p.id) + "”", focus: "#rreason", button: "Publish",
-    note: "Your report is public and signed by you; the person who told you is never named in it.",
+    note: `The report is public and signed by ${as === "you" ? "you" : "the issuer " + as}; the person who told you is never named in it.`,
     values: { reason: p.reason || "spam", days: 365 },
     fields: (v) => [
       h("label", { for: "rreason", text: "Why" }),
@@ -191,14 +207,30 @@ function openPublish(p) {
     submit: async (v) => {
       const body = { posts: [{ id: p.id, group: p.group, reason: v.reason || "spam" }], note: (v.note || "").trim() };
       if (p.key && v.key) body.keys = [{ key: p.key, reason: v.reason || "spam", days: Number(v.days) || 365 }];
-      await api("POST", "/api/reports/publish", body);
-      closeDialog(); toast("Report published.");
+      const got = await api("POST", "/api/reports/publish", body);
+      closeDialog();
+      if (got && got.job) {             // in the background: the issuer's postage takes a while
+        S.reportJobs = { ...(S.reportJobs || {}), [got.job]: "publish" };
+        toast("Publishing the report - the issuer's postage can take a few minutes, the first time longer. You can go on.");
+      } else toast("Report published.");
     } });
 }
 
-// Whether you publish spam reports: from your settings, or what /api/reports said.
+// Whether you publish spam reports - you, or an issuer beside you in your vault: from your
+// settings, or what /api/reports said.
 function isIssuer() {
   return !!((S.sidebar && S.sidebar.report_issuer) || (S.reports && S.reports.mine));
+}
+
+// "Publish a spam report…", and as whom when it is not you (an issuer beside you in your
+// vault, the project's in its maintainer's). Asks the core once, then redraws.
+function publishLabel() {
+  if (isIssuer() && !S.reports && !S.reportsAsked) {
+    S.reportsAsked = true;
+    loadReports().then(() => render());
+  }
+  const mine = S.reports && S.reports.mine;
+  return "Publish a spam report…" + (mine && mine.label && mine.label !== "you" ? " as " + mine.label : "");
 }
 
 // A report someone sent you (in your inbox or a team inbox you read): open the post it
@@ -210,7 +242,7 @@ function reportedPostButtons(m) {
   return [
     h("button", { class: "btn", onclick: () => openReportedPost(r) }, "Open the reported post"),
     isIssuer() ? h("button", { class: "btn primary", onclick: () => openPublish({ id: r.id, group: r.group,
-      key: r.author_key, subject: m.subject.replace(/^Report: /, ""), reason: r.reason }) }, "Publish a spam report…") : null];
+      key: r.author_key, subject: m.subject.replace(/^Report: /, ""), reason: r.reason }) }, publishLabel()) : null];
 }
 
 // Go to the post a report names, if you follow its group; otherwise say how.
@@ -230,7 +262,7 @@ function reportItems(m) {
   if (!m || m.private) return [];
   return [
     m.reported ? ["Show anyway", () => showReported(m)] : null,
-    isIssuer() && !m.mine && !m.reported ? ["Publish a spam report…",
+    isIssuer() && !m.mine && !m.reported ? [publishLabel(),
       () => openPublish({ id: m.id, group: m.group, key: m.key, subject: subjectOf(m) })] : null,
   ];
 }
