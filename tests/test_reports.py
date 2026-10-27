@@ -245,6 +245,7 @@ async def test_the_report_window(reports_page, tmp_path):
     await note.fill("Se **skærmbilledet**.\n\n- truslen\n- datoen")
     png = tmp_path / "skaerm.png"
     png.write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))
+    assert "application/pdf" in await dlg.locator("input[type=file]").get_attribute("accept")   # #637
     await dlg.locator("input[type=file]").set_input_files(str(png))
     await dlg.get_by_label("Description of skaerm.png").fill("Truslen")
     await page.screenshot(path=str(tmp_path / "report.png"))

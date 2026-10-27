@@ -457,7 +457,8 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
   // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
   // A private post: pictures, encrypted to them (#102, unseenet#497) - if their inbox
   // takes none, the runtime says so when it sends.
-  const fg = priv ? { files: { max_size: 4194304 - 40, types: ["image/*"] }, node_files: true } : g;
+  // a private post: pictures and PDFs, encrypted to them (#102, unseenet#497, unseenet#637)
+  const fg = priv ? { files: { max_size: 4194304 - 40, types: ["image/*", "application/pdf"] }, node_files: true } : g;
   const takes = !edit && fg && fg.files, carries = takes && fg.node_files !== false;
   // mention notices (UN-RFC 0032): who would be told, and a box to say no
   const N = { may: !priv && !edit && g && g.type !== "closed", names: [], max: 5,

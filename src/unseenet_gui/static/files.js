@@ -79,7 +79,9 @@ function fileView(m, a, inline) {
 function saveFile(m, a) {
   confirmDialog({ title: "Save " + (a.name || "the file") + "?", button: "Save",
     text: `${a.name || "The file"} (${a.type}, ${size(a.size)}) is saved as it came, checked against what the post names.\n\n` +
-      "Unseenet does not open it. If you open it in another program, that program runs outside Unseenet and may go to the internet without Tor.",
+      "Unseenet does not open it. If you open it in another program, that program runs outside Unseenet and may go to the internet without Tor." +
+      (/pdf/.test(a.type) ? "\n\nA PDF can carry harmful content, and it came encrypted all the way, so no node could check it. " +
+        "Open it only if you trust who sent it." : ""),
     ok: async () => {
       closeDialog();
       try {

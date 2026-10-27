@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **PDFs in private posts and reports** (unseenet#637): every inbox takes PDFs now, so
+  the compose window for a private post and the report window offer them (*Add
+  screenshots or PDFs*). A PDF is never shown in the app; saving one adds a warning
+  that it can carry harmful content no node could check (unseenet#638 asks whether a
+  safe view can be made).
+
 - **Team inboxes** (#68, unseenet#341, UN-RFC 0047): the post that adds you as a
   reader has *Read this inbox with the team*; a team inbox is a mailbox of its own
   under its name; *Reply* there answers as the team - "Reply as Unseenet
