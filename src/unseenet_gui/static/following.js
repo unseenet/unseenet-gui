@@ -373,7 +373,7 @@ async function openReply(m, g) {
   const top = `${m.who} wrote:\n${quoted}\n\n`;
   const sig = await signatureText();
   const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
-  openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
+  openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label, replyTo: m.id,
     subject, body, cursor: top.length, private: !!g.private_reply,
     send: (subject, text, notify, files, tags, languages) => g.private_reply ?
       doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id,
@@ -463,7 +463,7 @@ function moreMenu(m) {
 
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
-function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
+function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo }) {
   const dialog = { focus: "#body", node: null, files: [], tags: [] };
   let tagBox = null;                                  // tags and warnings (UN-RFC 0052), not in private posts
   // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
@@ -476,7 +476,28 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
   const N = { may: !priv && !edit && g && g.type !== "closed", names: [], max: 5,
     on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
   let lookup = 0;
+  // the language, from the text as you write (unseenet#686): asked at pauses; never over
+  // what you typed in the field yourself
+  let langTimer = null, langTouched = false;
+  const askLanguage = () => {
+    clearTimeout(langTimer);
+    if (priv || edit || !g || !g.suggested_languages) return;
+    langTimer = setTimeout(async () => {
+      const f = dialog.node && dialog.node.querySelector("form");
+      const field = f && f.querySelector("#clang");
+      if (!field || langTouched || S.dialog !== dialog) return;
+      try {
+        const r = await api("POST", `/api/groups/${encodeURIComponent(g.id)}/language`,
+          { text: f.subject.value + "\n" + f.body.value, ...(replyTo ? { reply_to: replyTo } : {}) });
+        if (langTouched || S.dialog !== dialog) return;
+        field.value = (r.codes || []).join(", ");
+        const why = dialog.node.querySelector(".langrow .hint");
+        if (why) why.textContent = r.from === "text" ? "from your text" : r.from === "answered" ? "the post you answer" : languageWhy(r.from);
+      } catch (_) { /* keep what it says */ }
+    }, 600);
+  };
   const askWho = () => {
+    askLanguage();
     if (tagBox) tagBox.redraw();                      // #words in the text, shown as tags
     clearTimeout(N.timer);
     const version = ++lookup;
@@ -538,6 +559,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
         h("label", { for: "clang", text: "Language" }),
         h("input", { id: "clang", name: "clang", class: "in lang-in", "data-k": "clang", autocomplete: "off",
+          oninput: () => { langTouched = true; },         // yours from now on
           value: (g.suggested_languages.codes || []).join(", "), placeholder: "none - e.g. da or en",
           title: "What you write in here; remembered for this group" }),
         h("span", { class: "hint", text: languageWhy(g.suggested_languages.from) })) : null,

@@ -173,3 +173,25 @@ function languageChip(gid) {
         closeDialog(); render();
       } }) }, codes.length ? codes.join(" ") : "—");
 }
+
+
+// A chat line's language from its text, at pauses in typing (unseenet#686): the core keeps
+// the conversation's for short lines and changes it only for a longer line it is sure of.
+// Never over a language chosen with the chip.
+let chatLangTimer = null;
+// Ask the core what the chat line being written is in, after a pause.
+function chatLanguage(gid, text) {
+  clearTimeout(chatLangTimer);
+  if ((S.langChosen || {})[gid] || !text.trim()) return;
+  chatLangTimer = setTimeout(async () => {
+    const g = S.data && S.data.group;
+    if (!g || g.id !== gid || !g.suggested_languages) return;
+    try {
+      const r = await api("POST", `/api/groups/${encodeURIComponent(gid)}/language`, { text, kind: "chat" });
+      const before = (g.suggested_languages.codes || []).join(" ");
+      g.suggested_languages = { codes: r.codes || [], from: r.from || "" };
+      const chip = document.querySelector(".chatbar .langchip");
+      if (chip && before !== (r.codes || []).join(" ")) chip.textContent = (r.codes || []).join(" ") || "—";
+    } catch (_) { /* keep it */ }
+  }, 700);
+}
