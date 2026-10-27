@@ -203,10 +203,37 @@ function ruleClass(m) {
 // 0044 4.5) - only while you have rules on (the rows have scores), since only rules use
 // it: without them nothing is sent. Pseudo-groups (For you, the timeline, chats) keep none.
 function markSeen(g, msgs) {
-  if (!g || !g.type || g.id === FOR_YOU || isMixed(g) || String(g.id).startsWith("contact:")) return;
-  if (!msgs.some(m => m.score !== undefined)) return;
+  // For you is always marked: seen lowers its count, never takes anything away (0051 5.5)
+  if (!g || (!g.type && g.id !== FOR_YOU) || isMixed(g) || String(g.id).startsWith("contact:")) return;
+  if (g.id !== FOR_YOU && !msgs.some(m => m.score !== undefined)) return;
   const newest = msgs.reduce((a, m) => (m.date && (!a || m.date > a) ? m.date : a), "");
   if (!newest || (S.seenSent || {})[g.id] === newest) return;
   S.seenSent = { ...(S.seenSent || {}), [g.id]: newest };
   api("POST", `/api/groups/${encodeURIComponent(g.id)}/seen`, { until: newest }).catch(() => {});
+}
+
+
+// ---- Show all (UN-RFC 0051 section 3, #169): this view without your rules ----
+// A look, not a setting: never saved, ends when you leave the view or close the client.
+function rulesActHere(d) {
+  return !!d && ((d.messages || []).some(m => m.score !== undefined) || (d.group && d.group.show_all));
+}
+
+// Show all on or off for the view you are in.
+async function toggleShowAll() {
+  if (!S.gid) return;
+  S.showAll = S.showAll === S.gid ? null : S.gid;
+  await loadGroup();
+  render();
+}
+
+// The line over a view where your rules act: Show all, or how to go back.
+function showAllBar(d) {
+  if (!rulesActHere(d)) return null;
+  const on = S.showAll === (d.group && d.group.id);
+  return h("div", { class: "showall" + (on ? " on" : ""), role: on ? "status" : null },
+    on ? [h("b", { text: "Showing all - your rules are paused here." }), " ",
+      h("button", { class: "link", onclick: toggleShowAll }, "Back to my rules")] :
+      h("button", { class: "link", title: "See this view as without your rules, for now - nothing is changed", onclick: toggleShowAll },
+        "Show all"));
 }

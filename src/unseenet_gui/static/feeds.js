@@ -104,6 +104,7 @@ function feedView(d) {
         h("div", { class: "state bad" }, "Not sent: " + (p.error || ""), " ", h("button", { class: "link", onclick: () => retry(job) }, "Try again")) :
         pendingState(p))),
     tagFilterBar(),                                     // shown: only posts with a tag
+    showAllBar(d),                                      // your rules paused here (0051 3)
     entries.length ? entries.filter(e => passesTag(e.m)).map(e => entryCard(d, e)) :
       h("div", { class: "empty" }, h("h2", { text: timeline ? "Nothing yet" : "No entries yet" }),
         h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), and their entries come here." :

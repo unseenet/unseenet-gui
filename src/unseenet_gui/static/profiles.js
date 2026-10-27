@@ -283,6 +283,7 @@ function commands() {
     { net: true, name: "Spam reports: the issuers that hide posts for you", key: "", also: "spam report issuer nocem hidden skjult", run: openReportIssuers },
     { net: true, name: "Content warnings and labels", key: "", also: "spoiler nsfw blur sløret advarsel labeller tags age alder", run: openContentWarnings },
     { net: true, name: "Who reads on this device: an age guide for warnings", key: "", also: "age alder barn child kids parental", run: openAgeGuide },
+    { net: true, name: "Show all here, for now - nothing changes in your settings", key: "", also: "rules regler pause all alle", run: toggleShowAll },
     { net: true, name: isIssuer() ? "Your spam reports: sent to you, published, withdraw" : "Become a spam report issuer", key: "",
       also: "spam report issuer publish publicer", run: openIssuing },
     { name: "Your nodes: add, remove, choose the default", key: "", also: "node server switch change onion noder skift", run: openNodes },
