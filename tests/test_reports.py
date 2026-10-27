@@ -350,3 +350,13 @@ async def test_an_issuer_as_a_separate_identity(reports_page):
     await page.wait_for_timeout(300)
     [(_, body)] = [r for r in api.requests if r[0] == "/api/reports/start"]
     assert body["separate"] == {"name": "reports", "display": "Example spam reports"}
+
+
+@pytest.mark.parametrize("reports_page", [{}], indirect=True)
+async def test_report_from_the_reader_s_bar(reports_page):
+    """Asked for by the maintainer: in a threads view, Report is a button under the post
+    too, not only in the ⋯ menu."""
+    page, _ = reports_page
+    await page.locator(".prow", has_text="Velkommen").click()
+    await page.locator(".reader .pbar").get_by_role("button", name="Report").click()
+    await expect(page.locator(".report-dlg h2")).to_have_text("Report a post")

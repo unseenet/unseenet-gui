@@ -246,6 +246,7 @@ const ICON = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5",
   cmd: "M5 7l5 5-5 5M12 17h7",
   plus: "M12 5v14M5 12h14",
+  flag: "M5 21V4M5 4h11l-2 4 2 4H5",                 // report a post
   send: "M5 12h14M13 6l6 6-6 6",
   check: "M20 6L9 17l-5-5",
   checks: "M2 13l4 4L16 7M10 15l2 2L22 7",
