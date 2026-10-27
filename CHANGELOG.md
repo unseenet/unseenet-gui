@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The report window closes at once** (unseenet#653): the report is sent in the
+  background - a sealed copy for each receiver takes a minute or two of postage - and
+  a note says when it has reached them all, or why not.
+
 - **A report sent to you says what to do** (unseenet#650): *Open the reported post*, and
   for an issuer *Publish a spam report…* with the reporter's reason - in your inbox
   and in a team inbox you read. Becoming an issuer asks *where reports sent to you

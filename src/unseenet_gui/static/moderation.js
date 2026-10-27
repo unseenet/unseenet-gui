@@ -459,11 +459,15 @@ function openReport(m) {
     const files = dialog.files.map(f => ({ name: f.name, data: f.data, alt: (f.alt || "").trim() }));
     st.busy = true; st.err = ""; redraw();
     try {
-      const { sent } = await api("POST", `/api/groups/${encodeURIComponent(m.group || g.id)}/report`,
+      const got = await api("POST", `/api/groups/${encodeURIComponent(m.group || g.id)}/report`,
         { id: m.id, targets: [...st.chosen], reason: st.reason, note: (S.drafts["rnote:" + m.id] || "").trim(),
           files, anonymous: st.anonymous });
       delete S.drafts["rnote:" + m.id];
-      closeDialog(); toast(`Reported to ${sent}.`);
+      closeDialog();
+      if (got.job) {                    // sent in the background: postage takes a while (unseenet#653)
+        S.reportJobs = { ...(S.reportJobs || {}), [got.job]: got.targets };
+        toast(`Sending the report to ${got.targets} - a sealed copy each, which takes a minute or two. You can go on.`);
+      } else toast(`Reported to ${got.sent}.`);       // a core from before
     } catch (x) { st.busy = false; st.err = x.message; redraw(); }
   };
   // screenshots and documents: pictures and PDFs, encrypted to each receiver (unseenet#637)
