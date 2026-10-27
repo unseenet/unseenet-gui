@@ -124,7 +124,8 @@ ever covered silently, and your own posts and your contacts' never are. Topics a
 quiet chips by the reactions; a click shows only the posts with that tag.
 
 When you write, tick the warnings that fit and add tags as chips, or write `#word`
-in the text. A group's owner gives a group tags in **Edit group**. Groups are named
+in the text. The **Language** field says what you write in - suggested from what
+you used last in the group, or the group's own - and is remembered per group. A group's owner gives a group tags in **Edit group**. Groups are named
 with `!`: `!dk.snak`.
 
 ## Spam and reports

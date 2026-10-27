@@ -146,7 +146,8 @@ function fromRow(r) {
     // a report sent to you (#74): the post it names {id, group, author_key, reason}
     report: r.report || null,
     // the author's tags (UN-RFC 0052), and warnings, topics and what to do (UN-RFC 0053)
-    tags: m.tags || [], labels: m.labels || null };
+    tags: m.tags || [], labels: m.labels || null,
+    languages: m.languages || [] };                   // Content-Language (UN-RFC 0052 5a)
 }
 
 // UN-RFC 0049 section 5.1: "Imported from Facebook · originally 3 August 2026" - the

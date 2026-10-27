@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The language of what you write** (#194, unseenet#671): a *Language* field by the subject,
+  filled with what the core suggests and why - what you wrote in here last, the group's,
+  or your profile's; change it there, and it is remembered for the group. Chat lines and
+  comments get the suggestion by themselves; nothing is sent when nothing is suggested. A
+  post shows its language only where it differs from its group's. *Edit group*: the
+  languages written there.
+
 - **For you and Show all** (#169, unseenet#629): **Show all** over a view where your rules
   act - the feed, a threaded group, For you - shows it without them, plainly marked
   (*Showing all - your rules are paused here*), with *Back to my rules*; never saved, and
