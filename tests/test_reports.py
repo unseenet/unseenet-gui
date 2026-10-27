@@ -98,7 +98,7 @@ class ReportsAPI:
                                 {"id": "threats", "label": "Threats or harassment"},
                                 {"id": "other", "label": "Something else"}]}
         elif path == f"/api/groups/{GROUP}/report":
-            data = {"sent": len(body["targets"])}
+            data = {"job": "job9", "targets": len(body["targets"])}   # a job (unseenet#653)
         elif path == "/api/reports":
             data = self.reports()
         elif path == "/api/reports/follow":
@@ -260,7 +260,10 @@ async def test_the_report_window(reports_page, tmp_path):
     await dlg.locator(".db").evaluate("e => e.scrollTop = 0")
     await page.screenshot(path=str(tmp_path / "report-top.png"))
     await dlg.get_by_role("button", name="Report").click()
-    await expect(page.locator(".report-dlg")).to_have_count(0)
+    await expect(page.locator(".report-dlg")).to_have_count(0)            # closes at once
+    await expect(page.locator(".toast").last).to_contain_text("Sending the report to 1")
+    await page.evaluate("jobEvent({job: 'job9', state: 'sent', message_id: '1'})")
+    await expect(page.locator(".toast").last).to_contain_text("Report sent to 1")
     [(path, body)] = [r for r in api.requests if r[0].endswith("/report")]
     assert body["targets"] == [0] and body["reason"] == "threats" and body["note"].startswith("Se **")
     assert body["files"][0]["name"] == "skaerm.png" and body["files"][0]["alt"] == "Truslen"
