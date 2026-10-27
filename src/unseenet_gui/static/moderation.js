@@ -43,7 +43,7 @@ function openEditGroup() {
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
     values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
-      team_name: g.team_name || "",
+      team_name: g.team_name || "", gtags: (g.tags || []).join(", "),
       reaction_set: Array.isArray(rset) ? rset.join(" ") : "",
       // Markdown if the rules already are, or - for new rules - if you write posts in Markdown
       markdown: g.rules ? !!g.rules_markdown : !(S.sidebar && S.sidebar.markdown === false) },
@@ -91,6 +91,9 @@ function openEditGroup() {
           h("input", { id: "eissuer", class: "in mono", "aria-label": "Add an issuer by its key", placeholder: "Add an issuer: ed25519:…",
             onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); addIssuer(e.target.value); } } }),
           h("button", { class: "btn", type: "button", onclick: () => addIssuer(document.querySelector("#eissuer").value) }, "Add"))] : null,
+      g.type !== "inbox" ? [h("label", { for: "etags", text: "The group's tags - every post here has them (up to 8)" }),
+        h("input", { id: "etags", name: "gtags", class: "in", "data-k": "etags", placeholder: "film, serier - or a warning such as sexual for an adult group",
+          value: vals.gtags || "" })] : null,
       g.type === "inbox" ? [h("label", { for: "eteam", text: "The name replies go out as (a team inbox)" }),
         h("input", { id: "eteam", name: "team_name", class: "in", maxlength: 64, "data-k": "eteam",
           placeholder: "e.g. Example (operator)", value: vals.team_name || "" })] : null,
@@ -106,7 +109,9 @@ function openEditGroup() {
           reactions: reacts === "own" ? splitOwnSet(v.reaction_set) : reacts,
           ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}),
           ...(issuers.map(i => i.key).join(" ") !== startIssuers ? { report_issuers: issuers.map(i => i.key) } : {}),
-          ...(g.type === "inbox" && (v.team_name || "") !== (g.team_name || "") ? { team_name: (v.team_name || "").trim() } : {}) });
+          ...(g.type === "inbox" && (v.team_name || "") !== (g.team_name || "") ? { team_name: (v.team_name || "").trim() } : {}),
+          ...(g.type !== "inbox" && (v.gtags || "") !== (g.tags || []).join(", ") ?
+            { tags: (v.gtags || "").split(/[\s,]+/).map(t => t.replace(/^#/, "").toLowerCase()).filter(Boolean) } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
 }
@@ -521,8 +526,8 @@ async function openCompose() {
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
-    send: (subject, text, notify, files) => doPost(g.id, { subject, body: text, signature: false, notify,
-      ...(files && files.length ? { files } : {}) }, { text }) });
+    send: (subject, text, notify, files, tags) => doPost(g.id, { subject, body: text, signature: false, notify,
+      ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}) }, { text }) });
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 

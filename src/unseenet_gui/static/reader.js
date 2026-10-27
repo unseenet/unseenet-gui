@@ -173,7 +173,9 @@ function threadsView(d) {
           mayWrite(d, "post").allowed ? "Be the first: press N to write a post." : mayWrite(d, "post").reason })));
   }
   const ruled = ruledRows(msgs);                        // your own rules (UN-RFC 0051)
-  const shown = ruled.rows.length ? ruled.rows : msgs;
+  const shown = (ruled.rows.length ? ruled.rows : msgs).filter(passesTag);   // a tag chosen
+  if (!shown.length) return h("div", { class: "content" }, tagFilterBar(),
+    h("div", { class: "empty" }, h("h2", { text: "Nothing tagged " + S.tagFilter + " here" })));
   const cur = currentPost(shown);
   S.post = cur.id;
   markRead([cur]);
@@ -181,6 +183,7 @@ function threadsView(d) {
   const pend = pendingIn(g, msgs, false);
   const table = h("section", { class: "ptable", "aria-label": "Posts", "data-scroll": "ptable:" + g.id },
     teamRemovedNote(g),                                 // removed from a team inbox (0047)
+    tagFilterBar(),                                     // only posts with a tag (UN-RFC 0052)
     pinnedSection(d, msgs),
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
       h("span", { text: "From" }), h("span", { text: "Date" })),
@@ -191,12 +194,15 @@ function threadsView(d) {
       ondblclick: () => { S.post = m.id; S.full = true; render(); } },
       h("span", { class: "flag", "aria-label": m.read ? null : "Unread", text: m.read ? "" : "●" }),
       h("span", { class: "sj" },
+        warningStripe(m),                               // a warning's colour (UN-RFC 0053)
         m.depth ? h("span", { class: "tree", "aria-hidden": "true", text: "  ".repeat(m.depth - 1) + "└ " }) : null,
         m.for_me === "reply" ? h("span", { class: "you", text: "◄ " }) : m.for_me === "mention" ? h("span", { class: "you", text: "♦ " }) : null,
         m.pinned ? h("span", { class: "pinmark", title: "Pinned", text: PIN + " " }) : null,
         m.private && !m.notice ? h("span", { class: "muted", text: "@ " }) : m.encrypted && !m.notice ? h("span", { class: "muted", text: "∩ " }) : null,
         // a reply with the thread's own subject: quieter, so new subjects stand out
-        h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
+        // hidden by a warning you chose to hide: a quiet line, never silently (UN-RFC 0053)
+        hiddenRowText(m) ? h("span", { class: "muted lhidden", text: hiddenRowText(m) }) :
+          h("span", { class: m.depth && sameSubject(m, msgs) ? "same" : null, text: subjectOf(m) }),
         m.origin ? h("span", { class: "muted origin", title: originText(m), text: "  ⇲ " + networkName(m.origin.network) }) : null,
         g.id === FOR_YOU ? h("span", { class: "muted", text: "  (" + (m.notice ? m.notice.label + ", not followed" : labelOf(m.group)) + ")" }) : null,
         ruled.folded[m.id] ? h("span", { class: "folded", role: "button", tabindex: "0", title: "Show them",

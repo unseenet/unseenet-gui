@@ -12,6 +12,7 @@
 // before leaving Tor.
 function messageBody(m) {
   if (m.reported) return reportedNote(m);             // hidden by a report: who and why (0045)
+  if (labelCovered(m)) return labelVeil(m);          // a warning blurred or hidden: why (0053)
   if (!m.readable) return h("p", { class: "text bad", text: m.error || "Could not be read." });
   RENDERING = m;
   const body = m.markdown ? h("div", { class: "md" }, renderTree(m.tree || [])) : renderBody(m.text || "");

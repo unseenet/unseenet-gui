@@ -112,6 +112,21 @@ first post waits a few minutes more, once, while your new key
 - A light and a dark theme, and phones and other narrow screens. On the
   bootable image also the network, Wi-Fi, the keyboard, restart and shut down.
 
+## Tags and content warnings
+
+Authors tag their own posts, and labellers others choose can label them
+([Tags](https://unseenet.org/spec/un-rfc-0052/), [Content labels](https://unseenet.org/spec/un-rfc-0053/)).
+A **warning** - profanity, sexual content, nudity, violence, gore, spoiler - is a
+square flag at the top left of the post, in its own colour, saying who set it. Its
+text and pictures are blurred behind **Show anyway**, or hidden as a quiet line, as
+you chose under **Content warnings and labels** in the command palette; nothing is
+ever covered silently, and your own posts and your contacts' never are. Topics are
+quiet chips by the reactions; a click shows only the posts with that tag.
+
+When you write, tick the warnings that fit and add tags as chips, or write `#word`
+in the text. A group's owner gives a group tags in **Edit group**. Groups are named
+with `!`: `!dk.snak`.
+
 ## Spam and reports
 
 How it works, and why nobody gets power over anyone by it, is in the guide:

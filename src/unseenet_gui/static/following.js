@@ -291,6 +291,7 @@ function readerPane(g, m, msgs) {
       h("span", { class: "mono", text: g.label }), h("span", { class: "grow" }),
       h("span", { class: "hint", text: "N next · P previous · Space page, then next unread · R reply · Esc back" })) : null,
     h("div", { class: "scroll", "data-scroll": "post:" + m.id },
+      warningFlags(m),                                  // warnings above the subject (UN-RFC 0053)
       h("h2", { text: subjectOf(m) }),
       h("div", { class: "post" }, avatar(m),
         h("div", { class: "pb" }, h("div", { class: "ph" }, whoEl(m), marks, postMenu(m, g)),
@@ -298,8 +299,9 @@ function readerPane(g, m, msgs) {
             "In reply to ", h("span", { class: "mono", text: parent.who })) : null)),
       h("div", { class: "pbody" },
         messageBody(m),
-        m.signature ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null,
-        reactionBar(m))),
+        m.signature && !labelCovered(m) ? h("p", { class: "sig", text: "-- \n" + m.signature }) : null,
+        h("div", { class: "rbar-row" }, reactionBar(m),
+          tagChips(m, { groupTags: g.id === TIMELINE || g.id === FOR_YOU })))),
     h("div", { class: "pbar" },
       canReply ? h("button", offProps(rp, { class: "btn primary", onclick: () => openReply(m, g) }),
         commenting(S.data) && !g.private_reply ? "Comment" : "Reply", h("kbd", { text: "R" })) : null,
@@ -372,11 +374,11 @@ async function openReply(m, g) {
   const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
   openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
     subject, body, cursor: top.length, private: !!g.private_reply,
-    send: (subject, text, notify, files) => g.private_reply ?
+    send: (subject, text, notify, files, tags) => g.private_reply ?
       doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id,
         ...(files && files.length ? { files } : {}) }, { text }) :
       doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify,
-        ...(files && files.length ? { files } : {}) }, { text }) });
+        ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}) }, { text }) });
 }
 
 // Reply in a team inbox: as the team, sealed to the writer - without your signature,
@@ -460,7 +462,8 @@ function moreMenu(m) {
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit }) {
-  const dialog = { focus: "#body", node: null, files: [] };
+  const dialog = { focus: "#body", node: null, files: [], tags: [] };
+  let tagBox = null;                                  // tags and warnings (UN-RFC 0052), not in private posts
   // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
   // A private post: pictures, encrypted to them (#102, unseenet#497) - if their inbox
   // takes none, the runtime says so when it sends.
@@ -472,6 +475,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     on: !(S.sidebar && S.sidebar.notices && S.sidebar.notices.send === false), timer: null };
   let lookup = 0;
   const askWho = () => {
+    if (tagBox) tagBox.redraw();                      // #words in the text, shown as tags
     clearTimeout(N.timer);
     const version = ++lookup;
     if (!N.may) return;
@@ -505,7 +509,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     if (files.some(f => /^image\//.test(dialog.files.find(x => x.name === f.name).type) && !f.alt) &&
         !window.confirm("A picture without a description: people who cannot see it - a terminal, a screen reader - get only its name. Post anyway?")) return;
     closeDialog();
-    await send(s, b, N.may ? N.on : undefined, files);
+    await send(s, b, N.may ? N.on : undefined, files, dialog.tags);
     toast(edit ? "Saving the new version - postage takes a few seconds." :
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
@@ -524,6 +528,10 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
       takes ? filePicker(dialog, fg, carries) : null,
+      !priv && !edit ? (tagBox = tagField(dialog, () => {
+        const f = dialog.node && dialog.node.querySelector("form");
+        return f ? f.subject.value + "\n" + f.body.value : "";
+      })) : null,
       h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
         "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
         (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),

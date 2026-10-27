@@ -280,6 +280,7 @@ function commands() {
       run: () => openTeamReaders(g) },
     { name: "Your rules: what comes first, what is hidden or folded", key: "", also: "scorefile killfile score filter sort regler", run: openRules },
     { net: true, name: "Spam reports: the issuers that hide posts for you", key: "", also: "spam report issuer nocem hidden skjult", run: openReportIssuers },
+    { net: true, name: "Content warnings and labels", key: "", also: "spoiler nsfw blur sløret advarsel labeller tags age alder", run: openContentWarnings },
     { net: true, name: isIssuer() ? "Your spam reports: sent to you, published, withdraw" : "Become a spam report issuer", key: "",
       also: "spam report issuer publish publicer", run: openIssuing },
     { name: "Your nodes: add, remove, choose the default", key: "", also: "node server switch change onion noder skift", run: openNodes },

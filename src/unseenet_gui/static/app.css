@@ -1013,3 +1013,50 @@ time.ago { white-space: nowrap; }
 .own-set .hint { margin-left: auto; }
 .own-set .hint.error { color: var(--red); }
 .own-set-box .emoji-btn { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+
+/* Tags and content warnings (UN-RFC 0052, 0053; unseenet-gui#186). Warnings: square flags,
+   a fixed colour each, always with the word; topics: neutral round chips, no colours. */
+.wflags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; }
+.wflag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; line-height: 1.4;
+  padding: 2px 9px 2px 7px; border-left: 3px solid; border-radius: 0 4px 4px 0; }
+.wby { font-size: 12px; }
+/* dark first, as the page is; light under the same rules as the palette's */
+.w-spoiler { --w: #AFA9EC; --wb: #3C3489; --wt: #EEEDFE; }
+.w-profanity { --w: #FAC775; --wb: #633806; --wt: #FAEEDA; }
+.w-violence, .w-gore { --w: #F09595; --wb: #791F1F; --wt: #FCEBEB; }
+.w-sexual, .w-nudity { --w: #ED93B1; --wb: #72243E; --wt: #FBEAF0; }
+.w-rule { --w: var(--line-2); --wb: transparent; --wt: inherit; }
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .w-spoiler { --w: #534AB7; --wb: #EEEDFE; --wt: #3C3489; }
+  :root:not([data-theme="dark"]) .w-profanity { --w: #854F0B; --wb: #FAEEDA; --wt: #633806; }
+  :root:not([data-theme="dark"]) :is(.w-violence, .w-gore) { --w: #A32D2D; --wb: #FCEBEB; --wt: #791F1F; }
+  :root:not([data-theme="dark"]) :is(.w-sexual, .w-nudity) { --w: #993556; --wb: #FBEAF0; --wt: #72243E; }
+}
+:root[data-theme="light"] .w-spoiler { --w: #534AB7; --wb: #EEEDFE; --wt: #3C3489; }
+:root[data-theme="light"] .w-profanity { --w: #854F0B; --wb: #FAEEDA; --wt: #633806; }
+:root[data-theme="light"] :is(.w-violence, .w-gore) { --w: #A32D2D; --wb: #FCEBEB; --wt: #791F1F; }
+:root[data-theme="light"] :is(.w-sexual, .w-nudity) { --w: #993556; --wb: #FBEAF0; --wt: #72243E; }
+.wflag { background: var(--wb); color: var(--wt); border-color: var(--w); }
+.wstripe { display: inline-block; width: 4px; height: 1em; margin-right: 6px; vertical-align: -2px; background: var(--w); }
+.lveil { border: 1px dashed var(--line-2); border-radius: 8px; padding: 14px; text-align: center; display: flex;
+  flex-direction: column; align-items: center; gap: 8px; color: var(--muted); margin: 6px 0; }
+.lveil.hidden { padding: 8px 12px; flex-direction: row; justify-content: space-between; text-align: left; }
+.lhidden { font-style: italic; }
+.tchips { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tchip { font: inherit; font-size: 12px; padding: 1px 9px; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel-2, transparent); color: var(--muted); cursor: pointer; }
+.tchip.grp { background: transparent; border-style: dashed; }
+.tchip.lab { background: transparent; border-style: dotted; }
+.tchip .x { border: 0; background: none; color: inherit; cursor: pointer; padding: 0 0 0 4px; }
+.tchips.ghead .tchip { cursor: default; }
+.rbar-row, .eact { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rbar-row .tchips, .eact-tags { margin-left: auto; order: 9; }
+.tagbar { padding: 6px 12px; font-size: 13px; color: var(--muted); border-bottom: 1px solid var(--line); }
+.tagfield { display: flex; flex-direction: column; gap: 6px; }
+.warnpick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.wpick { font: inherit; font-size: 12px; padding: 2px 9px; border: 1px solid var(--line); border-left: 3px solid var(--w);
+  border-radius: 0 4px 4px 0; background: transparent; color: inherit; cursor: pointer; }
+.wpick.on { background: var(--wb); color: var(--wt); }
+.tagin { font: inherit; font-size: 13px; border: 0; border-bottom: 1px solid var(--line); background: transparent;
+  color: inherit; min-width: 14em; padding: 2px 0; }
+.wrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
