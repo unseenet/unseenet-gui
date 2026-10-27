@@ -195,6 +195,7 @@ function entryCard(d, e) {
 // "Show less" at its end - and its pictures under it, never cut, so a picture post shows
 // its picture (unseenet-gui#143). Whether it is long is measured after drawing (clipEntries).
 function entryBody(m) {
+  if (m.reported) return h("div", { class: "ebody" }, reportedNote(m));   // UN-RFC 0045
   if (m.kind === "chat" && m.readable)
     return h("div", { class: "ebody" }, m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false));
   const [text, files] = messageBody(m);
@@ -248,7 +249,7 @@ function commentEl(c, entry, byId) {
       h("div", { class: "chd" }, whoEl(c), timeEl(c.date),
         parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null,
         moreMenu(c)),
-      h("div", { class: "ctext" }, c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
+      h("div", { class: "ctext" }, c.reported ? reportedNote(c) : c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
         [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
       // the reactions given stay; adding one and Answer show on hover or focus (#120)
       h("div", { class: "crow" }, reactionBar(c),

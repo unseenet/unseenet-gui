@@ -48,6 +48,8 @@ builds, and - inlined into one file - the browser build (unseenet-entrance).
 | `notify.js` | notifications when something new lands in For you (#126), from the core's /api/notifications |
 | `publish.js` | publishing a folder as a site (#125, on the core's site import, unseenet#538) |
 | `export.js` | Export my data (#141, on the core's export, unseenet#577 and UN-RFC 0049 section 7) |
+| `rules.js` | your own rules for your feed and groups (UN-RFC 0051, unseenet#615) |
+| `reports.js` | spam reports: posts hidden by a report shown as hidden, the issuers you follow, being an issuer (UN-RFC 0045, #70) |
 
 ## Words
 

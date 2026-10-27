@@ -11,6 +11,7 @@
 // exist, show their description), and links open only on a click, with a warning
 // before leaving Tor.
 function messageBody(m) {
+  if (m.reported) return reportedNote(m);             // hidden by a report: who and why (0045)
   if (!m.readable) return h("p", { class: "text bad", text: m.error || "Could not be read." });
   RENDERING = m;
   const body = m.markdown ? h("div", { class: "md" }, renderTree(m.tree || [])) : renderBody(m.text || "");

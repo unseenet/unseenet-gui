@@ -135,7 +135,9 @@ function fromRow(r) {
     origin: m.origin || null, old_on_arrival: !!m.old_on_arrival,
     // your own rules (UN-RFC 0051), only when you have some: score, actions, hidden, why
     score: r.score, actions: r.actions || [], hidden: !!r.hidden, why: r.why || "",
-    thread_mark: r.thread_mark || "" };
+    thread_mark: r.thread_mark || "",
+    // hidden by a spam report from an issuer you follow (UN-RFC 0045): who, why, which report
+    reported: m.reported || null };
 }
 
 // UN-RFC 0049 section 5.1: "Imported from Facebook · originally 3 August 2026" - the
@@ -171,6 +173,7 @@ function fromSidebar(d, st) {
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
     state_local: !!st.state_local,
+    report_issuer: !!st.report_issuer,   // you publish spam reports (UN-RFC 0045, core 0.6)
     markdown: st.markdown !== false, notices: st.notices || {},
     hierarchies: d.hierarchies.map(h => ({ name: h.name, tree: h.tree, groups: by[h.name] || [] })) };
 }

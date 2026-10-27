@@ -120,9 +120,9 @@ function fileChoice(files) {
 const FILE_PICKS = [["none", "No files", "text only"], ["pictures", "Pictures", "up to 4 MiB each"],
   ["pictures+pdf", "Pictures and PDFs", "up to 4 MiB each"]];
 
-// Choosing files for a post: at most four, with a description each. The core saves
+// Choosing files for a post: at most four, with a description each; ``label`` on its button. The core saves
 // pictures again without their metadata (GPS, time, camera) before they are sent.
-function filePicker(dialog, g, carries) {
+function filePicker(dialog, g, carries, label = "Add pictures or files") {
   if (!carries) return h("p", { class: "hint", style: "margin:0",
     text: "This group takes pictures and files, but your node does not carry them." });
   const max = g.files.max_size || 0, list = h("div", { class: "picklist" });
@@ -141,7 +141,7 @@ function filePicker(dialog, g, carries) {
     } });
   draw();
   return h("div", { class: "attach" },
-    h("label", { for: "cfiles", class: "btn" }, "Add pictures or files"), input,
+    h("label", { for: "cfiles", class: "btn" }, label), input,
     h("span", { class: "hint", text: " Pictures are saved again without where and when they were taken." + (max ? ` Up to ${size(max)} each.` : "") }),
     list);
 }

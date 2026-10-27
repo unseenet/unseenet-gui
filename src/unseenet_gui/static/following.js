@@ -220,6 +220,7 @@ function postMenu(m, g) {
       m.address && !m.private ? ["Copy address", () => copy(m.address, "The post's address is copied.")] : null,
       m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
       m.why ? ["Why is this here?", () => openWhy(m)] : null,
+      ...reportItems(m),                        // spam reports: show anyway, publish one
       !m.mine && !m.private && g.id !== FOR_YOU ? ["Report", () => openReport(m)] : null]],
     ["This thread", ruleItems(m).filter(i => i && i[0] !== "Why is this here?")],
     ["The author", [
@@ -343,6 +344,7 @@ async function signatureText() {
 
 // A post's title in the list; a chat line among posts shows its first line (UN-RFC 0028).
 function subjectOf(m) {
+  if (m.reported) return "⊘ " + reportedText(m);      // never the spam's own subject (0045)
   if (m.kind === "chat") {
     const first = ((m.text || "").trim().split("\n")[0] || "…");
     return "» " + (first.length > 60 ? first.slice(0, 60) + "…" : first);
@@ -421,6 +423,7 @@ function moreMenu(m) {
     m.address && !m.private ? ["Copy address", () => copy(m.address, "The address is copied.")] : null,
     m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
     ...ruleItems(m),                        // your own rules: why, and the thread's mark
+    ...reportItems(m),                      // spam reports: show anyway, publish one
   ].filter(Boolean);
   if (!items.length) return null;
   const open = S.menuFor === m.id;
