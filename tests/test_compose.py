@@ -374,3 +374,37 @@ async def test_composition_continues_across_status_event(compose_page):
     await session.send("Input.imeSetComposition", {"text": "日本", "selectionStart": 2, "selectionEnd": 2})
     await session.send("Input.insertText", {"text": "日本"})
     await expect(page.locator("#body")).to_have_value("Before 日本")
+
+
+async def test_the_language_is_suggested_and_chosen(compose_page):
+    """unseenet#671, UN-RFC 0052 5a: the language field says what the core suggests and
+    why; what you write there is sent; cleared, it sends [] - forget it for the group."""
+    page, api = compose_page
+    await page.evaluate("S.data.group.suggested_languages = {codes: ['da'], from: 'group'}")
+    await open_compose(page)
+    await expect(page.locator("#clang")).to_have_value("da")
+    await expect(page.locator(".langrow")).to_contain_text("the group's")
+    await page.locator("#subject").fill("Hello")
+    await page.locator("#clang").fill("en")
+    await page.locator("#body").fill("In English\n")
+    await page.locator("#body").press("Control+s")
+    await expect(page.get_by_role("dialog")).to_have_count(0)
+    assert api.sent[-1][1]["languages"] == ["en"]
+    await open_compose(page)
+    await page.locator("#subject").fill("Uden")
+    await page.locator("#clang").fill("")
+    await page.locator("#body").fill("x\n")
+    await page.locator("#body").press("Control+s")
+    await expect(page.get_by_role("dialog")).to_have_count(0)
+    assert api.sent[-1][1]["languages"] == []                 # cleared: forget it here
+
+
+async def test_no_suggestion_sends_no_language(compose_page):
+    page, api = compose_page
+    await open_compose(page)
+    await expect(page.locator("#clang")).to_have_count(0)        # nothing suggested: no field
+    await page.locator("#subject").fill("Hej")
+    await page.locator("#body").fill("x\n")
+    await page.locator("#body").press("Control+s")
+    await expect(page.get_by_role("dialog")).to_have_count(0)
+    assert "languages" not in api.sent[-1][1]

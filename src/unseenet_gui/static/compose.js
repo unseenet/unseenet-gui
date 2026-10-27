@@ -8,7 +8,40 @@
 
 // ---- posting ------------------------------------------------------------
 function doPost(gid, body, local) {
+  // the language: as chosen in the compose window, else what the core suggests for the
+  // group - chat lines and comments too; nothing when it suggests nothing (UN-RFC 0052 5a)
+  if (body.languages === undefined) {
+    const sug = S.data && S.data.group && S.data.group.id === gid && S.data.group.suggested_languages;
+    if (sug && sug.codes && sug.codes.length) body = { ...body, languages: sug.codes };
+  }
   return doSend(`/api/groups/${encodeURIComponent(gid)}/post`, gid, body, local);
+}
+
+// What a suggestion's origin says, by the language field.
+function languageWhy(from) {
+  return from === "you" ? "what you wrote in here last" : from === "group" ? "the group's" :
+    from === "profile" ? "from your profile" : "none: no language is sent";
+}
+
+// Language codes as typed: "da, en" or "da en" - lower case, a region dropped.
+function languageCodes(text) {
+  const out = [];
+  for (const w of String(text || "").split(/[\s,]+/)) {
+    const c = w.trim().toLowerCase().split(/[-_]/)[0];
+    if (/^[a-z]{2,3}$/.test(c) && !out.includes(c)) out.push(c);
+  }
+  return out.slice(0, 4);
+}
+
+// A post's language, small, only where it differs from its group's (a Danish group does
+// not say "da" on every post).
+function languageMark(m) {
+  const langs = m.languages || [];
+  if (!langs.length) return null;
+  const g = (S.data && S.data.group && S.data.group.id === m.group) ? S.data.group : groupOf(m.group);
+  const main = (g && g.languages) || [];
+  if (main.length && langs.every(l => main.includes(l))) return null;
+  return h("span", { class: "sm lang", title: "Written in " + langs.join(", "), text: langs.join(" · ") });
 }
 
 // Your own message shows up greyed out at once (#48): it goes into S.pending under a

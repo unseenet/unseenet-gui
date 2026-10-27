@@ -1067,3 +1067,8 @@ time.ago { white-space: nowrap; }
 /* Show all (UN-RFC 0051 section 3): your rules paused in this view, for now */
 .showall { padding: 4px 12px; font-size: 13px; border-bottom: 1px solid var(--line); color: var(--muted); }
 .showall.on { background: var(--panel-2, transparent); color: inherit; }
+
+/* The language of what you write (UN-RFC 0052 5a) */
+.langrow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.langrow .lang-in { width: 9em; flex: 0 0 auto; }
+.sm.lang { text-transform: lowercase; letter-spacing: 0.02em; }

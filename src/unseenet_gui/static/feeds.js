@@ -158,7 +158,7 @@ function entryCard(d, e) {
     warningFlags(m),                                    // warnings at the top left (UN-RFC 0053)
     h("div", { class: "ehd" }, avatar(m), h("div", { class: "who" }, whoEl(m),
       m.bot ? h("span", { class: "sm", text: "bot" }) : null,
-      timeEl(m.date),
+      timeEl(m.date), languageMark(m),
       m.origin ? h("span", { class: "hint origin", title: "Posted " + exactTime(m.date) + " - the date it was first published is the poster's claim",
         text: originText(m) }) : null,
       timeline ? h("button", { class: "link efeed", onclick: () => openGroup(m.group) }, "in " + (m.group_label || labelOf(m.group))) : null,

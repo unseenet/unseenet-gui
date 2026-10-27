@@ -275,6 +275,7 @@ function readerPane(g, m, msgs) {
     marks.push(h("span", { class: "sm origin", text: originText(m) }));
     marks.push(h("span", { class: "sm" }, "posted ", timeEl(m.date, "")));
   } else marks.push(timeEl(m.date, "sm"));
+  marks.push(languageMark(m));                         // only where it differs (UN-RFC 0052 5a)
   if (m.for_me === "reply") marks.push(h("span", { class: "sm you", text: "◄ reply to you" }));
   if (m.for_me === "mention") marks.push(h("span", { class: "sm you", text: "♦ names you" }));
   if (m.encrypted) marks.push(h("span", { class: "sm lock" }, svg(ICON.lock, 12, 2.5), " encrypted"));
@@ -374,11 +375,12 @@ async function openReply(m, g) {
   const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
   openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label,
     subject, body, cursor: top.length, private: !!g.private_reply,
-    send: (subject, text, notify, files, tags) => g.private_reply ?
+    send: (subject, text, notify, files, tags, languages) => g.private_reply ?
       doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id,
         ...(files && files.length ? { files } : {}) }, { text }) :
       doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify,
-        ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}) }, { text }) });
+        ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}),
+        ...(languages !== undefined ? { languages } : {}) }, { text }) });
 }
 
 // Reply in a team inbox: as the team, sealed to the writer - without your signature,
@@ -508,8 +510,13 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     const files = dialog.files.map(f => ({ name: f.name, data: f.data, alt: f.alt.trim() }));
     if (files.some(f => /^image\//.test(dialog.files.find(x => x.name === f.name).type) && !f.alt) &&
         !window.confirm("A picture without a description: people who cannot see it - a terminal, a screen reader - get only its name. Post anyway?")) return;
+    const langField = f.querySelector("#clang");
+    const chosen = langField ? languageCodes(langField.value) : null;
+    const suggested = (g && g.suggested_languages && g.suggested_languages.codes) || [];
+    // none suggested and none typed: send nothing; cleared: [] forgets it for the group
+    dialog.languages = langField ? (chosen.length || suggested.length ? chosen : undefined) : undefined;
     closeDialog();
-    await send(s, b, N.may ? N.on : undefined, files, dialog.tags);
+    await send(s, b, N.may ? N.on : undefined, files, dialog.tags, dialog.languages);
     toast(edit ? "Saving the new version - postage takes a few seconds." :
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
@@ -519,6 +526,12 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       h("button", { class: "btn primary dh-send", onclick: go }, priv ? "Send" : "Post"),   // phones: above the keyboard
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
+      (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
+        h("label", { for: "clang", text: "Language" }),
+        h("input", { id: "clang", name: "clang", class: "in lang-in", "data-k": "clang", autocomplete: "off",
+          value: (g.suggested_languages.codes || []).join(", "), placeholder: "none - e.g. da or en",
+          title: "What you write in here; remembered for this group" }),
+        h("span", { class: "hint", text: languageWhy(g.suggested_languages.from) })) : null,
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
       h("div", { class: "label-row" }, h("label", { for: "body", text: "Text" }), emojiButton("cbody")),
