@@ -54,7 +54,7 @@ class ReportsAPI:
     def reports(self):
         return {"reasons": ["spam", "flood", "phishing", "malware", "illegal", "other"],
                 "issuers": [{"key": ISSUER, "label": "Spamjægeren", "yours": False, "hierarchies": ["dk"],
-                             "on": self.following}],
+                             "groups": [GROUP], "on": self.following}],
                 "mine": {"group": "reports@me", "policy": "Spam i dk.*", "contact": "", "automatic": False}
                 if self.issuer else None}
 
@@ -168,7 +168,7 @@ async def test_stop_following_from_the_hidden_post_and_the_issuers(reports_page)
     assert ("/api/reports/follow", {"key": ISSUER, "on": False}) in api.requests
     await page.evaluate("openReportIssuers()")
     issuer = page.locator(".issuer", has_text="Spamjægeren")
-    await expect(issuer).to_contain_text("named for dk.*")
+    await expect(issuer).to_contain_text("named for dk.*, dk.snak")      # hierarchy and group (7.5)
     await expect(issuer).to_have_class("issuer off")
     await issuer.get_by_role("checkbox").check()                         # on again
     await page.wait_for_timeout(300)
