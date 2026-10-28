@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Read more where the author chooses** (#188, UN-RFC 0031 3.2.1): an entry with a line of
+  only `...` is cut there with *… more* - even when short, and up to twice the normal cut;
+  further down the line is ignored. Opened, the line is not shown. *Insert read more* beside
+  the text when writing a post.
 - **Private chats as a fixed item** (asked for by the maintainer, #172): *Private chats* at
   the top under *Private posts*, with what is unread and only the chats with unread lines
   under it (at most five, then *Show all*); the full list in the main pane - filter,

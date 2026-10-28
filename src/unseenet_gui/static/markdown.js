@@ -15,9 +15,41 @@ function messageBody(m) {
   if (labelCovered(m)) return labelVeil(m);          // a warning blurred or hidden: why (0053)
   if (!m.readable) return h("p", { class: "text bad", text: m.error || "Could not be read." });
   RENDERING = m;
-  const body = m.markdown ? h("div", { class: "md" }, renderTree(m.tree || [])) : renderBody(m.text || "");
+  const split = !m.markdown && hasReadMore(m) ? splitReadMore(m.text) : null;   // opened: no line
+  const body = m.markdown ? h("div", { class: "md" }, renderTree(m.tree || []))
+    : renderBody(split ? split[0] + "\n\n" + split[1] : m.text || "");
   RENDERING = null;
   return [body, filesOf(m, false)];
+}
+
+// A read-more line (UN-RFC 0031 section 3.2.1): the core marks it in the tree with a
+// "more" block, so whether there is one is the core's word; where it is in a plain text is
+// found again by the same rule - the first line of only "..." or "…", not in code or quotes.
+function hasReadMore(m) {
+  return m.readable && m.kind !== "chat" && (m.tree || []).some(b => b.t === "more");
+}
+
+// The text before the read-more line and after it, the line left out, or null.
+function splitReadMore(text) {
+  const lines = (text || "").split("\n");
+  let fence = null, quote = false;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i], f = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    if (fence) { if (f && f[1][0] === fence[0] && f[1].length >= fence.length) fence = null; continue; }
+    if (f) fence = f[1];
+    else if (!line.trim()) quote = false;
+    else if (line.trimStart().startsWith(">")) quote = true;
+    else if (/^ {0,3}(\.\.\.|…)[ \t]*$/.test(line) && !quote)
+      return [lines.slice(0, i).join("\n").replace(/\n+$/, ""), lines.slice(i + 1).join("\n").replace(/^\n+/, "")];
+  }
+  return null;
+}
+
+// A message cut at its read-more line: the same message with only what comes before.
+function beforeReadMore(m) {
+  const tree = m.tree || [], at = tree.findIndex(b => b.t === "more");
+  const split = splitReadMore(m.text);
+  return { ...m, tree: at >= 0 ? tree.slice(0, at) : tree, text: split ? split[0] : m.text };
 }
 
 // The core's safe Markdown tree (UN-RFC 0031) as DOM: blocks.

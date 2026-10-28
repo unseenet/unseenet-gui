@@ -204,10 +204,12 @@ function entryBody(m) {
   if (labelCovered(m)) return h("div", { class: "ebody" }, labelVeil(m));   // UN-RFC 0053
   if (m.kind === "chat" && m.readable)
     return h("div", { class: "ebody" }, m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false));
-  const [text, files] = messageBody(m);
   const open = S.textOpen && S.textOpen[m.id];
-  return h("div", { class: "ebody" },
-    h("div", { class: "etext" + (open ? " open" : " clip"), "data-clip": m.id }, text),
+  // the author's read-more line (UN-RFC 0031 3.2.1): cut there, up to twice the normal cut
+  const more = !open && hasReadMore(m) && !(S.moreTooLong || {})[m.id];
+  const [text, files] = messageBody(more ? beforeReadMore(m) : m);
+  return h("div", { class: "ebody" + (more ? " cut" : "") },
+    h("div", { class: "etext" + (open ? " open" : more ? " more-cut" : " clip"), "data-clip": m.id }, text),
     open ? h("button", { class: "link less", onclick: () => { delete S.textOpen[m.id]; render(); } }, "Show less") :
       h("button", { class: "link emore", onclick: () => { S.textOpen = { ...(S.textOpen || {}), [m.id]: true }; render(); } }, "… more"),
     files);
@@ -216,6 +218,17 @@ function entryBody(m) {
 // After a feed is drawn: an entry's text that is cut by only a line or two is shown whole,
 // and "… more" is shown only where something is really hidden.
 function clipEntries() {
+  // a read-more line further down than twice the normal cut is ignored (UN-RFC 0031 3.2.1)
+  let again = false;
+  document.querySelectorAll(".etext.more-cut").forEach(el => {
+    const line = parseFloat(getComputedStyle(el).lineHeight) || 22;
+    const lines = matchMedia("(min-width: 1100px)").matches ? 10 : CLIP_LINES;   // as app.css
+    if (el.scrollHeight > line * lines * 2 + line / 2) {
+      S.moreTooLong = { ...(S.moreTooLong || {}), [el.dataset.clip]: true };
+      again = true;
+    }
+  });
+  if (again) { render(); return; }
   document.querySelectorAll(".etext.clip").forEach(el => {
     const line = parseFloat(getComputedStyle(el).lineHeight) || 22;
     const hidden = el.scrollHeight - el.clientHeight;
