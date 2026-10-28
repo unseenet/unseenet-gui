@@ -7,6 +7,8 @@ Run with: pip install -e '.[dev]' playwright; playwright install chromium;
 python -m pytest -q tests/test_feeds.py
 """
 
+import asyncio
+
 import pytest
 from aiohttp import web
 from aiohttp.test_utils import TestServer
@@ -42,6 +44,7 @@ class FeedAPI:
         self.following = False
         self.subscribed = True               # False: Bob's feed read without following (#506)
         self.subscribes = []
+        self.outbox = []                     # events to send to the page
         self.in_timeline = True              # UN-RFC 0034 6.2: a feed is in it by default
         self.timeline_calls = []
         self.changed = []                    # withdraw and edit, from the ⋯ menu
@@ -84,8 +87,10 @@ class FeedAPI:
     async def events(self, request):
         ws = web.WebSocketResponse(protocols=["unseenet"])
         await ws.prepare(request)
-        async for _ in ws:
-            pass
+        while not ws.closed:                 # events a test sends (self.outbox)
+            while self.outbox:
+                await ws.send_json(self.outbox.pop(0))
+            await asyncio.sleep(0.05)
         return ws
 
     async def handle(self, request):
@@ -494,3 +499,15 @@ async def test_an_entry_cut_at_the_authors_read_more_line(feed_page):
     await more.click()
     await expect(entry.locator(".etext")).to_contain_text("Resten af historien")
     assert "..." not in await entry.locator(".etext").inner_text()
+
+
+async def test_a_node_not_answering_yet_is_said_plainly(feed_page):
+    """gui#206 (unseenet#704): the groups the others have are shown; the slow node is
+    named in the status bar until it answers."""
+    page, api = feed_page
+    api.outbox.append({"event": "refreshed", "available": 1, "subscribed": 1,
+                       "unreachable": [], "slow": ["abcdefghijklmnop.onion:119"]})
+    slow = page.locator(".statusbar .slow-node")
+    await expect(slow).to_contain_text("not answering yet")
+    api.outbox.append({"event": "node-state", "address": "abcdefghijklmnop.onion:119", "up": True})
+    await expect(slow).to_have_count(0)

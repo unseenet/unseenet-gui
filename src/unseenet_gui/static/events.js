@@ -49,6 +49,13 @@ function connectEvents() {
       if (type === "refreshed") {
         const was = S.state.connected;
         S.state.connected = !e.error; redrawNodeLink();
+        // a node asked but not answering yet (unseenet#704): said plainly, the rest shown
+        const slowBefore = (S.state.slow || []).join();
+        S.state.slow = e.slow || [];
+        if (S.state.slow.join() !== slowBefore) {
+          const st = document.querySelector(".statusbar");
+          if (st && !S.dialog) st.replaceWith(statusbar());
+        }
         if (S.dialog && was !== S.state.connected) render();   // the palette: grey or ready now
       }
       sidebarSoon();
@@ -62,6 +69,11 @@ function connectEvents() {
     } else if (type === "node-state") {
       S.nodes = S.nodes || {};
       S.nodes[e.address] = { up: e.up, error: e.error };
+      if ((S.state.slow || []).includes(e.address)) {          // it answered, or gave up (#206)
+        S.state.slow = S.state.slow.filter(a => a !== e.address);
+        const st = document.querySelector(".statusbar");
+        if (st && !S.dialog) st.replaceWith(statusbar());
+      }
       if (e.address === S.state.node) redrawNodeLink();
     } else if (type === "tor-state") {
       S.tor = { progress: e.progress, summary: e.summary };

@@ -331,6 +331,10 @@ function statusbar() {
     h("span", { class: "grow" }),
     S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
+    // nodes not answering yet (#206, unseenet#704): the others' groups are already shown
+    (S.state.slow || []).length ? h("span", { class: "slow-node", role: "status",
+      title: "Its groups and posts come as soon as it answers; the other nodes' are shown already",
+      text: (S.state.slow.map(nodeLabel).join(", ")) + (S.state.slow.length === 1 ? " is" : " are") + " not answering yet" }) : null,
     h("span", { class: "st", title: S.state.status },
       h("span", { class: "dot" + (S.state.connected ? " ok" : "") }),
       // "Connected to <node>" only repeats the box at the bottom left (#111)
