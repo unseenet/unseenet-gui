@@ -423,6 +423,8 @@ kbd { font-family: var(--mono); font-size: 11px; padding: 1px 6px; border-radius
   width: 100%; min-height: 32px; padding: 0 20px; border: none; background: transparent; color: var(--paper-2);
   text-align: left; font-size: 13.5px; }
 .prow:hover { background: var(--ink-2); }
+/* "Show older": where a large group's older rows would be (unseenet#724) */
+.older { display: flex; justify-content: center; padding: 12px 20px; }
 .prow.on { background: var(--ink-sel); color: var(--paper); }
 .prow.head { position: sticky; top: 0; z-index: 1; min-height: 28px; background: var(--ink); cursor: default;
   font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);

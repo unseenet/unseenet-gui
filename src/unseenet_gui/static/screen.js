@@ -50,6 +50,21 @@ async function openGroup(gid, rerender = true) {
   if (g && g.view === "chat" && !PHONE.matches) setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
 }
 
+// A large group comes in part (unseenet#724): its newest threads, entries or chat lines,
+// SHOWN_FIRST at first, twice as many each time you ask for older ones.
+const SHOWN_FIRST = 200;
+const shownLimit = (gid) => (S.shown && S.shown[gid]) || SHOWN_FIRST;
+// "Show older": the button where a group's older rows would be, when the core left some out.
+function olderButton(d) {
+  if (!d || !d.group || !d.group.more) return null;
+  const gid = d.group.id;
+  return h("div", { class: "older" }, h("button", { class: "btn", "data-k": "older", onclick: async (e) => {
+    e.currentTarget.disabled = true;
+    S.shown = { ...(S.shown || {}), [gid]: shownLimit(gid) * 2 };
+    await loadGroup(); render();
+  } }, d.group.view === "chat" ? "Show older lines" : "Show older " + (d.group.view === "feed" ? "entries" : "threads")));
+}
+
 // Read the group shown from the core again: its settings and messages, and what you may do
 // there.
 async function loadGroup() {
@@ -61,8 +76,8 @@ async function loadGroup() {
     return;
   }
   try {
-    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + (S.showAll === gid ? "?all=1" : ""),
-      null, { signal: viewSignal() });
+    const q = [S.showAll === gid ? "all=1" : "", "limit=" + shownLimit(gid)].filter(Boolean).join("&");
+    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + "?" + q, null, { signal: viewSignal() });
     let site = null;
     if (data.group.view === "pages") site = await loadSite(gid);   // a site: its pages (UN-RFC 0035)
     if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: writeOf(data), site };

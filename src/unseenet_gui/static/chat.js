@@ -12,7 +12,7 @@ function chatView(d) {
   const msgs = d.messages.slice().sort((a, b) => (a.date || "").localeCompare(b.date || ""));
   markRead(msgs);
   const byId = Object.fromEntries(msgs.map(m => [m.id, m]));
-  const out = [h("div", { class: "spacer" })];
+  const out = [h("div", { class: "spacer" }), olderButton(d)].filter(Boolean);   // unseenet#724
   let lastDay = null, grp = null;
   const flush = () => { if (grp) out.push(grp.el); grp = null; };
   for (const m of msgs) {

@@ -105,7 +105,7 @@ function feedView(d) {
         pendingState(p))),
     tagFilterBar(),                                     // shown: only posts with a tag
     showAllBar(d),                                      // your rules paused here (0051 3)
-    entries.length ? entries.filter(e => passesTag(e.m)).map(e => entryCard(d, e)) :
+    entries.length ? [entries.filter(e => passesTag(e.m)).map(e => entryCard(d, e)), olderButton(d)] :
       h("div", { class: "empty" }, h("h2", { text: timeline ? "Nothing yet" : "No entries yet" }),
         h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), or add a group with ☰ in its header, and the entries come here." :
           note ? "Write the first note above." : "" }))));
