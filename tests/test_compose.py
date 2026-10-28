@@ -167,7 +167,7 @@ async def compose_page():
 
 async def open_compose(page, mode="new"):
     if mode == "private-reply":
-        await page.get_by_role("button", name="@ Private posts", exact=True).click()
+        await page.get_by_role("button", name="Private posts", exact=True).click()
     if mode == "new":
         await page.get_by_role("button", name=re.compile("New post")).click()
     elif mode == "edit":

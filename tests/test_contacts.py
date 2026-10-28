@@ -1,4 +1,4 @@
-"""The Contacts dialog (#118, unseenet#523) against a synthetic local API: type to find
+"""Your contacts as a pane, and the person picker (#118, unseenet#523, gui#209) against a synthetic local API: type to find
 someone by the name you gave them, their key or a name they hold; Up/Down choose,
 Enter chats, Esc clears the filter first and closes on the second press; a key that
 matches nobody offers a chat with it.
@@ -79,7 +79,7 @@ async def page():
         try:
             await pg.goto(str(server.make_url("/")) + "#t=" + TOKEN)
             await pg.wait_for_load_state("networkidle")
-            await pg.get_by_role("button", name="Contacts").first.click()
+            await pg.get_by_role("button", name="Your contacts").first.click()
             yield pg
         finally:
             await browser.close()
@@ -87,49 +87,57 @@ async def page():
 
 
 async def test_find_a_contact(page):
-    dialog = page.get_by_role("dialog", name="Contacts")
-    find = dialog.get_by_role("searchbox", name="Find a contact")
-    await expect(find).to_be_focused()
-    rows = dialog.get_by_role("option")
+    """gui#209: Your contacts is a pane with the same head as the other private lists."""
+    await expect(page.locator(".ghead h1")).to_have_text("Your contacts")
+    await expect(page.locator(".ghead")).to_contain_text("names only you see")
+    find = page.get_by_role("searchbox", name="Find a contact")
+    rows = page.locator(".contactrow")
     await expect(rows).to_have_count(3)
-    await expect(rows.locator(".nm")).to_have_text(["Mia", "Mikkel", "Sonia sonia@lorensen"])
-    await expect(dialog.locator(".df")).to_contain_text("3 contacts")
-
+    await expect(rows.locator(".item .nm")).to_have_text(["Mia", "Mikkel", "Sonia"])
     await find.fill("mi")                                                # any part, any case
     await expect(rows).to_have_count(2)
-    await expect(dialog.locator(".df")).to_contain_text("2 of 3 contacts")
     await find.fill("lorensen")                                          # a name they hold
     await expect(rows).to_have_count(1)
     await expect(rows.first).to_contain_text("Sonia")
     await find.fill("mmmmmmmm")                                          # a key
     await expect(rows).to_have_count(1)
     await expect(rows.first).to_contain_text("Mikkel")
-
-    await find.press("Escape")                                           # clears first
+    await find.press("Escape")                                           # clears
     await expect(find).to_have_value("")
-    await expect(dialog).to_be_visible()
-    await find.press("ArrowDown")                                        # Mia -> Mikkel
-    await expect(dialog.locator(".cmd.on")).to_contain_text("Mikkel")
-    await find.press("Escape")                                           # then closes
-    await expect(dialog).to_have_count(0)
+    await expect(page.get_by_role("dialog", name="Contacts")).to_have_count(0)   # no dialog left
 
 
 async def test_no_match_and_a_key(page):
-    dialog = page.get_by_role("dialog", name="Contacts")
-    find = dialog.get_by_role("searchbox", name="Find a contact")
+    find = page.get_by_role("searchbox", name="Find a contact")
     await find.fill("nobody")
-    await expect(dialog).to_contain_text("No contacts match")
-    await expect(dialog.get_by_role("button", name="Chat with this key")).to_have_count(0)
+    await expect(page.locator(".contacts-list")).to_contain_text("No contact matches")
+    await expect(page.get_by_role("button", name="Chat with this key")).to_have_count(0)
     await find.fill(STRANGER)
-    await expect(dialog.get_by_role("button", name="Chat with this key")).to_be_visible()
-    await expect(dialog.get_by_role("button", name="Add as contact")).to_be_visible()
+    await expect(page.get_by_role("button", name="Chat with this key")).to_be_visible()
+    await expect(page.get_by_role("button", name="Add as contact")).to_be_visible()
 
 
-async def test_enter_chats(page):
-    dialog = page.get_by_role("dialog", name="Contacts")
-    find = dialog.get_by_role("searchbox", name="Find a contact")
+async def test_the_person_picker(page):
+    """gui#209: M and Chat with someone open a picker, not a To field - Chat | Post (Tab),
+    find by name or paste a key, Enter opens the chat itself."""
+    await page.evaluate("openWrite('', 'chat')")
+    dialog = page.locator(".dialog.picker")
+    await expect(dialog).to_have_attribute("aria-label", "New private chat")
+    find = dialog.get_by_role("searchbox", name="Find a contact, or paste a key")
+    await expect(find).to_be_focused()
+    await expect(dialog.locator("#wkey")).to_have_count(0)
+    await find.press("Tab")
+    await expect(dialog).to_have_attribute("aria-label", "New private post")
+    await find.press("Tab")
     await find.fill("son")
+    await expect(dialog.locator(".cmd.on")).to_contain_text("Sonia")
     await find.press("Enter")
     await expect(dialog).to_have_count(0)
+    await page.wait_for_load_state("networkidle")
+    assert any(p.startswith("/api/groups/contact:" + SONIA) for p in SEEN), SEEN
+
+
+async def test_chat_from_a_contact_row(page):
+    await page.locator(".contactrow").filter(has_text="Sonia").get_by_role("button", name="Chat", exact=True).click()
     await page.wait_for_load_state("networkidle")
     assert any(p.startswith("/api/groups/contact:" + SONIA) for p in SEEN), SEEN

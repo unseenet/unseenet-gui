@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Your contacts, Private posts and Private chats alike** (asked for by the maintainer,
+  #209): three rows at the top with person, envelope and bubble icons and no buttons on
+  them, at most three unread chats under Private chats; each opens its list in the main
+  pane with the same head - title, chip, one line, the main action. *Your contacts* is a
+  pane now (Chat, Post, ⋯ Rename/Remove, *Add a contact*); `C` opens it. **A person
+  picker** replaces the *To* field: Chat | Post (Tab), find a contact or paste a key,
+  recent people first - Chat opens the chat itself.
 - **Room to write a post** (asked for by the maintainer, #203): the post composer is wider
   and taller, and ⤢ makes it nearly the whole window (remembered on this device); a thin
   toolbar above the text - bold, quote, emoji, the paperclip, read more, and a *Markdown*

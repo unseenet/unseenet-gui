@@ -227,104 +227,86 @@ function contactMatches(c, q) {
   return words.some(w => (w || "").toLowerCase().includes(q));
 }
 
-// Your contacts: find one, chat, add, rename, remove.
+// Your contacts (C): their list in the main pane (gui#209), no dialog any more.
 function openContacts() {
-  let removing = null;                         // Remove asks once more, on the button itself
-  let query = "", at = 0;
-  const shownList = () => {
-    const q = query.trim().toLowerCase();
-    return contactList().filter(c => contactMatches(c, q))
-      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
-  };
-  const looksLikeKey = (t) => /^ed25519:[a-z2-7]{20,}$/i.test(t.trim());
-  S.dialog = { focus: "#cfind", render: () => {
-    const all = contactList(), list = shownList();
-    if (at >= list.length) at = Math.max(0, list.length - 1);
-    const count = !all.length ? "" : list.length === all.length ? `${all.length} contacts` :
-      `${list.length} of ${all.length} contacts`;
-    return dialogShell({ label: "Contacts", wide: true },
-      h("div", { class: "dh" }, h("h2", { text: "Contacts" }), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-      all.length ? h("div", { class: "side-filter cfind" }, svg(ICON.search, 16),
-        h("label", { for: "cfind", class: "sr", text: "Find a contact" }),
-        h("input", { id: "cfind", type: "search", "data-k": "cfind", autocomplete: "off", value: query,
-          placeholder: "Find: a name, a key or sonia@lorensen",
-          "aria-controls": "clist", "aria-activedescendant": list.length ? "c-" + at : null,
-          oninput: (e) => { query = e.target.value; at = 0; removing = null; render(); },
-          onkeydown: (e) => {
-            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-              e.preventDefault();
-              at = Math.max(0, Math.min(list.length - 1, at + (e.key === "ArrowDown" ? 1 : -1)));
-              render();
-              const row = document.getElementById("c-" + at);
-              if (row) row.scrollIntoView({ block: "nearest" });
-            } else if (e.key === "Enter" && list[at]) {
-              e.preventDefault(); closeDialog(); openGroup(list[at].id);
-            } else if (e.key === "Escape" && query) {
-              e.preventDefault(); e.stopPropagation(); query = ""; at = 0; render();
-            }
-          } })) : null,
-      h("div", { class: "db list", id: "clist", role: "listbox", "aria-label": "Contacts" },
-        list.length ? list.map((c, i) => h("div", { class: "cmd" + (i === at ? " on" : ""), id: "c-" + i,
-            role: "option", "aria-selected": String(i === at), onmouseenter: () => { if (at !== i) { at = i; render(); } } },
-          h("span", { class: `av xs c${c.colour}`, "aria-hidden": "true", text: initials(c.label) }),
-          h("span", { class: "nm" }, h("span", { text: c.label }),
-            c.names && c.names.length ? h("span", { class: "hint", text: " " + c.names.join(", ") }) : null),
-          h("button", { class: "btn primary", onclick: () => { closeDialog(); openGroup(c.id); } }, "Chat"),
-          h("button", { class: "btn", onclick: () => { closeDialog(); openPost(c.key, c.label); } }, "Write a post"),
-          h("button", { class: "btn", onclick: () => openAddContact(c.key, c.label) }, "Rename"),
-          h("button", { class: removing === c.key ? "btn danger" : "btn",
-            title: removing === c.key ? "The contact is forgotten; your chat and posts stay" : null,
-            onclick: async () => {
-              if (removing !== c.key) { removing = c.key; render(); return; }
-              removing = null;
-              await api("POST", "/api/contacts", { key: c.key, remove: true });
-              toast(c.label + " is no longer a contact."); await loadSidebar(); } },
-            removing === c.key ? "Really remove?" : "Remove"))) :
-        all.length ? h("div", { style: "padding:12px" },
-          h("p", { class: "muted", style: "margin:0 0 8px", text: "No contacts match." }),
-          looksLikeKey(query) ? h("div", { class: "row" },
-            h("button", { class: "btn primary", onclick: () => { closeDialog(); openGroup("contact:" + query.trim()); } }, "Chat with this key"),
-            h("button", { class: "btn", onclick: () => openAddContact(query.trim(), "") }, "Add as contact")) : null) :
-        h("p", { class: "muted", style: "padding:12px", text: "No contacts yet. Open a post and choose Add contact to give its author a name of your own." })),
-      h("div", { class: "df" }, h("span", { text: count }), h("span", { text: all.length ? "↑↓ choose · Enter chat · Esc " + (query ? "clear" : "close") : "Esc close" })));
-  } };
-  render();
+  closeDialog();
+  openGroup(CONTACTS);
 }
 
 // Write to someone by their key: a post (a subject, read on its own) or a chat
 // (a line in a running conversation). UN-RFC 0028; the same choice as in the TUI.
 function openWrite(key = "", kind = "post") {
-  if (kind === "post" && key) { openPost(key); return; }
-  formDialog({ values: { key, body: "", subject: "" },
-    label: kind === "chat" ? "Chat with someone" : "Write a post",
-    title: kind === "chat" ? "Chat with someone" : "Write a post",
-    focus: key ? (kind === "chat" ? "#wtext" : "#wsubject") : "#wkey", button: kind === "chat" ? "Send" : "Write …",
-    note: kind === "chat" ? "Sealed to their key: the node cannot read it, nor see who sent it. To write a post instead: M." :
-      "Next you write the post in the compose window. To chat instead: Ctrl P, Chat with someone.",
-    fields: (vals) => [
-      h("label", { for: "wkey", text: "To" }),
-      h("input", { id: "wkey", name: "key", class: "in", value: vals.key, "data-k": "wkey", list: "wcontacts",
-        placeholder: "a contact's name, or a key (ed25519:… - they find it with K)", autocomplete: "off" }),
-      h("datalist", { id: "wcontacts" }, contactList().map(c => h("option", { value: c.label }))),
-      kind === "chat" ? [
-        h("div", { class: "label-row" }, h("label", { for: "wtext", text: "Message" }), emojiButton("wtext")),
-        h("textarea", { id: "wtext", name: "body", class: "in", "data-k": "wtext", style: "min-height:120px", value: vals.body })] :
-      [h("label", { for: "wsubject", text: "Subject" }),
-        h("input", { id: "wsubject", name: "subject", class: "in", "data-k": "wsubject", value: vals.subject, autocomplete: "off" })]],
-    submit: async (v) => {
-      const k = recipient(v.key);                 // a contact's name (or its start), or a key
-      if (kind === "chat") {
-        const body = (v.body || "").trim();
-        if (!body) throw new Error("Write a message, please.");
-        const gid = "contact:" + k;
-        closeDialog();
-        await openGroup(gid);
-        await doSend("/api/private", gid, { key: k, body, chat: true }, { text: body, chat: true });
-      } else {
-        closeDialog();
-        openPost(k, "", (v.subject || "").trim());
-      }
-    } });
+  if (key) { pickedPerson(key, "", kind); return; }       // from a person: already chosen
+  openPersonPicker(kind);
+}
+
+// What a chosen person opens: the chat itself, with the cursor in its input - or the
+// compose window for a post (gui#209).
+async function pickedPerson(key, label, kind) {
+  closeDialog();
+  if (kind === "post") { openPost(key, label); return; }
+  await openGroup("contact:" + key);
+  setTimeout(() => { const i = document.querySelector('[data-k="chat"]'); if (i) i.focus(); });
+}
+
+// The person picker (gui#209), in place of a To field: Chat | Post, a search that also
+// takes a pasted key, recent people first, then contacts; arrows choose, Enter opens.
+function openPersonPicker(kind = "chat") {
+  let query = "", at = 0;
+  const looksLikeKey = (t) => /^ed25519:[a-z2-7]{20,}$/i.test(t.trim());
+  const people = () => {
+    const sb = S.sidebar || { people: [], contacts: [] };
+    const recent = sb.people.map(p => ({ key: p.key, label: p.label, colour: p.colour, names: p.names, recent: true }));
+    const seen = new Set(recent.map(p => p.key));
+    const rest = contactList().filter(c => !seen.has(c.key))
+      .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+    const q = query.trim().toLowerCase();
+    return [...recent, ...rest].filter(c => contactMatches(c, q));
+  };
+  const choose = (p) => pickedPerson(p.key, p.label, kind);
+  S.dialog = { focus: "#pfind", render: () => {
+    const list = people();
+    if (at >= list.length) at = Math.max(0, list.length - 1);
+    const firstRest = list.findIndex(p => !p.recent);
+    return dialogShell({ label: kind === "chat" ? "New private chat" : "New private post", cls: "picker" },
+      h("div", { class: "dh" }, h("h2", { text: kind === "chat" ? "New private chat" : "New private post" }),
+        h("div", { class: "seg", role: "group", "aria-label": "Chat or post" },
+          ["chat", "post"].map(k => h("button", { type: "button", class: "segbtn" + (kind === k ? " on" : ""),
+            "aria-pressed": String(kind === k), onclick: () => { kind = k; render(); } }, k === "chat" ? "Chat" : "Post"))),
+        h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+      h("div", { class: "side-filter cfind" }, svg(ICON.search, 16),
+        h("label", { for: "pfind", class: "sr", text: "Find a contact, or paste a key" }),
+        h("input", { id: "pfind", type: "search", "data-k": "pfind", autocomplete: "off", value: query,
+          placeholder: "Find a contact, or paste a key", "aria-controls": "plist",
+          "aria-activedescendant": list.length ? "p-" + at : null,
+          oninput: (e) => { query = e.target.value; at = 0; render(); },
+          onkeydown: (e) => {
+            if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); kind = kind === "chat" ? "post" : "chat"; render(); }
+            else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              e.preventDefault(); at = Math.max(0, Math.min(list.length - 1, at + (e.key === "ArrowDown" ? 1 : -1))); render();
+              const row = document.getElementById("p-" + at); if (row) row.scrollIntoView({ block: "nearest" });
+            } else if (e.key === "Enter") {
+              e.preventDefault();
+              if (looksLikeKey(query)) choose({ key: query.trim(), label: "" });
+              else if (list[at]) choose(list[at]);
+            } else if (e.key === "Escape" && query) { e.preventDefault(); e.stopPropagation(); query = ""; at = 0; render(); }
+          } })),
+      h("div", { class: "db list", id: "plist", role: "listbox", "aria-label": "People" },
+        looksLikeKey(query) ? h("div", { class: "cmd on", role: "option", "aria-selected": "true", onclick: () => choose({ key: query.trim(), label: "" }) },
+          h("span", { class: "nm", text: (kind === "chat" ? "Chat with " : "Write to ") + query.trim().slice(0, 28) + "…" })) :
+        list.length ? list.map((p, i) => [
+          i === 0 && p.recent ? h("div", { class: "msect", text: "Recent" }) : null,
+          i === firstRest && firstRest >= 0 ? h("div", { class: "msect", text: "Contacts" }) : null,
+          h("div", { class: "cmd" + (i === at ? " on" : ""), id: "p-" + i, role: "option", "aria-selected": String(i === at),
+            onmouseenter: () => { if (at !== i) { at = i; render(); } }, onclick: () => choose(p) },
+            h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+            h("span", { class: "nm", text: p.label }))]) :
+        h("p", { class: "muted", style: "padding:12px", text: query ? "Nobody matches - paste their key (they find it with K)." :
+          "Nobody yet - paste someone's key (they find it with K)." })),
+      h("div", { class: "df" }, h("span", { text: kind === "chat" ? "Sealed to their key: only the two of you can read it" :
+        "A post with a subject, sealed to them" }), h("span", { text: "↑↓ choose · Enter open · Tab chat/post" })));
+  } };
+  render();
 }
 
 // The compose window for a post: subject, text, your signature; sent to their inbox.
