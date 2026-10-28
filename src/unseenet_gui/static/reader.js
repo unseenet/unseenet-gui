@@ -188,7 +188,7 @@ function threadsView(d) {
     pinnedSection(d, msgs),
     h("div", { class: "prow head", "aria-hidden": "true" }, h("span", {}), h("span", { text: "Subject" }),
       h("span", { text: "From" }), h("span", { text: "Date" })),
-    shown.map(m => h("button", {
+    [shown.map(m => h("button", {
       class: `prow${m === cur ? " on" : ""}${m.read ? "" : " unread"}${m.depth === 0 ? " root" : ""}${ruleClass(m)}`,
       "data-id": m.id, "aria-current": m === cur ? "true" : null,
       onclick: () => { S.post = m.id; S.mobileReading = true; render(); },
@@ -214,7 +214,7 @@ function threadsView(d) {
         m.score !== undefined ? h("span", { class: "score", title: "Your rules' score - ⋯ says why",
           text: `  ${m.score > 0 ? "+" : ""}${m.score}` }) : null),
       h("span", { class: "from mono" }, m.who, m.bot ? h("span", { class: "muted", text: " · bot" }) : null),
-      h("span", { class: "date" }, timeEl(m.date, "")))),
+      h("span", { class: "date" }, timeEl(m.date, "")))), olderButton(d)],
     pend.map(([job, p]) => pendingRow(job, p)));
   return h("div", { class: "content news" + (S.full ? " full" : "") + (S.mobileReading ? " reading" : "") },
     table, readerPane(g, cur, msgs));
