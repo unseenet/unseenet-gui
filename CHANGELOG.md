@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **New screenshots and demo** (#207): the README shows People you follow, the timeline,
+  Private chats and the post composer; the playground (`tools/dev.sh`) has feeds, a site,
+  contacts, unread chats and a read-more entry, and its node carries sites and pictures.
 - **People you follow, by person** (asked for by the maintainer, #210, unseenet#706):
   following someone puts their feed and site together under their name in *People you
   follow*, sorted by name - one row when they have only one - instead of branches called

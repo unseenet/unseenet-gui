@@ -13,7 +13,7 @@ mkdir -p "$DEV"
 export UNSEENET_INSECURE_FAST_KDF=1 UNSEENET_NODE_PASSPHRASE=dev
 # no key ripening on the playground (UN-RFC 0025): new keys would work minutes each first
 # (in [node]: settings outside it are not read, so min_pow used to stay at 18)
-[ -f "$DEV/node.toml" ] || printf '[node]\nmin_pow = 12\nmin_ripe = "-"\n' > "$DEV/node.toml"
+[ -f "$DEV/node.toml" ] || printf '[node]\nmin_pow = 12\nmin_ripe = "-"\nsites = "accept"\navatars = "accept"\n[blobs]\nenabled = true\nencrypted = true\n' > "$DEV/node.toml"
 
 unseenet-node --data "$DEV/node-data" --config "$DEV/node.toml" --no-tor --listen 127.0.0.1:1119 \
   > "$DEV/node.log" 2>&1 &

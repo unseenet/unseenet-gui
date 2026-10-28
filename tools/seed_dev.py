@@ -96,6 +96,39 @@ async def main() -> None:
                       ("Og den kører fra en USB-stick.", mikkel)]:
         await who.post(chat, "", text, kind="chat")
 
+    # feeds, a site and following people (UN-RFC 0034, 0035; gui#210): Mikkel and Tove
+    # have feeds, Tove a site too, and Andreas follows both - People you follow
+    mfeed = await mikkel.start_personal_group("feed")
+    tfeed = await tove.start_personal_group("feed")
+    tsite = await tove.start_personal_group("site")
+    await tove.put_page(tsite, "index", "# Toves noder\n\nNoter om at køre en node på en Pi 5 - "
+                        "og hvorfor jeg gør det.\n")
+    long = await mikkel.post(mfeed, "Første tur med noden i rygsækken",
+                             "Jeg har haft en node kørende fra en Pi i rygsækken hele weekenden.\n\n"
+                             "...\n\n"            # read more (UN-RFC 0031 3.2.1): the feed cuts here
+                             "Den holdt fint på et powerbank i 14 timer, og Tor fandt vej hver gang "
+                             "jeg skiftede net. Næste gang prøver jeg med solcelle.")
+    await tove.post(tfeed, "", "Ny side om at køre en node på en Pi 5 - link i min profil :rocket:",
+                    kind="chat")
+    for who, name, f in ((mikkel, "Mikkel", mfeed), (tove, "Tove", tfeed)):
+        await who.publish_profile({"v": 1, "about": f"Hej, jeg er {name}.", "feeds": [f]})
+    await me.follow_person(mikkel.identity().key_text)
+    await me.follow_person(tove.identity().key_text)
+    me.subscribe(tsite)
+    await tove.fetch_group(mfeed)
+    await tove.post(mfeed, "", "Solcelle! Det vil jeg se.", kind="chat", references=[long])
+    me.set_in_timeline(snak, True)         # a discussion group in the timeline (UN-RFC 0034 6.2)
+
+    # private: contacts, a private post and chats with unread lines (gui#209)
+    me.add_contact(mikkel.identity().key_text, "Mikkel")
+    me.add_contact(tove.identity().key_text, "Tove")
+    await mikkel.send_chat("contact:" + me.identity().key_text, "Har du set mit feed? Rygsæk-noden kører.")
+    await tove.send_chat("contact:" + me.identity().key_text, "Kan vi peere node4 med din i aften?")
+    await tove.send_chat("contact:" + me.identity().key_text, "Jeg har sendt dig onion-adressen som post.")
+    await tove.send_private(me.my_inbox, "Onion-adressen til node4",
+                            "Her er den - del den ikke videre endnu.\n",
+                            owner_key=me.identity().public_key)
+
     for p in (mikkel, tove):           # pick up the invitation
         p.subscribe(ops)
         await p.fetch_group(ops)
