@@ -277,8 +277,8 @@ function listRow(p, cls, buttons, extra = null) {
   const label = p.label.replace(/ √$/, "");
   return h("div", { class: "listrow " + cls },
     h("button", { class: `item person${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`,
-      onclick: () => openGroup(p.id || "contact:" + p.key),
-      title: p.contact ? "Chat with " + label : "Not a contact - open the chat to add them" },
+      onclick: () => p.open ? p.open() : openGroup(p.id || "contact:" + p.key),
+      title: p.openTitle || (p.contact ? "Chat with " + label : "Not a contact - open the chat to add them") },
       h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
       h("span", { class: "nm", text: p.label }), extra,
       p.unread ? h("span", { class: "count", text: p.unread }) : null),
@@ -331,7 +331,10 @@ function contactsView() {
     h("button", { class: "btn primary", onclick: () => openAddContact("", "") }, svg(ICON.plus, 16, 2.5), "Add a contact")]);
   const body = h("div", { class: "content chats-list contacts-list" },
     privateFilter("contactFilter", "Find a contact", "Find: a name, a key or sonia@lorensen"),
-    list.length ? h("div", { class: "nav" }, list.map(c => listRow({ ...c, contact: true, unread: 0 }, "contactrow", [
+    // the name opens their profile (gui#215) - feed, site, follow, chat, post from there
+    list.length ? h("div", { class: "nav" }, list.map(c => listRow({ ...c, contact: true, unread: 0,
+        open: () => openProfile(c.key, c.label, "me"), openTitle: "Profile of " + c.label }, "contactrow", [
+      h("button", { class: "btn", title: "Their profile, feed and site", onclick: () => openProfile(c.key, c.label, "me") }, "Profile"),
       h("button", { class: "btn", onclick: () => openGroup("contact:" + c.key) }, "Chat"),
       h("button", { class: "btn", onclick: () => openPost(c.key, c.label) }, "Post"),
       contactMenu(c)],

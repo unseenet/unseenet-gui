@@ -80,6 +80,14 @@ async function openProfile(key, who = "", context = S.gid) {
         onclick: () => copyWeb(p.address, "person") }, "Copy web address") : null,
       p && !p.mine ? h("button", { class: "btn", title: "A profile only they can read, shown only to them (UN-RFC 0022 section 6)",
         onclick: () => openShareProfile(key, p.label || who) }, "Share yours") : null,
+      // a chat or a private post from the profile too (gui#215)
+      p && !p.mine ? h("button", { class: "btn", title: "A private chat with them (UN-RFC 0047)",
+        onclick: () => { closeDialog(); openGroup("contact:" + key); } }, "Chat") : null,
+      p && !p.mine ? h("button", { class: "btn", title: "Write a private post to them",
+        onclick: () => { closeDialog(); openPost(key, (p.label || who || "").replace(/ √$/, "")); } }, "Post") : null,
+      p && !p.mine && contactList().some(c => c.key === key) ? h("button", { class: "btn",
+        onclick: () => { closeDialog(); const c = contactList().find(c => c.key === key);
+          openAddContact(key, (c && c.name) || (p.label || who || "").replace(/ √$/, "")); } }, "Rename") : null,
       p && !p.mine ? (contactList().some(c => c.key === key)
         ? h("button", { class: "btn", onclick: () => { closeDialog(); removeContact(key, p.label || who); } }, "Remove contact")
         : h("button", { class: "btn", onclick: () => { closeDialog(); openAddContact(key, (p.label || who || "").replace(/~.*$/, "").replace(/^@/, "")); } }, "Add contact")) : null,
