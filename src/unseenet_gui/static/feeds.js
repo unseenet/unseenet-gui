@@ -86,7 +86,8 @@ function feedView(d) {
     input.value = ""; S.drafts["note:" + g.id] = "";
     doPost(g.id, { body: text, chat: true }, { text, chat: true, thread: "new:" + g.id });
   };
-  const pendNew = Object.entries(S.pending).filter(([, p]) => p.thread === "new:" + g.id);
+  const known = new Set(d.messages.map(x => x.id));
+  const pendNew = Object.entries(S.pending).filter(([, p]) => p.thread === "new:" + g.id && !(p.message_id && known.has(p.message_id)));
   return h("div", { class: "content" }, h("section", { class: "feed", "aria-label": timeline ? "Timeline" : "Feed",
     "data-scroll": "feed:" + g.id },
     String(g.id).startsWith(TAGGED) ? h("p", { class: "hint feed-note", text: `Everything tagged ${g.tag} in your groups and feeds, newest first - the authors' tags, the groups', and topics of labellers you follow for topics.` }) :
@@ -152,7 +153,8 @@ function entryCard(d, e) {
     if (S.answering) delete S.answering[m.id];
     doPost(m.group, { body: text, chat: true, references: [...to.references, to.id] }, { text, chat: true, thread: m.id });
   };
-  const pend = Object.entries(S.pending).filter(([, p]) => p.thread === m.id);
+  const have = new Set(e.comments.map(c => c.id));      // drawn once: the real one wins
+  const pend = Object.entries(S.pending).filter(([, p]) => p.thread === m.id && !(p.message_id && have.has(p.message_id)));
   const own = groupOf(m.group) || g;
   return h("article", { class: "entry" + (m.pinned ? " pinned" : "") + (m.read ? "" : " unread") + (S.post === m.id ? " on" : ""), "data-id": m.id },
     warningFlags(m),                                    // warnings at the top left (UN-RFC 0053)

@@ -62,7 +62,7 @@ function connectEvents() {
     } else if (type === "group-updated") {
       if (e.new) notifySoon();                                 // #126 (notify.js)
       if (e.new) sidebarSoon();                                // counts in the sidebar
-      if (e.group_id === S.gid || S.gid === FOR_YOU ||
+      if (e.group_id === S.gid || S.gid === FOR_YOU || (e.new && isMixed(S.data && S.data.group)) ||
           (S.gid && S.gid.startsWith("contact:") && S.sidebar && e.group_id === S.sidebar.inbox.id)) {
         await loadGroup(); render();
       }

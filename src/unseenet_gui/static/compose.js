@@ -117,8 +117,10 @@ async function jobEvent(e, draw = true) {                   // a post on its way
   p.state = e.state; p.error = e.error;
   if (e.message_id) p.message_id = e.message_id;
   if (e.state === "reached") {
-    // keep the grey line until the group has the real one: no gap, no jump
-    if (S.gid === p.group) await loadGroup();
+    // keep the grey line until the view has the real one: no gap, no jump - in the group
+    // itself, and in a view that mixes groups (the timeline, a tag), where a comment's
+    // group is one of those shown (gui#235)
+    if (S.gid === p.group || isMixed(S.data && S.data.group)) await loadGroup();
     delete S.pending[e.job];
   }
   if (e.state === "failed") toast("Not sent: " + (e.error || "unknown error"));
