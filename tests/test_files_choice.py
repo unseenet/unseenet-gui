@@ -81,6 +81,11 @@ class LocalAPI:
             data = {"key": SONIA, "label": "Sonia", "mine": False, "hidden": False, "profile": None,
                     "address": "unseenet:" + "s" * 16, "feed": None, "following": False,
                     "theirs": {"feed": None, "site": None}}
+        elif path == "/api/help/group-settings":       # the core's help (#178)
+            data = {"intro": "Every save is a new version.", "settings": [
+                {"key": k, "label": k.title(), "what": "What " + k + " does.",
+                 "affects": "Readers.", "later": "Any time."}
+                for k in ("title", "view", "files", "team_name", "low_latency")]}
         elif path.startswith("/x/gui/write/"):
             data = {"post": {"allowed": True}, "chat": {"allowed": True}}
         elif path.endswith("/settings"):
@@ -170,6 +175,25 @@ async def test_edit_a_group_files(files_page):
     await dialog.get_by_role("button", name="Save", exact=True).click()
     await expect(page.locator(".toast")).to_contain_text("updated")
     assert api.settings[-1]["files"] == "pictures+pdf"
+
+
+async def test_edit_group_has_help(files_page):
+    """#178: Help beside Edit group - the core's words for the settings shown here, and
+    what you typed stays when it opens."""
+    page, api, _ = files_page
+    await page.get_by_role("button", name=re.compile("dk.foto.chat")).first.click()
+    await page.evaluate("openEditGroup()")
+    dialog = page.locator(".dialog.edit-group")
+    panel = dialog.locator("#settings-help")
+    await expect(panel).to_be_hidden()
+    await dialog.locator("#etitle").fill("Nyt navn")
+    await dialog.get_by_role("button", name="Help", exact=True).click()
+    await expect(panel).to_be_visible()
+    await expect(panel).to_contain_text("Every save is a new version.")
+    await expect(panel.locator("h3")).to_have_text(["Title", "View", "Files"])   # shown here, in order
+    await expect(dialog.locator("#etitle")).to_have_value("Nyt navn")
+    await dialog.get_by_role("button", name="Hide help").click()
+    await expect(panel).to_be_hidden()
 
 
 async def test_a_picture_on_a_chat_line(files_page):
