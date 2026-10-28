@@ -417,8 +417,8 @@ function mainArea() {
         h("button", { class: "btn", onclick: () => copy(g.key, "Their key is copied.") }, "Copy key"),
         h("button", { class: "btn primary", title: "A post with a subject instead of a chat line (N)",
           onclick: () => openPost(g.key, g.label.replace(/ √$/, "")) }, "Write a post", h("kbd", { text: "N" }))] : null,
-      // your private posts: the same head as the other private lists (gui#209)
-      S.sidebar && g.id === S.sidebar.inbox.id ? [contactsButton(),
+      // your private posts: the same head as the other private lists, one action (gui#209, gui#219)
+      S.sidebar && g.id === S.sidebar.inbox.id ? [
         h("button", { class: "btn primary", onclick: () => openWrite("", "post") },
           svg(ICON.plus, 16, 2.5), "Write a private post", h("kbd", { text: "M" }))] : null,
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
