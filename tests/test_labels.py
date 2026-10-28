@@ -158,7 +158,11 @@ async def test_writing_with_warnings_and_tags(page_with):
     await page.locator("#subject").fill("Finalen")
     await page.locator("#body").fill("Om #Serier og !dk.film\n")
     await expect(page.locator(".tagfield .tchip.lab")).to_have_text("serier")      # from the text, at once
-    await page.locator(".wpick.w-spoiler").click()
+    await expect(page.locator(".wpick")).to_have_count(0)          # no colours until chosen (gui#203)
+    await page.locator(".wbtn").click()
+    await page.locator('.wmenu input[data-w="spoiler"]').check()
+    await expect(page.locator(".wpick.w-spoiler")).to_be_visible()
+    await expect(page.locator(".wbtn")).to_contain_text("Warnings (1)")
     tag = page.locator(".tagin")
     await tag.fill("finale")
     await tag.press("Enter")

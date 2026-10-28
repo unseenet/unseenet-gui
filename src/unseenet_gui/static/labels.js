@@ -161,14 +161,22 @@ function tagField(st, textOf) {
   };
   const draw = () => {
     const fromText = tagWords(textOf()).filter(t => !st.tags.includes(t));
+    // content warnings behind one button (gui#203): only the chosen ones show, in colour
+    const chosen = WARNINGS.filter(w => st.tags.includes(w));
+    const toggle = (w) => { st.tags = st.tags.includes(w) ? st.tags.filter(x => x !== w) : [...st.tags, w].slice(0, 8); draw(); };
+    const order = ["spoiler", ...WARNINGS.filter(w => w !== "spoiler")];   // the one people use first
     box.replaceChildren(
       h("div", { class: "warnpick", role: "group", "aria-label": "Content warnings" },
-        h("span", { class: "hint", text: "Warn about:" }),
-        WARNINGS.map(w => h("button", { type: "button", class: "wpick w-" + w + (st.tags.includes(w) ? " on" : ""),
-          "aria-pressed": String(st.tags.includes(w)),
-          onclick: () => { st.tags = st.tags.includes(w) ? st.tags.filter(x => x !== w) : [...st.tags, w].slice(0, 8); draw(); } }, w))),
+        chosen.map(w => h("button", { type: "button", class: "wpick on w-" + w, "aria-pressed": "true",
+          title: "Remove this warning", onclick: () => toggle(w) }, w, " ×")),
+        h("button", { type: "button", class: "btn wbtn", "aria-haspopup": "true", "aria-expanded": String(!!st.warnOpen),
+          onclick: () => { st.warnOpen = !st.warnOpen; draw(); } },
+          svg(ICON.alert, 14, 2.2), chosen.length ? ` Warnings (${chosen.length}) ▾` : " Content warning ▾"),
+        st.warnOpen ? h("div", { class: "wmenu", role: "group", "aria-label": "Warn about" },
+          order.map(w => h("label", { class: "check" },
+            h("input", { type: "checkbox", checked: st.tags.includes(w), "data-w": w, onchange: () => toggle(w) }),
+            " " + (WARNING_TEXT[w] || w)))) : null),
       h("div", { class: "tchips edit" },
-        h("span", { class: "hint", text: "Tags:" }),
         st.tags.filter(t => !WARNINGS.includes(t)).map(t => h("span", { class: "tchip" }, t,
           h("button", { type: "button", class: "x", "aria-label": "Remove " + t,
             onclick: () => { st.tags = st.tags.filter(x => x !== t); draw(); } }, "×"))),

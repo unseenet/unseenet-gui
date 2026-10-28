@@ -192,7 +192,7 @@ async def test_a_private_post_takes_pictures(files_page):
     page, api, _ = files_page
     await page.evaluate("openWrite('ed25519:someone', 'post')")
     await expect(page.locator("#body")).to_be_visible()
-    await expect(page.locator(".dialog .attach")).to_contain_text("Add pictures or files")
+    await expect(page.locator(".toolbar label[for=cfiles]")).to_be_visible()   # the paperclip (gui#203)
 
 
 async def test_create_a_site_makes_it_a_channel(files_page):
@@ -294,3 +294,25 @@ async def test_the_sidebar_filter_and_the_palette_button(files_page):
     await box.fill("foto")
     await box.press("Enter")                                        # opens the first
     await expect(page.locator(".ghead h1")).to_contain_text("dk.foto.chat")
+
+
+async def test_the_post_composer_has_room_and_a_toolbar(files_page):
+    """gui#203: bigger, ⤢ makes it nearly the whole window and is remembered; a toolbar
+    with bold and quote; the footer short."""
+    page, api, _ = files_page
+    await page.evaluate("openWrite('ed25519:someone', 'post')")
+    win = page.locator(".dialog.compose-win")
+    await expect(win).to_be_visible()
+    await expect(win).not_to_have_class(re.compile(r"\bbig\b"))
+    await page.locator('[data-k="cgrow"]').click()
+    await expect(win).to_have_class(re.compile(r"\bbig\b"))
+    assert await page.evaluate("localStorage.getItem('unseenet.composeBig')") == "1"
+    body = page.locator("#body")
+    await body.fill("hej")
+    await body.evaluate("el => el.setSelectionRange(0, 3)")
+    await page.get_by_role("button", name="Bold").click()
+    await expect(body).to_have_value("**hej**")
+    await expect(page.locator(".dialog .df")).to_contain_text("Sealed to them")
+    await page.keyboard.press("Escape")
+    await page.evaluate("openWrite('ed25519:someone', 'post')")
+    await expect(page.locator(".dialog.compose-win.big")).to_be_visible()   # remembered

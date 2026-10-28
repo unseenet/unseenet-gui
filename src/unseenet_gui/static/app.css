@@ -1109,3 +1109,32 @@ time.ago { white-space: nowrap; }
 .btn.mini-text { padding: 2px 8px; font-size: 12px; margin-left: auto; }
 /* a node not answering yet (#206): quiet, beside the status */
 .statusbar .slow-node { color: var(--amber); font-size: 12px; margin-right: 10px; }
+/* the post composer (gui#203): room to write, a toolbar, one row for language/tags/warnings */
+.dialog.compose-win { max-width: 860px; }
+.dialog.compose-win .compose-body { min-height: 180px; height: min(32vh, calc(100vh - 500px)); border: none; border-radius: 0 0 8px 8px; resize: vertical; }
+.dialog.compose-win.big { max-width: 95vw; width: 95vw; height: 95vh; max-height: 95vh; }
+.dialog.compose-win.big .db { flex: 1 1 auto; display: flex; flex-direction: column; }
+.dialog.compose-win.big .editor { flex: 1 1 auto; display: flex; flex-direction: column; }
+.dialog.compose-win.big .compose-body { flex: 1 1 auto; height: auto; resize: none; }
+.editor { border: 1px solid var(--line-2); border-radius: 8px; display: flex; flex-direction: column; }
+.editor .toolbar { display: flex; align-items: center; gap: 2px; padding: 3px 6px; border-bottom: 1px solid var(--line); }
+.editor .toolbar .btn { height: 28px; min-width: 28px; padding: 0 6px; border: none; background: transparent;
+  box-shadow: none; display: inline-flex; align-items: center; justify-content: center; }
+.editor .toolbar .btn:hover { background: var(--line); }
+.editor .toolbar .mini-text { font-size: 12px; margin-left: 4px; }
+.editor .toolbar .mdmark { font-size: 12px; cursor: help; }
+.attach.in-toolbar .hint[hidden] { display: none; }
+.metarow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.metarow .tagfield { flex: 1 1 320px; flex-direction: row; flex-wrap: wrap; align-items: center; }
+.metarow .tagfield .tchips { flex: 1 1 200px; }
+.metarow .tagfield .warnpick { order: 2; position: relative; }
+.warnpick .wmenu { position: absolute; bottom: 38px; right: 0; z-index: 5; background: var(--ink); border: 1px solid var(--line-2);
+  border-radius: 8px; padding: 6px 10px; display: flex; flex-direction: column; gap: 2px; min-width: 190px; }
+.df.btns { align-items: center; }
+.df.btns .hint.grow { flex: 1; font-size: 12px; }
+.metarow .tagin { min-width: 270px; }
+@media (max-width: 760px) {
+  .dialog.compose-win.big { width: auto; height: 100dvh; max-width: none; }
+  .dialog.compose-win .compose-body { height: 40dvh; }
+}
+.editor .toolbar .grow { flex: 1; }
