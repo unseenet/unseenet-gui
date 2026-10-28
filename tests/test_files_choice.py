@@ -235,10 +235,8 @@ async def test_close_a_chat_from_the_list(files_page):
     assert api.closed == [{"key": SONIA, "on": True}]
     await expect(page.locator(".chats-list")).to_contain_text("Closed - back when one of you writes")
     await expect(page.locator(".chats-list .personrow .more")).to_have_count(0)
-    await page.keyboard.press("Control+k")                # still a contact
-    await page.keyboard.type("Contacts")
-    await page.keyboard.press("Enter")
-    await expect(page.locator(".dialog")).to_contain_text("Sonia")
+    await page.get_by_role("button", name="Your contacts").click()   # still a contact (gui#209)
+    await expect(page.locator(".contacts-list")).to_contain_text("Sonia")
 
 
 async def test_a_chat_has_close_chat_not_unsubscribe(files_page):

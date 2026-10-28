@@ -81,6 +81,7 @@ const S = {
 const FOR_YOU = "for-you:";                          // the core's pseudo group (threads.FOR_YOU)
 const TIMELINE = "timeline:";                        // every feed you follow (threads.TIMELINE)
 const CHATS = "chats:";                              // the list of private chats, drawn here (gui#172)
+const CONTACTS = "contacts:";                        // your contacts, drawn here (gui#209)
 const TAGGED = "tag:";                               // + a tag: everything with it (threads.TAGGED)
 // Posts from many groups, each in its own: the timeline and a tag's view.
 const isMixed = (g) => !!g && (g.id === TIMELINE || String(g.id).startsWith(TAGGED));

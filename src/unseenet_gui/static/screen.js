@@ -48,8 +48,9 @@ async function openGroup(gid, rerender = true) {
 async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
-  if (gid === CHATS) {                                // a list drawn from the sidebar's people (gui#172)
-    S.data = { group: { id: CHATS, label: "Private chats", view: "list" }, messages: [], write: {} };
+  if (gid === CHATS || gid === CONTACTS) {            // lists drawn from the sidebar (gui#172, #209)
+    S.data = { group: { id: gid, label: gid === CHATS ? "Private chats" : "Your contacts", view: "list" },
+      messages: [], write: {} };
     return;
   }
   try {
@@ -187,9 +188,7 @@ function sidebar() {
         ? item(m.id, ic, "Your " + kind, m.unread ? h("span", { class: "count", text: m.unread }) : null, "", title)
         : h("button", { class: "item start", onclick: start, title },
             h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: "Start your " + kind }))),
-      sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
-        sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
-      ...chatsItem(sb),
+      ...privateItems(sb),                            // contacts, posts, chats alike (gui#209)
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
       sb.moderation ? h("button", { class: "item", onclick: openModeration },
         h("span", { class: "ic", text: "✓" }), h("span", { class: "nm", text: "To approve" }),
@@ -215,24 +214,26 @@ function sidebar() {
       h("button", { class: "btn icon", "aria-label": "Show your key", title: "Show your key (K)", onclick: openKey, text: "K" })));
 }
 
-const CHATS_SHOWN = 5;                               // unread chats under Private chats
+const CHATS_SHOWN = 3;                               // unread chats under Private chats (gui#209)
 
-// Private chats as a fixed item at the top (gui#172), with what is unread: under it only
-// the chats with unread lines, at most five, and the one you are in, then Show all - so
-// a hundred chats never push the groups down.
-function chatsItem(sb) {
+// The private part of the sidebar (gui#209): three rows alike - Your contacts, Private
+// posts, Private chats - each opening its list in the main pane, no buttons on them;
+// under Private chats only the chats with unread lines (at most three, and the one you
+// are in), then Show all, so a hundred chats never push the groups down.
+function privateItems(sb) {
+  const row = (gid, icon, label, count, title) => h("button", {
+    class: `item private-item${gid === CHATS ? " chats-item" : ""}${S.gid === gid ? " on" : ""}${count ? " unread" : ""}`,
+    "aria-current": S.gid === gid ? "page" : null, onclick: () => openGroup(gid), title },
+    h("span", { class: "ic" }, svg(icon, 14, 2.2)), h("span", { class: "nm", text: label }),
+    count ? h("span", { class: "count", text: count }) : null);
   const unread = sb.people.reduce((n, p) => n + (p.unread || 0), 0);
   const under = sb.people.filter(p => p.unread || S.gid === p.id).slice(0, CHATS_SHOWN);
   const all = sb.people.length + (sb.contacts || []).filter(c => c.closed).length;
-  return [h("div", { class: "chats-row" },
-    h("button", { class: `item chats-item${S.gid === CHATS ? " on" : ""}${unread ? " unread" : ""}`,
-      "aria-current": S.gid === CHATS ? "page" : null, onclick: () => openGroup(CHATS),
-      title: "One chat per person - only the two of you can read it" },
-      h("span", { class: "ic" }, svg(ICON.lock, 13, 2.5)), h("span", { class: "nm", text: "Private chats" }),
-      unread ? h("span", { class: "count", text: unread }) : null),
-    // your contacts and a new chat stay one click away, as before
-    h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
-    h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
+  return [
+    row(CONTACTS, ICON.people, "Your contacts", 0, "The people you gave a name - only you see the names (C)"),
+    sb.inbox.id ? row(sb.inbox.id, ICON.mail, "Private posts", sb.inbox.unread, "Posts sealed to you") : null,
+    h("div", { class: "chats-row" }, row(CHATS, ICON.bubble, "Private chats", unread,
+      "One chat per person - only the two of you can read it")),
     under.length ? h("div", { class: "sub chats-sub" }, under.map(p => personRow(p)),
       all > under.length ? h("button", { class: "item more-chats", onclick: () => openGroup(CHATS) },
         h("span", { class: "nm", text: `Show all (${all})` })) : null) : null];
@@ -250,6 +251,28 @@ function personRow(p, extra = null) {
     p.closed ? null : chatMenu(p));
 }
 
+// The head every private list has (gui#209): title, a chip, one line, the main action -
+// and Contacts beside it where that helps.
+function privateHead(title, chip, about, actions) {
+  return h("header", { class: "ghead" },
+    h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
+    h("div", { class: "t" }, h("div", { class: "row" }, h("h1", { text: title }),
+      h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5), chip)), h("p", { text: about })),
+    h("div", { class: "actions" }, actions));
+}
+
+// A filter field for a private list, kept in S[key].
+function privateFilter(key, label, placeholder) {
+  return h("div", { class: "side-filter chats-filter" }, svg(ICON.search, 16),
+    h("label", { for: key.toLowerCase(), class: "sr", text: label }),
+    h("input", { id: key.toLowerCase(), type: "search", "data-k": key.toLowerCase(), autocomplete: "off", placeholder, value: S[key] || "",
+      oninput: (e) => { S[key] = e.target.value; render(); },
+      onkeydown: (e) => { if (e.key === "Escape") { e.preventDefault(); S[key] = ""; render(); } } }));
+}
+
+const contactsButton = () => h("button", { class: "btn", title: "Your contacts (C)", onclick: openContacts },
+  "Contacts", h("kbd", { text: "C" }));
+
 // The full list of private chats in the main pane (gui#172): filterable, room for
 // hundreds, + to start one; closed chats last, back when either of you writes.
 function chatsView() {
@@ -260,26 +283,59 @@ function chatsView() {
   const closed = (sb.contacts || []).filter(c => c.closed && hit(c)).map(c => ({ ...c, id: "contact:" + c.key }));
   const about = "Private chats, one per person - only you and the other person can read them. " +
     "Add people as contacts, or start a chat with +.";
-  const head = h("header", { class: "ghead" },
-    h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
-    h("div", { class: "t" }, h("div", { class: "row" }, h("h1", { text: "Private chats" }),
-      h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5), "end-to-end encrypted")),
-      h("p", { text: about })),
-    h("div", { class: "actions" },
-      h("button", { class: "btn", title: "Your contacts (C)", onclick: openContacts }, "Contacts", h("kbd", { text: "C" })),
-      h("button", { class: "btn primary", title: "Chat with someone", onclick: () => openWrite("", "chat") },
-        svg(ICON.plus, 16, 2.5), "Chat with someone")));
+  const head = privateHead("Private chats", "end-to-end encrypted", about, [contactsButton(),
+    h("button", { class: "btn primary", title: "Chat with someone", onclick: () => openWrite("", "chat") },
+      svg(ICON.plus, 16, 2.5), "Chat with someone")]);
   const body = h("div", { class: "content chats-list" },
-    h("div", { class: "side-filter chats-filter" }, svg(ICON.search, 16),
-      h("label", { for: "chatfilter", class: "sr", text: "Filter chats" }),
-      h("input", { id: "chatfilter", type: "search", "data-k": "chatfilter", autocomplete: "off",
-        placeholder: "Filter by name or key", value: S.chatFilter || "",
-        oninput: (e) => { S.chatFilter = e.target.value; render(); },
-        onkeydown: (e) => { if (e.key === "Escape") { e.preventDefault(); S.chatFilter = ""; render(); } } })),
+    privateFilter("chatFilter", "Filter chats", "Filter by name or key"),
     open.length ? h("div", { class: "nav" }, open.map(p => personRow(p))) : null,
     closed.length ? [h("h3", { class: "row-h", text: "Closed - back when one of you writes" }),
       h("div", { class: "nav" }, closed.map(p => personRow(p)))] : null,
     !open.length && !closed.length ? h("div", { class: "empty" },
       h("h2", { text: q ? "No chat matches" : "No private chats yet" }), h("p", { text: about })) : null);
   return [head, body];
+}
+
+// Your contacts in the main pane (gui#209, instead of the old dialog): find one, chat,
+// write a post, rename or remove - and add someone by their key.
+function contactsView() {
+  const q = (S.contactFilter || "").trim().toLowerCase();
+  const list = contactList().filter(c => contactMatches(c, q))
+    .sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "base" }));
+  const looksLikeKey = /^ed25519:[a-z2-7]{20,}$/i.test((S.contactFilter || "").trim());
+  const about = "The people you gave a name. The names are yours: only you see them, and nobody is told.";
+  const head = privateHead("Your contacts", "names only you see", about, [
+    h("button", { class: "btn primary", onclick: () => openAddContact("", "") }, svg(ICON.plus, 16, 2.5), "Add a contact")]);
+  const body = h("div", { class: "content chats-list contacts-list" },
+    privateFilter("contactFilter", "Find a contact", "Find: a name, a key or sonia@lorensen"),
+    list.length ? h("div", { class: "nav" }, list.map(c => h("div", { class: "personrow contactrow" },
+      h("button", { class: "item person", onclick: () => openGroup("contact:" + c.key), title: "Chat with " + c.label },
+        h("span", { class: `av xs c${c.colour}`, "aria-hidden": "true", text: initials(c.label) }),
+        h("span", { class: "nm", text: c.label }),
+        c.names && c.names.length ? h("span", { class: "hint", text: c.names.join(", ") }) : null),
+      h("button", { class: "btn", onclick: () => openGroup("contact:" + c.key) }, "Chat"),
+      h("button", { class: "btn", onclick: () => openPost(c.key, c.label) }, "Post"),
+      contactMenu(c)))) :
+    h("div", { class: "empty" }, h("h2", { text: q ? "No contact matches" : "No contacts yet" }),
+      looksLikeKey ? h("div", { class: "row" },
+        h("button", { class: "btn primary", onclick: () => openGroup("contact:" + S.contactFilter.trim()) }, "Chat with this key"),
+        h("button", { class: "btn", onclick: () => openAddContact(S.contactFilter.trim(), "") }, "Add as contact")) :
+        h("p", { text: q ? "Paste a key to chat with it or add it." :
+          "Open a post or a profile and choose Add contact to give its author a name of your own." })));
+  return [head, body];
+}
+
+// "⋯" on a contact: rename or remove (asked once more).
+function contactMenu(c) {
+  const id = "contact:" + c.key, open = S.menuFor === id;
+  const items = [["Rename", () => openAddContact(c.key, c.label)],
+    ["Remove", async () => {
+      if (!window.confirm(`Remove ${c.label}? The contact is forgotten; your chat and posts stay.`)) return;
+      try { await api("POST", "/api/contacts", { key: c.key, remove: true }); } catch (x) { toast(x.message); return; }
+      toast(c.label + " is no longer a contact."); await loadSidebar(); render(); }]];
+  return h("div", { class: "more" + (open ? " open" : "") },
+    h("button", { class: "morebtn", type: "button", "aria-label": "More about " + c.label, "aria-haspopup": "menu",
+      "aria-expanded": String(open), onclick: (e) => { e.stopPropagation(); S.menuFor = open ? null : id; render(); } }, "⋯"),
+    open ? h("div", { class: "menu", role: "menu" }, items.map(([label, run]) => h("button", { class: "mi", type: "button",
+      role: "menuitem", onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))) : null);
 }
