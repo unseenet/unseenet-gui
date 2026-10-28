@@ -395,11 +395,17 @@ function openTeamReply(m, g) {
 }
 
 // Edit your own post (UN-RFC 0042): a new version, in the same place in its thread.
+// Its tags, warnings and language are filled in, so fixing a typo keeps them (#239,
+// unseenet#733): the tags without the #words in its text, which come from the new text.
 function openEdit(m, g) {
+  const written = tagWords((m.subject || "") + "\n" + (m.text || ""));
+  const startTags = m.edit_tags || (m.tags || []).filter(t => !written.includes(t));
   openComposeWindow({ g, title: "Edit your post in " + g.label, subject: m.subject, edit: true, cursor: 0,
     body: (m.text || "").trimEnd() + "\n" + (m.signature ? "\n-- \n" + m.signature + "\n" : ""),
-    send: (subject, text) => doSend(`/api/groups/${encodeURIComponent(g.id)}/edit`, g.id,
-      { id: m.id, subject, body: text }, { text }) });
+    startTags, startLanguages: m.languages || [],
+    send: (subject, text, _notify, _files, tags, languages) => doSend(`/api/groups/${encodeURIComponent(g.id)}/edit`, g.id,
+      { id: m.id, subject, body: text, tags: tags || [],
+        ...(languages !== undefined ? { languages } : {}) }, { text }) });
 }
 
 // Edit a chat line or a comment (UN-RFC 0042): one line, no subject, no signature.
@@ -498,8 +504,13 @@ function quoteSelection(k) {
 
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
-function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo }) {
-  const dialog = { focus: "#body", node: null, files: [], tags: [] };
+function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo,
+                             startTags, startLanguages }) {
+  // an edit starts with the post's own tags and warnings (unseenet#733)
+  const dialog = { focus: "#body", node: null, files: [], tags: [...(startTags || [])] };
+  // the language row: an edit's is the post's own, a new post's the core's suggestion
+  const langStart = edit ? { codes: startLanguages || [], why: "the post's" } :
+    (g && g.suggested_languages) ? { codes: g.suggested_languages.codes || [], why: languageWhy(g.suggested_languages.from) } : null;
   let tagBox = null;                                  // tags and warnings (UN-RFC 0052), not in private posts
   // files (UN-RFC 0027): where the group takes them; said plainly where its node does not.
   // A private post: pictures, encrypted to them (#102, unseenet#497) - if their inbox
@@ -580,8 +591,10 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     const langField = f.querySelector("#clang");
     const chosen = langField ? languageCodes(langField.value) : null;
     const suggested = (g && g.suggested_languages && g.suggested_languages.codes) || [];
-    // none suggested and none typed: send nothing; cleared: [] forgets it for the group
-    dialog.languages = langField ? (chosen.length || suggested.length ? chosen : undefined) : undefined;
+    // none suggested and none typed: send nothing; cleared: [] forgets it for the group.
+    // An edit sends what the field says - the post's own unless you changed it
+    dialog.languages = !langField ? undefined : edit ? chosen :
+      (chosen.length || suggested.length ? chosen : undefined);
     closeDialog();
     await send(s, b, N.may ? N.on : undefined, files, dialog.tags, dialog.languages);
     toast(edit ? "Saving the new version - postage takes a few seconds." :
@@ -639,14 +652,14 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       takes ? filePicker(dialog, fg, carries, undefined, { toolbar: true }) : null,
       // language, tags and content warnings on one row (gui#203), each with its explanation
       h("div", { class: "metarow" },
-      (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
+      (!priv && g && langStart) ? h("div", { class: "langrow" },
         h("span", { class: "llabel", text: "Language" }),
         // the codes as sent, kept in the form; the button shows and changes them
-        h("input", { type: "hidden", id: "clang", name: "clang", value: (g.suggested_languages.codes || []).join(", ") }),
-        h("span", { class: "langslot" }, languageButton(g.suggested_languages.codes || [],
+        h("input", { type: "hidden", id: "clang", name: "clang", value: langStart.codes.join(", ") }),
+        h("span", { class: "langslot" }, languageButton(langStart.codes,
           (codes) => setLanguage(codes, "you chose it", true), langOpts())),
-        h("span", { class: "hint", text: languageWhy(g.suggested_languages.from) })) : null,
-      !priv && !edit ? (tagBox = tagField(dialog, () => {
+        h("span", { class: "hint", text: langStart.why })) : null,
+      !priv ? (tagBox = tagField(dialog, () => {
         const f = dialog.node && dialog.node.querySelector("form");
         return f ? f.subject.value + "\n" + f.body.value : "";
       })) : null),

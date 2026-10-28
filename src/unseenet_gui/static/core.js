@@ -131,6 +131,7 @@ function fromRow(r) {
     readable: m.readable, error: m.error, edited: m.edited,
     tree: r.tree, markdown: isMd(m.content_type), read: r.read, for_me: r.for_me,
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
+    edit_tags: r.edit_tags || null,                   // what an edit starts with (unseenet#733)
     depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null,
     pinned: !!r.pinned, address: r.address || "",
     // reactions (UN-RFC 0048): the counts, may you react, and its own group's set
