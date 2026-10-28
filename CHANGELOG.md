@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A group's charter** (#231, unseenet#726): what a group's owner writes about the group
+  is now called its *charter* - in About this group, Edit group (with a hint that no
+  machine enforces it), the palette and the report texts. *Rules* means only your own
+  rules. Uses the core's `charter`, `charter_type` and `charter_tree` (unseenet#727).
+
 - **New screenshots and demo** (#207): the README shows People you follow, the timeline,
   Private chats and the post composer; the playground (`tools/dev.sh`) has feeds, a site,
   contacts, unread chats and a read-more entry, and its node carries sites and pictures.

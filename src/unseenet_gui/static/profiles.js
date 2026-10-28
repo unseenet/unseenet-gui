@@ -283,7 +283,7 @@ function commands() {
   const cmds = [
     { name: "New post", key: "N", when: g && g.type && mayWrite(S.data, "post").allowed && g.view !== "chat", run: openCompose },
     { name: "Switch between chat and threads", key: "V", when: g && g.type && g.type !== "inbox", run: toggleView },
-    { name: "About this group: rules, type, owner", key: "?", when: g && g.type, run: openInfo },
+    { name: "About this group: charter, type, owner", key: "?", when: g && g.type, run: openInfo },
     { net: true, name: "Find groups on your nodes", key: "G", run: openBrowse },
     { net: true, name: "Who reads this inbox: readers with team keys", key: "", also: "team inbox readers operator",
       when: g && g.type === "inbox" && g.owner && !(S.sidebar && S.sidebar.inbox && S.sidebar.inbox.id === g.id),
