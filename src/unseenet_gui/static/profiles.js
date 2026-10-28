@@ -377,6 +377,7 @@ function commands() {
     { name: "About Unseenet: what it is, why, and how it protects you", key: "F1", run: openAbout },
     { name: "Refresh now", key: "", run: () => api("POST", "/api/refresh").then(() => toast("Refreshing …")) },
     { name: "Private posts", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
+    { name: "Private chats: every person you chat with", key: "", also: "chats people dm messages beskeder", run: () => openGroup(CHATS) },
     { name: "Chat with someone", key: "", run: () => openWrite("", "chat") },
     { name: "For you: replies and mentions", key: "", run: () => openGroup(FOR_YOU) },
   ].filter(c => c.when === undefined || c.when);

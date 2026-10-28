@@ -82,6 +82,7 @@ async def chat():
         page.on("pageerror", lambda e: errors.append(str(e)))
         await page.goto(str(server.make_url("/")) + "#t=" + TOKEN)
         await page.wait_for_load_state("networkidle")
+        await page.locator(".chats-item").click()            # the list of private chats (gui#172)
         await page.get_by_role("button", name="Sonia").first.click()
         await page.wait_for_load_state("networkidle")
         yield page, api

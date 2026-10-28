@@ -1098,3 +1098,9 @@ time.ago { white-space: nowrap; }
 /* a group in your timeline (UN-RFC 0034 6.2): a quiet mark in the list, a switch in its head */
 .tl-mark { color: var(--green); font-weight: 700; margin-left: 2px; }
 .btn.tl-switch.on { border-color: var(--green); color: var(--green); }
+/* Private chats (gui#172): the fixed item, the unread chats under it, the full list */
+.chats-sub { margin-left: 14px; }
+.chats-sub .more-chats .nm { color: var(--muted); font-size: 12px; }
+.chats-list .chats-filter { margin: 0 0 10px; }
+.chats-row { display: flex; align-items: center; gap: 2px; }
+.chats-row .chats-item { flex: 1; min-width: 0; }
