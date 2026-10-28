@@ -46,6 +46,10 @@ async def handle(request):
                              contact(MIKKEL, "Mikkel"), contact(MIA, "Mia")]}
     elif path == "/api/pictures":
         data = {"pictures": {}}
+    elif path == "/api/profile":
+        data = {"key": request.query.get("key"), "label": "Sonia √", "mine": False,
+                "context": request.query.get("context"),
+                "theirs": {"feed": "feed@ssss", "site": None}, "profile": {"about": "Hej"}}
     else:
         data = {}
     return web.json_response(data)
@@ -132,6 +136,26 @@ async def test_the_person_picker(page):
     await find.fill("son")
     await expect(dialog.locator(".cmd.on")).to_contain_text("Sonia")
     await find.press("Enter")
+    await expect(dialog).to_have_count(0)
+    await page.wait_for_load_state("networkidle")
+    assert any(p.startswith("/api/groups/contact:" + SONIA) for p in SEEN), SEEN
+
+
+async def test_a_contacts_profile(page):
+    """gui#215: the name, or Profile, opens their profile - and from there feed, chat,
+    post, rename and remove."""
+    row = page.locator(".contactrow").filter(has_text="Sonia")
+    await row.locator(".item").click()
+    dialog = page.get_by_role("dialog", name="Profile")
+    await expect(dialog.get_by_role("heading")).to_have_text("Sonia √")
+    assert any(p == "/api/profile" for p in SEEN), SEEN
+    for name in ("Their feed", "Follow", "Chat", "Post", "Rename", "Remove contact"):
+        await expect(dialog.get_by_role("button", name=name, exact=True)).to_be_visible()
+    await dialog.get_by_role("button", name="Close", exact=True).last.click()
+    await expect(dialog).to_have_count(0)
+    await row.get_by_role("button", name="Profile", exact=True).click()
+    await expect(dialog).to_be_visible()
+    await dialog.get_by_role("button", name="Chat", exact=True).click()
     await expect(dialog).to_have_count(0)
     await page.wait_for_load_state("networkidle")
     assert any(p.startswith("/api/groups/contact:" + SONIA) for p in SEEN), SEEN
