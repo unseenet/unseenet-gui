@@ -20,6 +20,7 @@ expect = playwright.expect
 
 TOKEN = "t" * 43
 FEED = "feed@bobbobbobbobbobb"
+SITE = "site@bobbobbobbobbobb"
 BOB = "ed25519:bob"
 OK = {"allowed": True, "reason": "", "code": "ok"}
 CLOSED = {"allowed": False, "reason": "Comments are closed on this entry", "code": "comments_closed"}
@@ -45,6 +46,7 @@ class FeedAPI:
         self.subscribed = True               # False: Bob's feed read without following (#506)
         self.subscribes = []
         self.outbox = []                     # events to send to the page
+        self.by_person = False               # people_followed (gui#210, unseenet#706)
         self.in_timeline = True              # UN-RFC 0034 6.2: a feed is in it by default
         self.timeline_calls = []
         self.changed = []                    # withdraw and edit, from the ⋯ menu
@@ -103,9 +105,14 @@ class FeedAPI:
         elif path == "/api/settings":
             data = {"signature_preview": "", "notices": {"send": True}}
         elif path == "/api/groups":
-            data = {"groups": [self.group()], "people": [],
+            data = {"groups": [self.group()] + ([{**self.group(), "id": SITE, "label": "Bob's site",
+                                                  "view": "pages", "hierarchy": "site"}] if self.by_person else []),
+                    "people": [],
                     "hierarchies": [{"name": "feed", "tree": None}], "inbox": {"id": "inbox:test"},
                     "timeline": {"id": "timeline:", "feeds": 1},
+                    **({"people_followed": [{"fingerprint": "b" * 16, "key": BOB, "label": "Bob",
+                                             "groups": {"feed": FEED, "site": SITE}}],
+                        "hierarchies": []} if self.by_person else {}),
                     "my_feed": {"id": "feed@memememememememe", "started": False, "unread": 0},
                     "my_site": {"id": "site@memememememememe", "started": True, "unread": 0}}
         elif path in (f"/api/groups/{FEED}/withdraw", f"/api/groups/{FEED}/edit"):
@@ -511,3 +518,21 @@ async def test_a_node_not_answering_yet_is_said_plainly(feed_page):
     await expect(slow).to_contain_text("not answering yet")
     api.outbox.append({"event": "node-state", "address": "abcdefghijklmnop.onion:119", "up": True})
     await expect(slow).to_have_count(0)
+
+
+async def test_a_persons_feed_and_site_under_them(feed_page):
+    """gui#210: following a person puts their feed and site under their name, in People
+    you follow - not on two branches called feed and site."""
+    page, api = feed_page
+    api.by_person = True
+    await page.evaluate("loadSidebar()")
+    people = page.locator("nav.side .people-followed")
+    await expect(people.locator(".row-h")).to_contain_text("People you follow")
+    person = people.locator(".item.folder")
+    await expect(person).to_contain_text("Bob")
+    if await person.get_attribute("aria-expanded") != "true":   # open when you are in one of them
+        await person.click()
+    await expect(people.locator(".sub .item")).to_have_count(2)
+    await expect(people.locator(".sub .item").nth(0)).to_contain_text("feed")
+    await expect(people.locator(".sub .item").nth(1)).to_contain_text("site")
+    await expect(page.locator("nav.side h3", has_text="site")).to_have_count(0)

@@ -189,6 +189,10 @@ function fromSidebar(d, st) {
     state_local: !!st.state_local,
     report_issuer: !!st.report_issuer,   // you publish spam reports (UN-RFC 0045, core 0.6)
     markdown: st.markdown !== false, notices: st.notices || {},
+    // other people's feeds and sites, by person (gui#210, core 0.6 #706): their groups here
+    people_followed: (d.people_followed || []).map(p => ({ ...p, colour: p.key ? colour(p.key) : 0,
+      items: Object.entries(p.groups).map(([kind, id]) => ({ kind, g: groups.find(g => g.id === id) }))
+        .filter(x => x.g) })).filter(p => p.items.length),
     hierarchies: d.hierarchies.map(h => ({ name: h.name, tree: h.tree, groups: by[h.name] || [] })) };
 }
 
