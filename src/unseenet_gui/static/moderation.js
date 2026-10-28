@@ -14,10 +14,15 @@ async function leaveGroup(g) {
 }
 
 // The owner's group settings: title, description, rules, view, comments, files, reactions,
-// pins and pages.
-function openEditGroup() {
+// pins and pages - with Help (#178): per setting what it does, whom it affects and what
+// changing it later does, the core's text, as in every client.
+async function openEditGroup() {
   const g = S.data && S.data.group;
   if (!g || !g.owner) return;
+  if (S.settingsHelp === undefined) {
+    try { S.settingsHelp = await api("GET", "/api/help/group-settings"); }
+    catch (_) { S.settingsHelp = null; }     // an older core: no help panel
+  }
   let view = g.owner_view || g.view, kinds = (g.kinds || []).length === 1 ? g.kinds[0] : "both";
   let files = fileChoice(g.files);
   // reactions (UN-RFC 0048 section 4): the view's default, none, any, or your own set
@@ -41,7 +46,16 @@ function openEditGroup() {
     onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value;
       else if (name === "reactions") reacts = value; else if (name === "index") index = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
+  // the settings this dialog shows, in its order, for the help beside it
+  const shown = ["title", "view", "kinds", "files", "reactions", site ? "index" : null,
+    g.type !== "inbox" ? "report_issuers" : null, g.type !== "inbox" ? "languages" : null,
+    g.type !== "inbox" ? "tags" : null, g.type === "inbox" ? "team_name" : null, "rules"].filter(Boolean);
+  const help = S.settingsHelp && Array.isArray(S.settingsHelp.settings) ? S.settingsHelp : null;
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
+    cls: () => "edit-group" + (S.groupHelp ? " helping" : ""),
+    headButtons: help ? () => h("button", { class: "btn small", type: "button", "aria-controls": "settings-help",
+      "aria-expanded": S.groupHelp ? "true" : "false", onclick: toggleGroupHelp }, S.groupHelp ? "Hide help" : "Help") : null,
+    aside: help ? () => settingsHelp(help, shown) : null,
     values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
       team_name: g.team_name || "", gtags: (g.tags || []).join(", "), glangs: (g.languages || []).join(", "),
       reaction_set: Array.isArray(rset) ? rset.join(" ") : "",
@@ -119,6 +133,27 @@ function openEditGroup() {
             { tags: (v.gtags || "").split(/[\s,]+/).map(t => t.replace(/^#/, "").toLowerCase()).filter(Boolean) } : {}) });
       closeDialog(); toast("The group is updated."); await loadGroup(); await loadSidebar();
     } });
+}
+
+// The help panel beside Edit group (#178): the core's intro, then the settings shown here.
+function settingsHelp(help, keys) {
+  const by = Object.fromEntries((help.settings || []).map(s => [s.key, s]));
+  return h("aside", { id: "settings-help", class: "settings-help", "aria-label": "What the settings do" },
+    h("p", { class: "hint", text: help.intro || "" }),
+    keys.filter(k => by[k]).map(k => h("section", { class: "sh-item" },
+      h("h3", { text: by[k].label }), h("p", { text: by[k].what }),
+      h("p", {}, h("b", { text: "Affects: " }), by[k].affects),
+      h("p", {}, h("b", { text: "Later: " }), by[k].later))));
+}
+
+// Show or hide the help beside Edit group without drawing the form again - what you typed
+// stays. Remembered while the page is open.
+function toggleGroupHelp(e) {
+  S.groupHelp = !S.groupHelp;
+  const dlg = document.querySelector(".dialog.edit-group");
+  if (dlg) dlg.classList.toggle("helping", S.groupHelp);
+  e.currentTarget.textContent = S.groupHelp ? "Hide help" : "Help";
+  e.currentTarget.setAttribute("aria-expanded", S.groupHelp ? "true" : "false");
 }
 
 // A group's own set of reactions (UN-RFC 0048 section 4): at most 12 emoji, each once.

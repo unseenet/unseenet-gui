@@ -127,7 +127,9 @@ function redrawDialog() {
 
 // A dialog with fields and a submit button, that keeps what was typed across redraws and
 // shows the error.
-function formDialog({ label, title, focus, fields, submit, button, note, values }) {
+// ``cls``, ``headButtons`` and ``aside`` (#178): a class on the dialog, buttons in its head
+// and a panel beside the form - a help panel, say.
+function formDialog({ label, title, focus, fields, submit, button, note, values, cls, headButtons, aside }) {
   let err = "";
   const vals = { ...(values || {}) };       // what you entered, also across a refresh()
   const keep = (e) => {
@@ -148,10 +150,13 @@ function formDialog({ label, title, focus, fields, submit, button, note, values 
     try { await submit(vals, f); }
     catch (x) { showError(x.message); }
   };
-  const build = () => dialogShell({ label },
-    h("div", { class: "dh" }, h("h2", {}, title), h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-    h("form", { class: "db", onsubmit: go, oninput: keep, onchange: keep }, fields(vals), note ? h("p", { class: "hint", style: "margin:0", text: note }) : null,
-      h("div", { class: "error", role: "alert", text: err })),
+  const form = () => h("form", { class: "db", onsubmit: go, oninput: keep, onchange: keep }, fields(vals),
+    note ? h("p", { class: "hint", style: "margin:0", text: note }) : null,
+    h("div", { class: "error", role: "alert", text: err }));
+  const build = () => dialogShell({ label, cls: typeof cls === "function" ? cls() : cls },
+    h("div", { class: "dh" }, h("h2", {}, title), headButtons ? headButtons() : null,
+      h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
+    aside ? h("div", { class: "fd-main" }, form(), aside()) : form(),
     h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
       h("button", { class: "btn primary", onclick: go }, button)));
   dialog.refresh = () => {
