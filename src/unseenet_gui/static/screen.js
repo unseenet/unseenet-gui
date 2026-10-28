@@ -198,9 +198,10 @@ function sidebar() {
         h("span", { class: "count", text: sb.name_requests })) : null) : null),
     h("div", { class: "side-scroll", "data-scroll": "side" },
     filtering() ? sideResults(sb, item) : null,
+    filtering() ? null : sb ? peopleFollowedNav(sb, item) : null,
     filtering() ? null : sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
       h("p", { class: "muted", text: "Loading your groups …" }),
-    sb && !sb.hierarchies.length ? h("div", { class: "nav" },
+    sb && !sb.hierarchies.length && !(sb.people_followed || []).length ? h("div", { class: "nav" },
       h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
       h("button", { class: "btn", onclick: openBrowse }, "Find groups", h("kbd", { text: "G" }))) : null),
     h("div", { class: "me" },

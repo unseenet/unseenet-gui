@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **People you follow, by person** (asked for by the maintainer, #210, unseenet#706):
+  following someone puts their feed and site together under their name in *People you
+  follow*, sorted by name - one row when they have only one - instead of branches called
+  `feed` and `site` whose rows all read "feed".
 - **Your contacts, Private posts and Private chats alike** (asked for by the maintainer,
   #209): three rows at the top with person, envelope and bubble icons and no buttons on
   them, at most three unread chats under Private chats; each opens its list in the main

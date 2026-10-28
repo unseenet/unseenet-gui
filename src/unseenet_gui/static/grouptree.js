@@ -156,6 +156,40 @@ function hierarchyNav(hier, item) {
     open ? contents(root) : null);
 }
 
+// What you follow because of a person (gui#210, unseenet#706): under "People you follow",
+// one row per person by name - their feed and site together under them, or just the one
+// row when they have only one - never hierarchies called "feed" and "site".
+function peopleFollowedNav(sb, item) {
+  const people = sb.people_followed || [];
+  if (!people.length) return null;
+  const KIND = { feed: ["☰", "feed"], site: ["⌂", "site"] };
+  const unreadOf = p => p.items.reduce((n, x) => n + (x.g.unread || 0), 0);
+  const counted = (n) => n ? h("span", { class: "count", text: n }) : null;
+  const open = "people:" in foldState() ? foldState()["people:"] : true;
+  return h("div", { class: "nav people-followed" },
+    h("h3", { class: "row-h fold-h" },
+      h("button", { class: "fold-t", "aria-expanded": String(open), title: open ? "Fold" : "Unfold",
+        onclick: () => { setFold("people:", !open); render(); } },
+        h("span", { class: "car", text: open ? "▾" : "▸" }), "People you follow"),
+      !open && people.some(unreadOf) ? counted(people.reduce((n, p) => n + unreadOf(p), 0)) : null),
+    open ? people.map(p => {
+      if (p.items.length === 1) {                       // one thing of theirs: one row
+        const { kind, g } = p.items[0];
+        return groupRow(g, item(g.id, KIND[kind][0], p.label, [timelineMark(g), forYouMarks(g), counted(g.unread)],
+          "group person-group" + (g.unread ? " unread" : ""), `${p.label}'s ${KIND[kind][1]}`));
+      }
+      const key = "person:" + p.fingerprint, popen = key in foldState() ? foldState()[key] : p.items.some(x => x.g.id === S.gid);
+      return h("div", { class: "fold" },
+        h("button", { class: "item group folder person-group" + (unreadOf(p) ? " unread" : ""),
+          "aria-expanded": String(popen), title: p.label, onclick: () => { setFold(key, !popen); render(); } },
+          h("span", { class: "ic", text: popen ? "▾" : "▸" }),
+          h("span", { class: "nm", text: p.label }), !popen ? counted(unreadOf(p)) : null),
+        popen ? h("div", { class: "sub" }, p.items.map(({ kind, g }) =>
+          groupRow(g, item(g.id, KIND[kind][0], KIND[kind][1], [timelineMark(g), forYouMarks(g), counted(g.unread)],
+            "group" + (g.unread ? " unread" : ""), `${p.label}'s ${KIND[kind][1]}`)))) : null);
+    }) : null);
+}
+
 // The mark of a group whose entries come into your timeline (UN-RFC 0034 section 6.2).
 function timelineMark(g) {
   return g.in_timeline ? h("span", { class: "tl-mark", title: "In your timeline" },
