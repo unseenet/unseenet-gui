@@ -48,6 +48,10 @@ async function openGroup(gid, rerender = true) {
 async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
+  if (gid === CHATS) {                                // a list drawn from the sidebar's people (gui#172)
+    S.data = { group: { id: CHATS, label: "Private chats", view: "list" }, messages: [], write: {} };
+    return;
+  }
   try {
     const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + (S.showAll === gid ? "?all=1" : ""));
     let site = null;
@@ -144,7 +148,8 @@ function forYouMarks(c) {
   return h("span", { class: "foryou", title, text: parts.join(" ") || `◄${c.for_you}` });
 }
 
-// The sidebar: you, For you, your feed, site and timeline, chats, and the group tree.
+// The sidebar: you, For you, your feed, site and timeline, private posts and chats, and the
+// group tree - groups only.
 function sidebar() {
   const sb = S.sidebar, me = S.state.me || {};
   const item = (gid, ic, label, extra, cls = "", title = null) => h("button", {
@@ -161,9 +166,9 @@ function sidebar() {
         onclick: () => openPalette() }, svg(ICON.cmd, 16, 2.5))),
     // a filter for what the sidebar lists, as / in the terminal client; Esc clears it
     h("div", { class: "side-filter" }, svg(ICON.search, 16),
-      h("label", { for: "sidefilter", class: "sr", text: "Filter groups and chats" }),
+      h("label", { for: "sidefilter", class: "sr", text: "Filter groups and people" }),
       h("input", { id: "sidefilter", type: "search", "data-k": "sidefilter", autocomplete: "off",
-        placeholder: "Filter groups and chats", value: S.sideFilter || "",
+        placeholder: "Filter groups and people", value: S.sideFilter || "",
         oninput: (e) => { S.sideFilter = e.target.value; render(); },
         onkeydown: (e) => {
           if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); S.sideFilter = ""; render(); }
@@ -184,6 +189,7 @@ function sidebar() {
             h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: "Start your " + kind }))),
       sb.inbox.id ? item(sb.inbox.id, "@", "Private posts",
         sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
+      ...chatsItem(sb),
       // posts waiting for you to approve, in groups you moderate (the TUI's Moderation queue)
       sb.moderation ? h("button", { class: "item", onclick: openModeration },
         h("span", { class: "ic", text: "✓" }), h("span", { class: "nm", text: "To approve" }),
@@ -193,25 +199,6 @@ function sidebar() {
         h("span", { class: "count", text: sb.name_requests })) : null) : null),
     h("div", { class: "side-scroll", "data-scroll": "side" },
     filtering() ? sideResults(sb, item) : null,
-    filtering() ? null : sb ? h("div", { class: "nav" },
-      h("h3", { class: "row-h" },
-        h("button", { class: "fold-chats", "aria-expanded": String(foldState().chats !== false),
-          title: foldState().chats !== false ? "Fold the chats away" : "Show the chats",
-          onclick: () => { setFold("chats", foldState().chats === false); render(); } },
-          h("span", { class: "car", text: foldState().chats !== false ? "▾" : "▸" }), "chats",
-          foldState().chats === false && sb.people.some(p => p.unread) ?
-            h("span", { class: "count", text: sb.people.reduce((n, p) => n + (p.unread || 0), 0) }) : null),
-        h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
-        h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
-      foldState().chats === false ? null :
-      sb.people.length ? sb.people.map(p => h("div", { class: "personrow" }, h("button", {
-        class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`, onclick: () => openGroup(p.id),
-        title: p.contact ? null : "Not a contact - open the chat to add them" },
-        h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
-        h("span", { class: "nm", text: p.label }),
-        p.unread ? h("span", { class: "count", text: p.unread }) : null),
-        chatMenu(p))) :
-        h("p", { class: "hint", style: "margin:0 10px", text: "Your chats, one per person. Add people as contacts, or start a chat with +." })) : null,
     filtering() ? null : sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
       h("p", { class: "muted", text: "Loading your groups …" }),
     sb && !sb.hierarchies.length ? h("div", { class: "nav" },
@@ -226,4 +213,73 @@ function sidebar() {
         nodeLink(),
         ripeLine()),
       h("button", { class: "btn icon", "aria-label": "Show your key", title: "Show your key (K)", onclick: openKey, text: "K" })));
+}
+
+const CHATS_SHOWN = 5;                               // unread chats under Private chats
+
+// Private chats as a fixed item at the top (gui#172), with what is unread: under it only
+// the chats with unread lines, at most five, and the one you are in, then Show all - so
+// a hundred chats never push the groups down.
+function chatsItem(sb) {
+  const unread = sb.people.reduce((n, p) => n + (p.unread || 0), 0);
+  const under = sb.people.filter(p => p.unread || S.gid === p.id).slice(0, CHATS_SHOWN);
+  const all = sb.people.length + (sb.contacts || []).filter(c => c.closed).length;
+  return [h("div", { class: "chats-row" },
+    h("button", { class: `item chats-item${S.gid === CHATS ? " on" : ""}${unread ? " unread" : ""}`,
+      "aria-current": S.gid === CHATS ? "page" : null, onclick: () => openGroup(CHATS),
+      title: "One chat per person - only the two of you can read it" },
+      h("span", { class: "ic" }, svg(ICON.lock, 13, 2.5)), h("span", { class: "nm", text: "Private chats" }),
+      unread ? h("span", { class: "count", text: unread }) : null),
+    // your contacts and a new chat stay one click away, as before
+    h("button", { class: "mini", "aria-label": "Contacts", title: "Your contacts (C)", onclick: openContacts }, svg(ICON.people, 14, 2.5)),
+    h("button", { class: "mini", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") }, svg(ICON.plus, 14, 2.5))),
+    under.length ? h("div", { class: "sub chats-sub" }, under.map(p => personRow(p)),
+      all > under.length ? h("button", { class: "item more-chats", onclick: () => openGroup(CHATS) },
+        h("span", { class: "nm", text: `Show all (${all})` })) : null) : null];
+}
+
+// One person's chat in a list: their initials, name, unread lines, and its ⋯.
+function personRow(p, extra = null) {
+  return h("div", { class: "personrow" }, h("button", {
+    class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`,
+    onclick: () => openGroup(p.id || "contact:" + p.key),
+    title: p.contact ? null : "Not a contact - open the chat to add them" },
+    h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+    h("span", { class: "nm", text: p.label }), extra,
+    p.unread ? h("span", { class: "count", text: p.unread }) : null),
+    p.closed ? null : chatMenu(p));
+}
+
+// The full list of private chats in the main pane (gui#172): filterable, room for
+// hundreds, + to start one; closed chats last, back when either of you writes.
+function chatsView() {
+  const sb = S.sidebar || { people: [], contacts: [] };
+  const q = (S.chatFilter || "").trim().toLowerCase();
+  const hit = p => !q || (p.label + " " + p.key).toLowerCase().includes(q);
+  const open = sb.people.filter(hit);
+  const closed = (sb.contacts || []).filter(c => c.closed && hit(c)).map(c => ({ ...c, id: "contact:" + c.key }));
+  const about = "Private chats, one per person - only you and the other person can read them. " +
+    "Add people as contacts, or start a chat with +.";
+  const head = h("header", { class: "ghead" },
+    h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
+    h("div", { class: "t" }, h("div", { class: "row" }, h("h1", { text: "Private chats" }),
+      h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5), "end-to-end encrypted")),
+      h("p", { text: about })),
+    h("div", { class: "actions" },
+      h("button", { class: "btn", title: "Your contacts (C)", onclick: openContacts }, "Contacts", h("kbd", { text: "C" })),
+      h("button", { class: "btn primary", title: "Chat with someone", onclick: () => openWrite("", "chat") },
+        svg(ICON.plus, 16, 2.5), "Chat with someone")));
+  const body = h("div", { class: "content chats-list" },
+    h("div", { class: "side-filter chats-filter" }, svg(ICON.search, 16),
+      h("label", { for: "chatfilter", class: "sr", text: "Filter chats" }),
+      h("input", { id: "chatfilter", type: "search", "data-k": "chatfilter", autocomplete: "off",
+        placeholder: "Filter by name or key", value: S.chatFilter || "",
+        oninput: (e) => { S.chatFilter = e.target.value; render(); },
+        onkeydown: (e) => { if (e.key === "Escape") { e.preventDefault(); S.chatFilter = ""; render(); } } })),
+    open.length ? h("div", { class: "nav" }, open.map(p => personRow(p))) : null,
+    closed.length ? [h("h3", { class: "row-h", text: "Closed - back when one of you writes" }),
+      h("div", { class: "nav" }, closed.map(p => personRow(p)))] : null,
+    !open.length && !closed.length ? h("div", { class: "empty" },
+      h("h2", { text: q ? "No chat matches" : "No private chats yet" }), h("p", { text: about })) : null);
+  return [head, body];
 }

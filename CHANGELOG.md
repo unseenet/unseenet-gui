@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Private chats as a fixed item** (asked for by the maintainer, #172): *Private chats* at
+  the top under *Private posts*, with what is unread and only the chats with unread lines
+  under it (at most five, then *Show all*); the full list in the main pane - filter,
+  *Contacts*, *Chat with someone*, closed chats last. The foldable `chats` heading among
+  the groups is gone, and the filter says "groups and people".
 - **What comes into the timeline** (asked for by the maintainer, #201, UN-RFC 0034 6.2): a
   ☰ switch in a group's head - *In timeline* / *Add to timeline* - and in its ⋯ menu and the
   palette; a quiet mark on the groups in the timeline in the list. Feeds are in by default,

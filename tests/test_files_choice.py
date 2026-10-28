@@ -226,13 +226,15 @@ async def test_create_a_feed_with_comments(files_page):
 async def test_close_a_chat_from_the_list(files_page):
     """A chat leaves the list with ⋯ Close chat (UN-RFC 0044 4.2); the contact stays."""
     page, api, _ = files_page
-    row = page.locator(".personrow").filter(has_text="Sonia")
+    await page.locator(".chats-item").click()                 # the full list (gui#172)
+    row = page.locator(".chats-list .personrow").filter(has_text="Sonia")
     await row.hover()
     await row.get_by_role("button", name=re.compile("More about the chat")).click()
     await row.get_by_role("menuitem", name="Close chat").click()
     await expect(page.locator(".toast")).to_contain_text("Closed the chat with Sonia")
     assert api.closed == [{"key": SONIA, "on": True}]
-    await expect(page.locator(".personrow")).to_have_count(0)
+    await expect(page.locator(".chats-list")).to_contain_text("Closed - back when one of you writes")
+    await expect(page.locator(".chats-list .personrow .more")).to_have_count(0)
     await page.keyboard.press("Control+k")                # still a contact
     await page.keyboard.type("Contacts")
     await page.keyboard.press("Enter")
@@ -241,7 +243,8 @@ async def test_close_a_chat_from_the_list(files_page):
 
 async def test_a_chat_has_close_chat_not_unsubscribe(files_page):
     page, api, _ = files_page
-    await page.locator(".personrow .item").filter(has_text="Sonia").click()
+    await page.locator(".chats-item").click()
+    await page.locator(".chats-list .personrow .item").filter(has_text="Sonia").click()
     await expect(page.get_by_role("button", name="Close chat")).to_be_visible()
     await page.get_by_role("button", name="About this group").click()
     dialog = page.locator(".dialog")
@@ -249,17 +252,26 @@ async def test_a_chat_has_close_chat_not_unsubscribe(files_page):
     assert await dialog.get_by_role("button", name="Leave").count() == 0
 
 
-async def test_contacts_from_the_profile_and_chats_fold_away(files_page):
+async def test_contacts_from_the_profile_and_private_chats_at_the_top(files_page):
     page, api, _ = files_page
     await page.evaluate("openProfile('ed25519:sonia', 'Sonia')")
     await page.locator(".dialog").get_by_role("button", name="Remove contact").click()
     await expect(page.locator(".toast")).to_contain_text("no longer a contact")
     assert api.contact_changes == [{"key": SONIA, "remove": True}]
-    fold = page.locator(".fold-chats")
-    await fold.click()
-    await expect(page.locator(".personrow")).to_have_count(0)
-    await fold.click()
-    await expect(page.locator(".personrow")).to_have_count(1)
+    # gui#172: a fixed item, no foldable chats heading among the groups
+    await expect(page.locator(".fold-chats")).to_have_count(0)
+    item = page.locator(".chats-item")
+    await expect(item).to_have_text("Private chats")
+    await expect(page.locator("nav.side .personrow")).to_have_count(0)     # nothing unread
+    api.people[0]["unread"] = 2
+    await page.evaluate("loadSidebar()")
+    await expect(item.locator(".count")).to_have_text("2")
+    await expect(page.locator(".chats-sub .personrow")).to_contain_text("Sonia")
+    await item.click()
+    await expect(page.locator(".ghead h1")).to_have_text("Private chats")
+    await expect(page.locator(".chats-list")).to_contain_text("Sonia")
+    await page.locator("#chatfilter").fill("zz")
+    await expect(page.locator(".chats-list")).to_contain_text("No chat matches")
 
 
 async def test_the_sidebar_filter_and_the_palette_button(files_page):
@@ -278,7 +290,7 @@ async def test_the_sidebar_filter_and_the_palette_button(files_page):
     await expect(results).to_contain_text("Sonia")
     await box.press("Escape")
     await expect(page.locator("nav.side .side-results")).to_have_count(0)
-    await expect(page.locator(".personrow")).to_have_count(1)
+    await expect(page.locator(".chats-item")).to_be_visible()      # chats: the item, not a list
     await box.fill("foto")
     await box.press("Enter")                                        # opens the first
     await expect(page.locator(".ghead h1")).to_contain_text("dk.foto.chat")

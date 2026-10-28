@@ -192,7 +192,7 @@ function contactList() {
 // stay, and it comes back when one of you writes.
 async function closeChat(key, label) {
   try { await api("POST", "/api/chats/close", { key, on: true }); } catch (x) { toast(x.message); return; }
-  if (S.gid === "contact:" + key) { S.gid = null; S.data = null; }
+  if (S.gid === "contact:" + key) { S.gid = CHATS; await loadGroup(); }   // back to the list (gui#172)
   closeDialog(); await loadSidebar(); render();
   toast(`Closed the chat with ${label}. It comes back when one of you writes.`);
 }

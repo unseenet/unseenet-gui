@@ -64,7 +64,7 @@ function sideResults(sb, item) {
   const people = sb.people.filter(p => hit(p.label, p.key));
   const groups = sb.hierarchies.flatMap(hr => hr.groups).filter(g => hit(g.label, g.id, g.title, g.shown));
   return h("div", { class: "nav side-results" },
-    people.length ? [h("h3", { text: "chats" }), people.map(p => h("button", {
+    people.length ? [h("h3", { text: "people" }), people.map(p => h("button", {
       class: `item person${S.gid === p.id ? " on" : ""}${p.unread ? " unread" : ""}`,
       onclick: () => { S.sideFilter = ""; openGroup(p.id); } },
       h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
@@ -345,6 +345,7 @@ function mainArea() {
     return h("div", { class: "empty" }, h("h2", { text: "Pick a group" }),
       h("p", { text: "Your groups are on the left. Press G to find more on your node." }));
   }
+  if (S.gid === CHATS) return chatsView();             // the list of private chats (gui#172)
   const g = d.group;
   const chips = [
     h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : g.view === "feed" ? "☰ feed" : g.view === "pages" ? "⌂ site" : "≡ threads" }),
