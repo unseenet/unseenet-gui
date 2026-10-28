@@ -1107,3 +1107,5 @@ time.ago { white-space: nowrap; }
 /* read more (UN-RFC 0031 3.2.1): the author's cut, shown as it is; a small text button */
 .etext.more-cut { max-height: none; }
 .btn.mini-text { padding: 2px 8px; font-size: 12px; margin-left: auto; }
+/* a node not answering yet (#206): quiet, beside the status */
+.statusbar .slow-node { color: var(--amber); font-size: 12px; margin-right: 10px; }

@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A node that does not answer is said plainly** (#206, unseenet#704): the other nodes'
+  groups and posts are shown at once, and the status bar says "unseenet-node4 is not
+  answering yet" until it does.
 - **Read more where the author chooses** (#188, UN-RFC 0031 3.2.1): an entry with a line of
   only `...` is cut there with *… more* - even when short, and up to twice the normal cut;
   further down the line is ignored. Opened, the line is not shown. *Insert read more* beside
