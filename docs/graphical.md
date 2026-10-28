@@ -37,6 +37,12 @@ included, and everything stays in `data/` beside the programs.
 - **Linux:** `sh start-graphical-linux.sh` opens Chromium, Chrome, Edge or
   Brave without tabs if you have one, else your browser.
 
+The builds are not signed, so Windows and macOS block the first start. How
+to let it through once - and why macOS may call `Python.framework` damaged if
+you start the program in `gui-macos-…/` instead of the `.command` - is under
+[Start it](https://unseenet.org/portable/#start-it) for the terminal client;
+it is the same for this one.
+
 ### Bootable (USB, SSD etc.) { #bootable }
 
 Write `unseenet-gui-…-x86_64.img.xz` to a USB stick (for example with
