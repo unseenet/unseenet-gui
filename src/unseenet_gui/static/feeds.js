@@ -90,7 +90,7 @@ function feedView(d) {
   return h("div", { class: "content" }, h("section", { class: "feed", "aria-label": timeline ? "Timeline" : "Feed",
     "data-scroll": "feed:" + g.id },
     String(g.id).startsWith(TAGGED) ? h("p", { class: "hint feed-note", text: `Everything tagged ${g.tag} in your groups and feeds, newest first - the authors' tags, the groups', and topics of labellers you follow for topics.` }) :
-    timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} feed${g.feeds === 1 ? "" : "s"} you follow, ${d.messages.some(x => x.score !== undefined) ? "in the order your rules give (⋯ on an entry says why)" : "in the order they were written"}. Nobody is told whom you follow.` }) : null,
+    timeline ? h("p", { class: "hint feed-note", text: `The newest entries of the ${g.feeds || 0} group${g.feeds === 1 ? "" : "s"} in your timeline, ${d.messages.some(x => x.score !== undefined) ? "in the order your rules give (⋯ on an entry says why)" : "in the order they were written"}. Nobody is told whom you follow.` }) : null,
     note ? h("form", { class: "chatbar notebar", onsubmit: (e) => { e.preventDefault(); send(); } },
       h("div", { class: "row" },
         h("label", { for: "note", class: "sr", text: "A note in " + g.label }),
@@ -107,7 +107,7 @@ function feedView(d) {
     showAllBar(d),                                      // your rules paused here (0051 3)
     entries.length ? entries.filter(e => passesTag(e.m)).map(e => entryCard(d, e)) :
       h("div", { class: "empty" }, h("h2", { text: timeline ? "Nothing yet" : "No entries yet" }),
-        h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), and their entries come here." :
+        h("p", { text: timeline ? "Follow someone or a feed (Ctrl P), or add a group with ☰ in its header, and the entries come here." :
           note ? "Write the first note above." : "" }))));
 }
 

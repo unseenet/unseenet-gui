@@ -1095,3 +1095,6 @@ time.ago { white-space: nowrap; }
 .langpop .lpick:hover, .langpop .lpick:focus { background: var(--line); }
 .langpop .lpick.on { font-weight: 600; }
 .langpop .lhint { margin-left: auto; font-size: 11px; color: var(--muted); }
+/* a group in your timeline (UN-RFC 0034 6.2): a quiet mark in the list, a switch in its head */
+.tl-mark { color: var(--green); font-weight: 700; margin-left: 2px; }
+.btn.tl-switch.on { border-color: var(--green); color: var(--green); }

@@ -42,6 +42,8 @@ class FeedAPI:
         self.following = False
         self.subscribed = True               # False: Bob's feed read without following (#506)
         self.subscribes = []
+        self.in_timeline = True              # UN-RFC 0034 6.2: a feed is in it by default
+        self.timeline_calls = []
         self.changed = []                    # withdraw and edit, from the ⋯ menu
         self.entry_mine = False
         self.many = 0                     # more entries, for a feed taller than the window
@@ -69,6 +71,8 @@ class FeedAPI:
         return {"id": gid, "label": "Bob's feed", "type": "channel", "view": "feed",
                 "owner_view": "feed", "hierarchy": "feed", "may_post": False, "unread": 0,
                 "kinds": ["chat", "post"], "subscribed": self.subscribed,
+                "in_timeline": self.in_timeline, "timeline_possible": True,
+                "timeline": {"on": self.in_timeline, "possible": True, "default": True},
                 "write": {"post": {"allowed": False, "reason": "Only Bob writes here", "code": "channel"},
                           "chat": {"allowed": False, "reason": "Only Bob writes here", "code": "channel"}}}
 
@@ -109,6 +113,11 @@ class FeedAPI:
             data = {"key": request.query.get("key"), "label": "Bob", "mine": False, "hidden": False,
                     "profile": None, "address": "unseenet:" + "b" * 16, "feed": FEED,
                     "following": self.following, "theirs": {"feed": FEED, "site": None}}
+        elif path == f"/api/groups/{FEED}/timeline":
+            body = await request.json()
+            self.timeline_calls.append(body)
+            self.in_timeline = True if body["on"] is None else body["on"]
+            data = {"ok": True, "on": self.in_timeline}
         elif path == "/api/subscribe":
             self.subscribes.append(await request.json())
             self.subscribed = True
@@ -208,9 +217,9 @@ async def test_entries_whole_with_comments_under_them(feed_page):
 
 async def test_the_timeline_and_following(feed_page):
     page, api = feed_page
-    await page.get_by_role("button", name="Timeline").click()
+    await page.get_by_title("The feeds you follow and the groups you added, newest first").click()
     await page.wait_for_load_state("networkidle")
-    await expect(page.locator(".feed-note")).to_contain_text("1 feed you follow")
+    await expect(page.locator(".feed-note")).to_contain_text("1 group in your timeline")
     await expect(page.locator(".entry").first.locator(".efeed")).to_have_text("in Bob's feed")
 
     await page.locator(".entry").first.get_by_role("button", name="Bob").first.click()   # the profile
@@ -322,7 +331,7 @@ async def test_their_feed_from_the_profile_without_following(feed_page):
     with a Follow there; no "Their site" button when they have none."""
     page, api = feed_page
     api.subscribed = False
-    await page.get_by_role("button", name="Timeline").click()
+    await page.get_by_title("The feeds you follow and the groups you added, newest first").click()
     await page.locator(".entry").first.get_by_role("button", name="Bob").first.click()   # the profile
     dialog = page.locator(".dialog")
     await expect(dialog.get_by_role("button", name="Their feed")).to_be_visible()
@@ -444,3 +453,23 @@ async def test_times_say_how_long_ago(feed_page):
     assert got[4] == "3 days" and "2024" in got[6] and "2026" not in got[5]
     t = page.locator(".entry time.ago").first
     assert await t.get_attribute("datetime") and await t.get_attribute("title")
+
+
+async def test_in_the_timeline_or_not(feed_page):
+    """UN-RFC 0034 6.2: one switch in the group's head and in its ⋯, a mark in the list -
+    not a second kind of follow; the view you read in is a separate button."""
+    page, api = feed_page
+    side = page.locator("nav.side .item").filter(has_text="Bob's feed")
+    await expect(side.locator(".tl-mark")).to_have_count(1)
+    await open_feed(page)
+    switch = page.locator('[data-k="tl-switch"]')
+    await expect(switch).to_have_text("☰ In timeline")
+    await expect(switch).to_have_attribute("aria-pressed", "true")
+    await switch.click()
+    await expect(page.locator(".toast")).to_contain_text("no longer in your timeline")
+    assert api.timeline_calls == [{"on": False}]
+    await expect(switch).to_have_text("☰ Add to timeline")
+    await expect(side.locator(".tl-mark")).to_have_count(0)
+    await expect(page.get_by_role("button", name="Show as threads")).to_be_visible()
+    await page.get_by_role("button", name="About this group").click()
+    await expect(page.locator(".dialog").get_by_role("button", name="Leave")).to_be_visible()

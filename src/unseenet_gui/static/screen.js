@@ -174,7 +174,7 @@ function sidebar() {
         } })),
     filtering() ? null : sb ? h("div", { class: "nav" },
       item(FOR_YOU, "◄", "For you", forYouMarks(sb)),
-      sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "Every feed you follow, newest first") : null,
+      sb.timeline.feeds ? item(TIMELINE, "☰", "Timeline", null, "", "The feeds you follow and the groups you added, newest first") : null,
       // your own feed and site at the top, or the way to start them, as in the terminal client (gui#101)
       ...[[sb.my_feed, "☰", "feed", openMyFeed, "Your own feed - public, anyone can comment"],
           [sb.my_site, "▤", "site", openMySite, "Your own site of pages - public"]].map(([m, ic, kind, start, title]) =>
