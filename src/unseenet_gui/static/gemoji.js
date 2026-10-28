@@ -25,11 +25,15 @@ function noteGroupEmoji(g) {
   if (g.emoji) S.groupEmoji[g.id] = g.emoji;
   if (!g.emoji_possible || gemojiRead.has(g.id)) return;
   gemojiRead.add(g.id);
-  api("GET", "/api/groups/" + encodeURIComponent(g.id) + "/emoji").then(d => {
+  // read from the node: given up after a while or when you leave the group (gui#227)
+  api("GET", "/api/groups/" + encodeURIComponent(g.id) + "/emoji", null,
+    { signal: viewSignal(), timeout: 15000 }).then(d => {
     const was = JSON.stringify(S.groupEmoji[g.id] || {});
     S.groupEmoji[g.id] = d.emoji || {};
     if (JSON.stringify(S.groupEmoji[g.id]) !== was && S.gid === g.id) render();
-  }, () => { /* the node does not answer: what we have */ });
+  }, (err) => {                                     // the node does not answer: what we have
+    if (err.name === "TimeoutError" || err.name === "AbortError") gemojiRead.delete(g.id);   // next time
+  });
 }
 
 // One group emoji as a picture at text size (data: from the set, nothing fetched).
