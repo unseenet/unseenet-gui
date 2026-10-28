@@ -609,7 +609,10 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       h("button", { class: "btn primary dh-send", onclick: go }, priv ? "Send" : "Post"),   // phones: above the keyboard
       growBtn,
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
-    h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
+    h("form", { class: "db", onsubmit: go,
+      // what a pasted or dropped file is told where none can go (gui#187)
+      "data-nofiles": takes ? null : edit ? "Files cannot be added to a new version." : "This group takes no files.",
+      onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
       h("label", { for: "body", class: "sr", text: "Text" }),

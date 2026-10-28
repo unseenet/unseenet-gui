@@ -1169,3 +1169,12 @@ time.ago { white-space: nowrap; }
 .content.chats-list > .nav { max-width: 720px; }
 .content.chats-list .chats-filter { max-width: 720px; }
 .dialog.picker .df { gap: 12px; }
+
+/* Pasting and dropping files (gui#187): a plain drop zone over what takes them, and
+   the reason over what does not */
+.dialog.dropping, .content.dropping { position: relative; }
+.dialog.dropping::after, .content.dropping::after { content: attr(data-droptext); position: absolute; inset: 6px;
+  display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 5;
+  border: 2px dashed var(--green); border-radius: 12px; font-weight: 600; color: var(--green);
+  background: color-mix(in srgb, var(--ink) 80%, transparent); }
+.dialog.dropping.nodrop::after, .content.dropping.nodrop::after { border-color: var(--red); color: var(--red); }
