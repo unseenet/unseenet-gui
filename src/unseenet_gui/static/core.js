@@ -288,10 +288,18 @@ function iconAction(icon, label, onclick, extra = {}, count = null) {
 
 // Call the core's local API (UN-RFC 0046) with the page's token; answers the JSON, or
 // throws with the API's error.
-async function api(method, path, body) {
+// ``opts``: ``signal`` to abort it, ``timeout`` (ms) for asking that may take long and that
+// the page can do without (pictures, a group's emoji): a browser has six connections to the
+// core, and requests left hanging while the node is busy would take them all (gui#227).
+async function api(method, path, body, opts = {}) {
+  let signal = opts.signal;
+  if (opts.timeout) {
+    const t = AbortSignal.timeout(opts.timeout);
+    signal = signal ? AbortSignal.any([signal, t]) : t;
+  }
   const res = await fetch(path, {
     method, headers: { "X-Unseenet-Token": TOKEN || "", ...(body ? { "Content-Type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined, cache: "no-store",
+    body: body ? JSON.stringify(body) : undefined, cache: "no-store", signal,
   });
   let data = null;
   try { data = await res.json(); } catch (_) { /* not JSON */ }
@@ -414,17 +422,33 @@ function personOf(key) {
   }
   return null;
 }
+const PEOPLE_WAIT = 10000, PEOPLE_AGAIN = 30000;      // ms: asking pictures, and again (gui#227)
+let peopleBusy = false;
 // Ask the core for the names and pictures of the keys asked for since the last time, at
-// most 255 at once, then draw again.
+// most 255 at once, then draw again. One asking at a time, never longer than PEOPLE_WAIT
+// (gui#227): what did not come in time is asked again later.
 async function loadPeople() {
+  if (peopleBusy) return;                              // asked again when it is done
   const keys = Array.from(WANTED).filter(k => !PEOPLE.has(k)).slice(0, 255);
-  WANTED.clear();
+  keys.forEach(k => WANTED.delete(k));
   if (!keys.length) return;
-  // every key asked for is known afterwards, answered or not: else each render asks again
-  let got = {};
-  try { got = (await api("GET", "/api/pictures?keys=" + keys.map(encodeURIComponent).join(","))).pictures || {}; }
-  catch (_) { /* an older core, or none: identicons from the rows, initials otherwise */ }
+  // every key answered is known afterwards, with a picture or not: else each render asks again
+  let got = {}, again = false;
+  peopleBusy = true;
+  try {
+    got = (await api("GET", "/api/pictures?keys=" + keys.map(encodeURIComponent).join(","), null,
+      { timeout: PEOPLE_WAIT })).pictures || {};
+  } catch (err) {
+    again = err.name === "TimeoutError" || err.name === "AbortError";   // the node was busy
+    /* otherwise an older core, or none: identicons from the rows, initials otherwise */
+  } finally { peopleBusy = false; }
+  if (again) {
+    keys.forEach(k => WANTED.add(k));
+    clearTimeout(wantTimer); wantTimer = setTimeout(loadPeople, PEOPLE_AGAIN);
+    return;
+  }
   keys.forEach(k => PEOPLE.set(k, got[k] || { identicon: null, picture: null }));
+  if (WANTED.size) { clearTimeout(wantTimer); wantTimer = setTimeout(loadPeople, 60); }
   if (Object.keys(got).length) render();
 }
 // "Mikkel~q7f3": the fingerprint part is shown quieter, like the TUI does.

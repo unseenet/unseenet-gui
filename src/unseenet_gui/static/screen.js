@@ -28,10 +28,17 @@ async function loadSidebar() {
 const PHONE = window.matchMedia("(max-width: 760px)");     // the same width as app.css
 PHONE.addEventListener?.("change", () => render());
 
+// What the group shown asks of the core, aborted when you leave it (gui#227): a group
+// still loading or its emoji must not hold the browser's few connections to the core.
+let viewAbort = new AbortController();
+const viewSignal = () => viewAbort.signal;
+const aborted = (err) => err && (err.name === "AbortError" || err.name === "TimeoutError");
+
 // Show a group (or a chat, For you, the timeline), loading it, and remember where you were.
 async function openGroup(gid, rerender = true) {
   if (S.gid !== gid) { S.post = null; S.postAt = null; S.full = false; S.mobileReading = false; S.moreTools = false;
-    S.showAll = null; }                               // Show all ends when you leave the view (0051 3)
+    S.showAll = null;                                 // Show all ends when you leave the view (0051 3)
+    viewAbort.abort(); viewAbort = new AbortController(); }
   if (rerender) S.pane = "group";      // the first group opened by itself leaves a phone on the list
   S.gid = gid;
   revealGroup(gid);
@@ -54,12 +61,13 @@ async function loadGroup() {
     return;
   }
   try {
-    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + (S.showAll === gid ? "?all=1" : ""));
+    const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + (S.showAll === gid ? "?all=1" : ""),
+      null, { signal: viewSignal() });
     let site = null;
     if (data.group.view === "pages") site = await loadSite(gid);   // a site: its pages (UN-RFC 0035)
     if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: writeOf(data), site };
     noteGroupEmoji(data.group);                       // its own emoji (UN-RFC 0056)
-  } catch (err) { S.status = err.message; }
+  } catch (err) { if (!aborted(err)) S.status = err.message; }    // left it: nothing to say
 }
 
 // ---- may you write here? (#13) -------------------------------------------------
