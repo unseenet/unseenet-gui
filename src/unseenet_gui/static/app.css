@@ -1104,3 +1104,6 @@ time.ago { white-space: nowrap; }
 .chats-list .chats-filter { margin: 0 0 10px; }
 .chats-row { display: flex; align-items: center; gap: 2px; }
 .chats-row .chats-item { flex: 1; min-width: 0; }
+/* read more (UN-RFC 0031 3.2.1): the author's cut, shown as it is; a small text button */
+.etext.more-cut { max-height: none; }
+.btn.mini-text { padding: 2px 8px; font-size: 12px; margin-left: auto; }

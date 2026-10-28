@@ -86,6 +86,23 @@ function insertEmoji(k, code, from) {
   rememberEmoji(code);
 }
 
+// A read-more line (UN-RFC 0031 3.2.1) at the cursor in field k, on a line of its own,
+// so nobody needs to know the syntax; a feed cuts the post there for "… more".
+function insertReadMore(k) {
+  const el = emojiField(k);
+  if (!el) return;
+  const at = el.selectionStart ?? el.value.length, end = el.selectionEnd ?? at;
+  const before = el.value.slice(0, at), after = el.value.slice(end);
+  const text = (before && !before.endsWith("\n\n") ? (before.endsWith("\n") ? "\n" : "\n\n") : "") +
+    "...\n" + (after.startsWith("\n") ? "" : "\n");
+  el.focus();
+  el.setSelectionRange(at, end);
+  if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+    el.setRangeText(text, at, end, "end");
+    el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
 // A popover next to `anchor` (a DOMRect): above it when there is room, else below.
 function placePopover(node, r, width, left = false) {
   const w = Math.min(width, innerWidth - 16);

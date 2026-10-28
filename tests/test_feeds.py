@@ -57,6 +57,11 @@ class FeedAPI:
 
     def rows(self, group=FEED):
         first = row("<a@x>", "En kort note", group=group)
+        if getattr(self, "read_more", False):     # UN-RFC 0031 3.2.1: the author's cut
+            first = row("<a@x>", "Kort indledning\n\n...\n\nResten af historien", kind="post",
+                        subject="Med læs mere", group=group)
+            first["tree"] = [{"t": "p", "c": [{"t": "text", "v": "Kort indledning"}]}, {"t": "more"},
+                             {"t": "p", "c": [{"t": "text", "v": "Resten af historien"}]}]
         if self.entry_mine:
             first.update(mine=True, may_withdraw=True, may_edit=True)
         second = row("<b@x>", getattr(self, "long_text", "Lang tekst her"), kind="post",
@@ -473,3 +478,19 @@ async def test_in_the_timeline_or_not(feed_page):
     await expect(page.get_by_role("button", name="Show as threads")).to_be_visible()
     await page.get_by_role("button", name="About this group").click()
     await expect(page.locator(".dialog").get_by_role("button", name="Leave")).to_be_visible()
+
+
+async def test_an_entry_cut_at_the_authors_read_more_line(feed_page):
+    """gui#188: cut at the "..." line even when short, "… more" shown; opened, the whole
+    text without the line."""
+    page, api = feed_page
+    api.read_more = True
+    await open_feed(page)
+    entry = page.locator(".entry").first
+    await expect(entry.locator(".etext")).to_contain_text("Kort indledning")
+    await expect(entry.locator(".etext")).not_to_contain_text("Resten")
+    more = entry.get_by_role("button", name="… more")
+    await expect(more).to_be_visible()
+    await more.click()
+    await expect(entry.locator(".etext")).to_contain_text("Resten af historien")
+    assert "..." not in await entry.locator(".etext").inner_text()
