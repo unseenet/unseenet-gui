@@ -5,7 +5,8 @@
     python tools/record_demo.py dev/web.log docs/img
 
 Needs Playwright (pip install playwright; playwright install chromium) and ffmpeg.
-Writes demo.gif, threads.png, reply.png, chat.png, light.png and palette.png.
+Writes demo.gif, threads.png, reply.png, chat.png, feed.png, timeline.png, private.png,
+compose.png, light.png and palette.png.
 """
 import re
 import shutil
@@ -30,6 +31,13 @@ def main() -> None:
                             record_video_dir=tmp, record_video_size={"width": W, "height": H})
         page = ctx.new_page()
         pause = lambda s=1.2: time.sleep(s)  # noqa: E731
+
+        def open_group(name: str) -> None:
+            """Open a group by name, as a person would find it: the sidebar's filter."""
+            page.fill("#sidefilter", name)
+            pause(0.6)
+            page.press("#sidefilter", "Enter")
+            pause(0.6)
         page.goto(url)
         page.wait_for_selector("#pass")
         pause(1)
@@ -58,7 +66,7 @@ def main() -> None:
         pause(1)
         page.wait_for_selector(".prow.pending", state="detached", timeout=90000)
         pause(2.5)
-        page.click(".item:has-text(\"dk.snak.chat\")")
+        open_group("dk.snak.chat")
         page.wait_for_selector('[data-k="chat"]')
         pause(1.5)
         page.type('[data-k="chat"]', "Hej fra webklienten!", delay=60)
@@ -68,6 +76,35 @@ def main() -> None:
         page.wait_for_selector("text=reached the node", timeout=90000)
         pause(2)
         page.screenshot(path=out / "chat.png")
+        # a person's feed under People you follow, cut at the author's read more (gui#210, #188)
+        page.click(".people-followed .item:has-text(\"Mikkel\")")
+        page.wait_for_selector(".entry")
+        pause(2)
+        page.screenshot(path=out / "feed.png")
+        # the timeline: feeds and a discussion group put into it (UN-RFC 0034 6.2)
+        page.click(".item:has-text(\"Timeline\")")
+        page.wait_for_selector(".entry")
+        pause(2)
+        page.screenshot(path=out / "timeline.png")
+        # private chats: one row among Your contacts and Private posts, the list in the pane (gui#209)
+        page.click(".chats-item")
+        page.wait_for_selector(".chats-list")
+        pause(1.5)
+        page.screenshot(path=out / "private.png")
+        # room to write a post (gui#203)
+        open_group("unseenet@")
+        page.wait_for_selector(".prow")
+        page.click(".ghead button:has-text(\"New post\")")
+        page.wait_for_selector("#subject")
+        page.type("#subject", "A UN-RFC for the forwarding delay", delay=30)
+        page.click("#body")
+        page.keyboard.press("Control+Home")
+        page.keyboard.type("A first draft of what Tove suggested: the delay grows with how few peers "
+                           "a node has.", delay=15)
+        pause(1)
+        page.screenshot(path=out / "compose.png")
+        page.keyboard.press("Escape")
+        pause(0.8)
         page.keyboard.press("Escape")
         page.keyboard.press("Control+k")
         pause(0.6)
@@ -76,14 +113,14 @@ def main() -> None:
         page.screenshot(path=out / "palette.png")
         page.keyboard.press("Escape")
         pause(0.6)
-        page.click(".item:has-text(\"operators\")")
+        open_group("operators")
         pause(2.5)
         page.keyboard.press("Escape")
         page.keyboard.press("Control+k")
         page.keyboard.type("light", delay=90)
         page.keyboard.press("Enter")
         pause(0.6)
-        page.click(".item:has-text(\"dk.snak\") >> nth=0")
+        open_group("dk.snak@")
         page.wait_for_selector(".prow")
         page.click(".prow:has-text(\"Bornhack\") >> nth=2")
         pause(2.5)
@@ -97,9 +134,9 @@ def main() -> None:
         b.close()
         gif = out / "demo.gif"
         ffmpeg = shutil.which("ffmpeg") or "ffmpeg"
-        filters = "fps=10,scale=960:-1:flags=lanczos"
+        filters = "fps=6,scale=800:-1:flags=lanczos"     # a longer demo, kept under ~5 MB
         subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-i", video, "-vf",
-                        f"{filters},split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=4",
+                        f"{filters},split[a][b];[a]palettegen=max_colors=64[p];[b][p]paletteuse=dither=bayer:bayer_scale=4",
                         str(gif)], check=True)
         shutil.copy(video, out / "demo.webm")
     print("wrote", ", ".join(sorted(f.name for f in out.iterdir())))

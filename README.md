@@ -42,6 +42,10 @@ below. Chat groups are chats. The group's owner decides which a group is, and
 | ![A discussion group: the posts as a tree, the selected post below with its quote](docs/img/threads.png) | ![The compose window: the post quoted with "wrote:", your answer, your signature below](docs/img/reply.png) |
 | **Chat where it is a chat** | **Light, or dark** |
 | ![A chat group: messages in order, and one that has reached the node](docs/img/chat.png) | ![The light theme](docs/img/light.png) |
+| **People you follow, their feeds** | **Your timeline** |
+| ![A person's feed under People you follow: an entry cut at the author's read more, a comment under it](docs/img/feed.png) | ![The timeline: the feeds you follow and a discussion group you put into it, newest first](docs/img/timeline.png) |
+| **Private chats, one per person** | **Room to write** |
+| ![Your contacts, Private posts and Private chats at the top; the list of private chats](docs/img/private.png) | ![The post composer: a toolbar, language, tags and content warnings](docs/img/compose.png) |
 
 ### Booted from a stick
 
