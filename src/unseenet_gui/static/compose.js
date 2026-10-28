@@ -133,6 +133,18 @@ async function toggleView() {
   await loadGroup(); await loadSidebar();
 }
 
+// Put a group you follow into your timeline or take it out (UN-RFC 0034 section 6.2). A
+// setting on what you follow, apart from the view you read it in: from a group of threads
+// each new thread comes in once, with its answers under it.
+async function setTimeline(g, on) {
+  try { await api("POST", `/api/groups/${encodeURIComponent(g.id)}/timeline`, { on }); }
+  catch (x) { toast(x.message); return; }
+  toast(on ? g.label + " is in your timeline now." : g.label + " is no longer in your timeline.");
+  await loadSidebar();
+  if (S.gid === g.id || S.gid === TIMELINE) await loadGroup();
+  render();
+}
+
 // Copy text to the clipboard and say so.
 async function copy(text, done) {
   try { await navigator.clipboard.writeText(text); toast(done); }

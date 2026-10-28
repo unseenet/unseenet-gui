@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **What comes into the timeline** (asked for by the maintainer, #201, UN-RFC 0034 6.2): a
+  ☰ switch in a group's head - *In timeline* / *Add to timeline* - and in its ⋯ menu and the
+  palette; a quiet mark on the groups in the timeline in the list. Feeds are in by default,
+  groups of threads come in with each new thread, chats never. One word everywhere:
+  *Follow* and *Leave*.
+
 - **Choosing a language, nicely** (asked for by the maintainer): one small button - the
   code in a badge and the language's own name, *EN English ▾* - and a list to pick from:
   suggested, the group's, the languages a text can be told in, more, and None, with a

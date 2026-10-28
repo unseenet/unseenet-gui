@@ -100,6 +100,8 @@ class LocalAPI:
             data = {}
         elif path == "/api/pictures":
             data = {"pictures": {}}
+        elif path == "/api/notifications":          # asked now and then (#126): nothing new
+            data = {"settings": {"on": False, "content": False}, "count": 0, "items": []}
         elif path.startswith("/api/jobs/"):
             data = {"state": "sending"}
         else:
@@ -244,7 +246,7 @@ async def test_a_chat_has_close_chat_not_unsubscribe(files_page):
     await page.get_by_role("button", name="About this group").click()
     dialog = page.locator(".dialog")
     await expect(dialog.get_by_role("button", name="Close chat")).to_be_visible()
-    assert await dialog.get_by_role("button", name="Unsubscribe").count() == 0
+    assert await dialog.get_by_role("button", name="Leave").count() == 0
 
 
 async def test_contacts_from_the_profile_and_chats_fold_away(files_page):

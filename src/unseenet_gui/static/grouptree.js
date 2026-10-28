@@ -93,7 +93,7 @@ function hierarchyNav(hier, item) {
     const g = byId[id];
     if (!g) return null;
     return groupRow(g, item(g.id, (g.access || "") + g.icon, dotted(shown + suffix(g)), [
-      forYouMarks(g),
+      timelineMark(g), forYouMarks(g),
       g.unread ? h("span", { class: "count", text: g.unread }) : null], "group" + (g.unread ? " unread" : ""), g.label), extra);
   };
   // "Mark all read" for the groups under a heading, when any of them has something unread
@@ -113,7 +113,7 @@ function hierarchyNav(hier, item) {
           "aria-label": (open ? "Fold " : "Unfold ") + node.path + ".*", title: (open ? "Fold " : "Unfold ") + node.path + ".*",
           onclick: () => toggle(node) }, open ? "▾" : "▸"),
         item(g.id, (g.access || "") + g.icon, dotted(shown + suffix(g)), [
-          forYouMarks(g),
+          timelineMark(g), forYouMarks(g),
           count ? h("span", { class: "count", text: count }) : null],
           "group head" + (count ? " unread" : ""), g.label)],
         [[node.path + ".*", [...readAll(node, node.path), [open ? "Fold" : "Unfold", () => toggle(node)]]]], "headrow"),
@@ -156,6 +156,12 @@ function hierarchyNav(hier, item) {
     open ? contents(root) : null);
 }
 
+// The mark of a group whose entries come into your timeline (UN-RFC 0034 section 6.2).
+function timelineMark(g) {
+  return g.in_timeline ? h("span", { class: "tl-mark", title: "In your timeline" },
+    "•", h("span", { class: "sr", text: " in your timeline" })) : null;
+}
+
 // A group's row in the sidebar: its button(s) and its ⋯, which a right click opens too.
 // ``more`` adds sections to the menu (the hierarchy, for a heading that is a group).
 function groupRow(g, buttons, more = [], cls = "") {
@@ -174,7 +180,9 @@ function groupMenu(g, more = []) {
       g.unread ? ["Mark all read", () => markAllRead([g])] : null,
       ["Copy address", () => copyGroupAddress(g)],
       g.owner ? ["Edit group", () => withGroup(g.id, openEditGroup)] : null,
-      ["Unsubscribe", () => unsubscribeGroup(g)]]],
+      g.timeline_possible ? [g.in_timeline ? "Take out of the timeline" : "Add to the timeline",
+        () => setTimeline(g, !g.in_timeline)] : null,
+      ["Leave", () => unsubscribeGroup(g)]]],
     ...more]);
 }
 
@@ -372,6 +380,12 @@ function mainArea() {
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         "Show as " + nextView(g), h("kbd", { text: "V" })) : null,
+      // in your timeline or not (UN-RFC 0034 6.2): one switch, not a second kind of follow
+      g.subscribed !== false && g.timeline && g.timeline.possible ? h("button", {
+        class: "btn tl-switch" + (g.timeline.on ? " on" : ""), "aria-pressed": String(!!g.timeline.on), "data-k": "tl-switch",
+        title: g.timeline.on ? "Its new " + (g.view === "feed" ? "entries" : "threads") + " come into your timeline - click to take it out"
+          : "Bring its new " + (g.view === "feed" ? "entries" : "threads") + " into your timeline, with the answers under them",
+        onclick: () => setTimeline(g, !g.timeline.on) }, "☰ ", g.timeline.on ? "In timeline" : "Add to timeline") : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
       h("button", { class: "btn icon pal-btn", "aria-label": "More: all commands", onclick: () => openPalette() }, "⋯"),
       g.type && !["contact", "inbox"].includes(g.type) && g.view !== "pages" && (g.kinds || ["post"]).includes("post") ?

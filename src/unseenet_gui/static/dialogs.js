@@ -118,6 +118,6 @@ function openInfo() {
       g.type === "contact" ? [
         g.contact ? h("button", { class: "btn", onclick: () => { closeDialog(); removeContact(g.key, g.label.replace(/ √$/, "")); } }, "Remove contact") : null,
         h("button", { class: "btn", onclick: () => closeChat(g.key, g.label.replace(/ √$/, "")) }, "Close chat")] :
-      g.id !== FOR_YOU ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Unsubscribe") : null)) };
+      g.id !== FOR_YOU ? h("button", { class: "btn", onclick: () => leaveGroup(g) }, "Leave") : null)) };
   render();
 }
