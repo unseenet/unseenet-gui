@@ -9,6 +9,12 @@
 // ---- unlock and setup -----------------------------------------------------
 function unlockScreen() {
   const st = S.state, isNew = !st.vault_exists;
+  // a PIN on this device (#145): which passkeys may open it, asked once
+  if (!isNew && S.pinDevices === undefined && devicePinPossible()) {
+    S.pinDevices = null;
+    devicePinList().then(d => { S.pinDevices = d.devices || []; render(); });
+  }
+  const pins = !isNew && devicePinPossible() && S.pinDevices && S.pinDevices.length ? S.pinDevices : null;
   const submit = async (e) => {
     e.preventDefault();
     const f = e.target, pass = f.pass.value;
@@ -31,7 +37,9 @@ function unlockScreen() {
         h("input", { id: "again", name: "again", type: "password", class: "field", "data-k": "again", required: true })] : null,
       h("div", { class: "error", role: "alert", text: S.error }),
       h("button", { class: "btn primary", type: "submit", disabled: S.busy },
-        S.busy ? "Unlocking …" : isNew ? "Create vault" : "Unlock")),
+        S.busy ? "Unlocking …" : isNew ? "Create vault" : "Unlock"),
+      pins ? h("button", { class: "btn", type: "button", "data-k": "pin-unlock", disabled: S.busy,
+        onclick: () => unlockWithDevicePin(pins) }, "Unlock with this device's PIN") : null),
     isNew ? h("p", { class: "hint", text: "Your keys, groups and saved posts are kept in this one file, " +
       "encrypted with the passphrase. Lose both, and they are gone - nobody can reset it." }) : null,
     S.state.web ? h("div", { class: "statuscard" },

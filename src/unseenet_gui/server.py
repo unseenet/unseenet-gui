@@ -57,6 +57,15 @@ def _bootable() -> None:
 
 
 # --- /x/gui/ -----------------------------------------------------------------
+def _portable() -> bool:
+    """Whether this program runs from a stick or a portable folder."""
+    try:
+        from unseenet.portable import portable_root
+        return portable_root() is not None
+    except ImportError:
+        return False
+
+
 async def state(request):
     """What the page shows besides the core's state: the vault's path, this
     machine (bootable image, browser), a newer release, your fingerprint."""
@@ -73,6 +82,8 @@ async def state(request):
            # what is true there - the entrance, not Tor on this computer, carries it
            "web": sys.platform == "emscripten",
            "bootable": system.enabled(),
+           # a stick or portable folder: no PIN there, the passphrase only (UN-RFC 0050 5)
+           "portable": _portable(),
            "update": request.app[UPDATER].info(s),
            "fp": s.identity().fingerprint[:4] if s is not None and s.has_identity() else None,
            # the vault's identities, to choose which to copy to another device (UN-RFC 0050 3.6)

@@ -363,6 +363,8 @@ function commands() {
       when: !!shareTarget(), run: () => openShareProfile(shareTarget().to, shareTarget().who) },
     { net: true, name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
+    { name: "PIN on this device - unlock without typing the passphrase", key: "", also: "pin passkey fingerprint face",
+      when: devicePinPossible(), run: openDevicePin },                         // #145 (pin.js)
     ...notifyCommands(),                                      // #126 (notify.js)
     { name: "Export your data", key: "", also: "export download backup takeout data gdpr",
       when: exportPossible(), run: openExport },                    // #141 (export.js)
