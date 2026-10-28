@@ -1140,9 +1140,24 @@ time.ago { white-space: nowrap; }
 .editor .toolbar .grow { flex: 1; }
 /* the private part (gui#209): three rows alike, lists with the same head, the person picker */
 .private-item .ic svg { vertical-align: -2px; }
-.contactrow { display: flex; align-items: center; gap: 6px; }
-.contactrow .item.person { flex: 1; min-width: 0; }
-.contactrow .item.person .hint { margin-left: 8px; font-size: 12px; }
+/* one row in Private chats and Your contacts alike (gui#217): height, spacing, buttons at the right */
+.content.chats-list > .nav { gap: 2px; }
+.listrow { display: flex; align-items: center; gap: 6px; min-height: 44px; padding-right: 6px; border-radius: 8px; }
+.listrow:hover { background: var(--ink-2); }
+.listrow > .item.person { flex: 1; min-width: 0; min-height: 44px; background: transparent; }
+.listrow > .item.person .hint { margin-left: 8px; font-size: 12px; }
+.listrow .rowbtns { display: flex; align-items: center; gap: 6px; flex: none; }
+.listrow .rowbtns .btn { height: 32px; }
+.listrow .rowbtns .more { margin-left: 0; }
+.listrow .rowbtns .morebtn { opacity: 1; height: 32px; }
+.listrow.closed .nm { color: var(--muted); }
+@media (max-width: 560px) {
+  .listrow .rowbtns { gap: 4px; }
+  .listrow .rowbtns .btn { padding: 0 8px; }
+  .listrow > .item.person .hint { display: none; }
+}
+.content.chats-list > h3.list-h { max-width: 720px; margin: 18px 0 4px; padding: 0 10px; font-family: var(--mono);
+  font-size: 12.5px; font-weight: 400; letter-spacing: 0.04em; color: var(--paper-2); }
 .dialog.picker { max-width: 520px; }
 .dialog.picker .dh { gap: 10px; }
 .dialog.picker .msect { padding: 8px 12px 4px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
@@ -1153,5 +1168,4 @@ time.ago { white-space: nowrap; }
 .content.chats-list { flex-direction: column; overflow-y: auto; padding: 14px 20px; gap: 4px; }
 .content.chats-list > .nav { max-width: 720px; }
 .content.chats-list .chats-filter { max-width: 720px; }
-.contactrow .btn { height: 32px; }
 .dialog.picker .df { gap: 12px; }
