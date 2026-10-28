@@ -125,7 +125,7 @@ const FILE_PICKS = [["none", "No files", "text only"], ["pictures", "Pictures", 
 // Choosing files for a post: at most four, with a description each; ``label`` on its button. The core saves
 // pictures again without their metadata (GPS, time, camera) before they are sent.
 function filePicker(dialog, g, carries, label = "Add pictures or files", { toolbar = false } = {}) {
-  if (!carries) return h("p", { class: "hint", style: "margin:0",
+  if (!carries) return h("p", { class: "hint", style: "margin:0", "data-nofiles": "Your node does not carry files.",
     text: "This group takes pictures and files, but your node does not carry them." });
   const max = g.files.max_size || 0, list = h("div", { class: "picklist" });
   const about = "Pictures are saved again without where and when they were taken." + (max ? ` Up to ${size(max)} each.` : "");
@@ -144,10 +144,89 @@ function filePicker(dialog, g, carries, label = "Add pictures or files", { toolb
       e.target.value = "";
       draw();
     } });
+  input._take = async (files) => { await readFiles(files, dialog.files, max); draw(); };   // pasted, dropped (gui#187)
   draw();
   return h("div", { class: "attach" + (toolbar ? " in-toolbar" : "") },
     toolbar ? null : h("label", { for: "cfiles", class: "btn" }, label), input, hint, list);
 }
+
+// Pictures and files pasted (Ctrl+V) or dropped where "Add pictures or files" is (gui#187).
+// They go the button's way - its input's accept, the same limits, and the core saves
+// pictures again without their metadata - under neutral names, since a name like
+// IMG_20261027_… or passport.jpg can tell more than the picture. Only real files: a
+// picture dragged from a web page is only a link, and is never fetched.
+let filesAdded = 0;
+// image-1.png, file-2.pdf: a name that tells nothing but the kind of file
+function neutralName(file) {
+  const sub = (file.type.split("/")[1] || "").replace(/\+.*$/, "").replace("jpeg", "jpg").replace(/[^a-z0-9]/gi, "");
+  const ext = (sub || (file.name.match(/\.([a-z0-9]{1,5})$/i) || [])[1] || "bin").toLowerCase();
+  return `${file.type.startsWith("image/") ? "image" : "file"}-${++filesAdded}.${ext}`;
+}
+// Whether a file is of a kind an input's accept names (image/*, application/pdf, .txt)
+function fileFits(file, accept) {
+  return accept.endsWith("/*") ? file.type.startsWith(accept.slice(0, -1))
+    : accept.startsWith(".") ? file.name.toLowerCase().endsWith(accept.toLowerCase()) : file.type === accept;
+}
+// Where files may go from here: the dialog or the view with an input that takes them, or
+// the reason it takes none (data-nofiles) - null where nothing takes files.
+function fileTarget(el) {
+  const box = el && el.closest ? el.closest(".dialog, .content") : null;
+  if (!box) return null;
+  const input = [...box.querySelectorAll("input[type=file]")].find(i => i._take);
+  if (input) return { box, input };
+  const no = box.querySelector("[data-nofiles]");
+  return no ? { box, refuse: no.getAttribute("data-nofiles") } : null;
+}
+// Pasted or dropped files to where they go: its kinds only, under neutral names
+function addFilesAt(at, files) {
+  if (at.refuse) { toast(at.refuse); return; }
+  const accept = (at.input.accept || "").split(",").map(a => a.trim()).filter(Boolean);
+  const ok = [];
+  for (const f of files) {
+    if (accept.length && !accept.some(a => fileFits(f, a))) {
+      toast(`${f.type || "That kind of file"} cannot be added here.`); continue; }
+    ok.push(new File([f], neutralName(f), { type: f.type }));
+  }
+  if (ok.length) at.input._take(ok);
+}
+let dropBox = null;
+// The drop zone over what is dragged over: "Drop to add", or why it takes no files
+function markDrop(at) {
+  const box = at && at.box;
+  if (dropBox && dropBox !== box) dropBox.classList.remove("dropping", "nodrop");
+  dropBox = box;
+  if (box) {
+    box.classList.add("dropping"); box.classList.toggle("nodrop", !!at.refuse);
+    box.setAttribute("data-droptext", at.refuse || "Drop to add");
+  }
+}
+const isFileDrag = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files");
+document.addEventListener("dragover", (e) => {
+  if (!isFileDrag(e)) return;
+  e.preventDefault();                        // never let the browser open a dropped file
+  const at = fileTarget(e.target);
+  markDrop(at);
+  e.dataTransfer.dropEffect = at && !at.refuse ? "copy" : "none";
+});
+document.addEventListener("dragleave", (e) => { if (!e.relatedTarget) markDrop(null); });
+document.addEventListener("drop", (e) => {
+  const at = fileTarget(e.target), files = [...((e.dataTransfer && e.dataTransfer.files) || [])];
+  markDrop(null);
+  if (isFileDrag(e)) e.preventDefault();
+  if (!at) return;
+  if (files.length) { e.preventDefault(); addFilesAt(at, files); return; }
+  // a picture from a web page: only its address - not fetched, and not typed in as a link
+  const html = e.dataTransfer ? e.dataTransfer.getData("text/html") : "";
+  if (!at.refuse && /<img\b/i.test(html)) { e.preventDefault(); toast("Only files can be added: save the picture first, then add it."); }
+});
+document.addEventListener("paste", (e) => {
+  const files = [...((e.clipboardData && e.clipboardData.files) || [])];
+  if (!files.length) return;                 // text pastes as text
+  const at = fileTarget(e.target);
+  if (!at) return;
+  e.preventDefault();
+  addFilesAt(at, files);
+});
 
 // The paperclip for a composer's toolbar (gui#203): opens the file picker's input.
 function attachButton(carries, about) {

@@ -212,7 +212,8 @@ function editProfile(p, share = null) {
           p.picture ? "Your picture - anybody can see it." : "No picture: your identicon is shown, made from your key." }),
         h("div", { class: "pic-btns" },
           h("label", { for: "picfile", class: "btn" }, pic.busy ? "Making it …" : p.picture || pic.preview ? "Choose another" : "Choose a picture"),
-          h("input", { id: "picfile", type: "file", accept: "image/*", class: "sr", onchange: choose }),
+          Object.assign(h("input", { id: "picfile", type: "file", accept: "image/*", class: "sr", onchange: choose }),
+            { _take: (files) => choose({ target: { files } }) }),          // pasted, dropped (gui#187)
           (p.picture || pic.preview) && !pic.remove ? h("button", { type: "button", class: "link", onclick: () => {
             Object.assign(pic, { file: null, preview: null, remove: !!p.picture }); dialog.refresh(); } }, "Remove picture") : null))),
     shown() || pic.file ? [h("label", { for: "picalt", text: "Picture description, for people who cannot see it" }),

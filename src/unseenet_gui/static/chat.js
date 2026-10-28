@@ -81,11 +81,13 @@ function chatView(d) {
     if (g.type === "contact") doSend("/api/private", g.id, { key: g.key, body: text, chat: true, ...more }, { text: shown, chat: true });
     else doPost(g.id, { body: text, chat: true, ...more }, { text: shown, chat: true });
   };
-  const attach = takesFiles ? [
-    h("input", { type: "file", multiple: true, class: "sr", id: "chatfiles",
+  const chatFiles = takesFiles ? h("input", { type: "file", multiple: true, class: "sr", id: "chatfiles",
       accept: g.files && (g.files.types || []).length ? g.files.types.join(",") : "image/*",
       onchange: async (e) => { await readFiles(e.target.files, pending, g.files ? g.files.max_size : 0);
-        e.target.value = ""; render(); } }),
+        e.target.value = ""; render(); } }) : null;
+  if (chatFiles) chatFiles._take = async (files) => {                  // pasted, dropped (gui#187)
+    await readFiles(files, pending, g.files ? g.files.max_size : 0); render(); };
+  const attach = takesFiles ? [chatFiles,
     h("label", { for: "chatfiles", class: "btn icon attachbtn", title: "Add pictures to your next line",
       "aria-label": "Add pictures" }, svg(ICON.plus, 18, 2.5))] : [];
   const chips = pending.length ? h("div", { class: "chatfiles" }, pending.map((f, i) => h("span", { class: "chip" },
@@ -98,7 +100,8 @@ function chatView(d) {
     g.type !== "contact" && g.kinds && !g.kinds.includes("chat") ?
       h("div", { class: "chatbar hint", text: mayWrite(d, "post").allowed ?
         "A discussion group: it takes posts with a subject only. N writes one." : mayWrite(d, "post").reason }) :
-    cp.allowed ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); } },
+    cp.allowed ? h("form", { class: "chatbar", onsubmit: (e) => { e.preventDefault(); send(); },
+      "data-nofiles": takesFiles ? null : "This group takes no files." },
       h("div", { class: "row" },
         h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
         h("textarea", { id: "chat", rows: 1, class: "grow-in", "data-k": "chat", autocomplete: "off", spellcheck: "true",
