@@ -53,6 +53,7 @@ class FeedAPI:
         self.entry_mine = False
         self.many = 0                     # more entries, for a feed taller than the window
         self.imported = False             # the second entry first published on Facebook (#137)
+        self.arrived = []                 # your comments the node has, once they reached it
         self.comments = [row(f"<c{i}@x>", f"Kommentar {i}", 1, refs=["<a@x>"], who=f"Læser {i}",
                              key=f"ed25519:r{i}") for i in range(4)]
         self.comments.append(row("<d@x>", "Svar på svar", 2, refs=["<a@x>", "<c1@x>"], who="Dybt",
@@ -74,7 +75,7 @@ class FeedAPI:
         if self.imported:                 # UN-RFC 0049: an import of the author's own
             second["message"].update(origin={"network": "facebook", "date": "2025-08-03T14:20:00Z",
                                              "id": None, "from": None}, old_on_arrival=True)
-        return [first, *self.comments, second,
+        return [first, *self.comments, *self.arrived, second,
                 *[row(f"<m{i}@x>", f"Note {i}", group=group) for i in range(self.many)]]
 
     def group(self, gid=FEED):
@@ -536,3 +537,43 @@ async def test_a_persons_feed_and_site_under_them(feed_page):
     await expect(people.locator(".sub .item").nth(0)).to_contain_text("feed")
     await expect(people.locator(".sub .item").nth(1)).to_contain_text("site")
     await expect(page.locator("nav.side h3", has_text="site")).to_have_count(0)
+
+
+async def test_your_comment_stays_in_the_timeline_until_the_real_one_is_there(feed_page):
+    """A comment written in the timeline did vanish at `reached` and came back only on
+    the next reload: the timeline is not the comment's group, so it was never reloaded."""
+    page, api = feed_page
+    await page.get_by_title("The feeds you follow and the groups you added, newest first").click()
+    await page.wait_for_load_state("networkidle")
+    note = page.locator(".entry").first
+    box = note.locator('[data-k="c:<a@x>"]')
+    await box.fill("Fra tidslinjen")
+    await box.press("Enter")
+    await expect(note.locator(".comment.pending")).to_contain_text("Fra tidslinjen")
+
+    api.outbox.append({"event": "job", "job": "j1", "group": FEED, "state": "sent",
+                       "message_id": "<mine@x>"})
+    await expect(note.locator(".comment.pending")).to_contain_text("sent")
+    api.arrived.append(row("<mine@x>", "Fra tidslinjen", 1, refs=["<a@x>"], who="Me",
+                           key="ed25519:me", mine=True))
+    api.outbox.append({"event": "job", "job": "j1", "group": FEED, "state": "reached",
+                       "message_id": "<mine@x>"})
+    await expect(note.locator(".comment.pending")).to_have_count(0)
+    await expect(note.locator(".comment", has_text="Fra tidslinjen")).to_have_count(1)
+
+
+async def test_your_comment_is_drawn_once_when_the_node_copy_comes_first(feed_page):
+    page, api = feed_page
+    await open_feed(page)
+    note = page.locator(".entry").first
+    box = note.locator('[data-k="c:<a@x>"]')
+    await box.fill("Kun én gang")
+    await box.press("Enter")
+    api.outbox.append({"event": "job", "job": "j1", "group": FEED, "state": "sent",
+                       "message_id": "<once@x>"})
+    await expect(note.locator(".comment.pending")).to_contain_text("sent")
+    api.arrived.append(row("<once@x>", "Kun én gang", 1, refs=["<a@x>"], who="Me",
+                           key="ed25519:me", mine=True))
+    api.outbox.append({"event": "group-updated", "group_id": FEED, "new": True})
+    await expect(note.locator(".comment", has_text="Kun én gang")).to_have_count(1)
+    await expect(note.locator(".comment.pending")).to_have_count(0)
