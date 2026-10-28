@@ -224,17 +224,19 @@ async def test_create_a_feed_with_comments(files_page):
 
 
 async def test_close_a_chat_from_the_list(files_page):
-    """A chat leaves the list with ⋯ Close chat (UN-RFC 0044 4.2); the contact stays."""
+    """A chat leaves the list with its Close button (UN-RFC 0044 4.2, gui#217); the contact stays."""
     page, api, _ = files_page
     await page.locator(".chats-item").click()                 # the full list (gui#172)
-    row = page.locator(".chats-list .personrow").filter(has_text="Sonia")
-    await row.hover()
-    await row.get_by_role("button", name=re.compile("More about the chat")).click()
-    await row.get_by_role("menuitem", name="Close chat").click()
+    row = page.locator(".chats-list .listrow").filter(has_text="Sonia")
+    await expect(row.get_by_role("button", name="Post", exact=True)).to_be_visible()
+    await expect(row.locator(".more")).to_have_count(0)        # buttons, not a ⋯ menu (gui#217)
+    await row.get_by_role("button", name="Close", exact=True).click()
     await expect(page.locator(".toast")).to_contain_text("Closed the chat with Sonia")
     assert api.closed == [{"key": SONIA, "on": True}]
     await expect(page.locator(".chats-list")).to_contain_text("Closed - back when one of you writes")
-    await expect(page.locator(".chats-list .personrow .more")).to_have_count(0)
+    closed = page.locator(".chats-list .listrow.closed").filter(has_text="Sonia")
+    await expect(closed.get_by_role("button", name="Chat", exact=True)).to_be_visible()
+    await expect(closed.get_by_role("button", name="Close", exact=True)).to_have_count(0)
     await page.get_by_role("button", name="Your contacts").click()   # still a contact (gui#209)
     await expect(page.locator(".contacts-list")).to_contain_text("Sonia")
 
@@ -242,7 +244,7 @@ async def test_close_a_chat_from_the_list(files_page):
 async def test_a_chat_has_close_chat_not_unsubscribe(files_page):
     page, api, _ = files_page
     await page.locator(".chats-item").click()
-    await page.locator(".chats-list .personrow .item").filter(has_text="Sonia").click()
+    await page.locator(".chats-list .listrow .item").filter(has_text="Sonia").click()
     await expect(page.get_by_role("button", name="Close chat")).to_be_visible()
     await page.get_by_role("button", name="About this group").click()
     dialog = page.locator(".dialog")

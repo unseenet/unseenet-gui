@@ -274,6 +274,31 @@ function privateFilter(key, label, placeholder) {
 const contactsButton = () => h("button", { class: "btn", title: "Your contacts (C)", onclick: openContacts },
   "Contacts", h("kbd", { text: "C" }));
 
+// One row in the private lists of the main pane (gui#217): the person, then the buttons at
+// the right - the same height, spacing and place in Private chats and Your contacts.
+function listRow(p, cls, buttons, extra = null) {
+  const label = p.label.replace(/ √$/, "");
+  return h("div", { class: "listrow " + cls },
+    h("button", { class: `item person${p.unread ? " unread" : ""}${p.contact ? "" : " stranger"}`,
+      onclick: () => openGroup(p.id || "contact:" + p.key),
+      title: p.contact ? "Chat with " + label : "Not a contact - open the chat to add them" },
+      h("span", { class: `av xs c${p.colour}`, "aria-hidden": "true", text: initials(p.label) }),
+      h("span", { class: "nm", text: p.label }), extra,
+      p.unread ? h("span", { class: "count", text: p.unread }) : null),
+    h("div", { class: "rowbtns" }, buttons));
+}
+
+// The buttons on a chat in the list (gui#217): plain buttons, not a ⋯ menu.
+function chatButtons(p) {
+  const label = p.label.replace(/ √$/, "");
+  if (p.closed) return [h("button", { class: "btn", onclick: () => openGroup(p.id) }, "Chat")];
+  return [p.contact ? null : h("button", { class: "btn", title: "Give " + label + " a name of your own",
+      onclick: () => openAddContact(p.key, label.replace(/~.*$/, "").replace(/^@/, "")) }, "Add contact"),
+    h("button", { class: "btn", title: "Write a private post to " + label, onclick: () => openPost(p.key, label) }, "Post"),
+    h("button", { class: "btn", title: "Close the chat - it comes back when one of you writes",
+      onclick: () => closeChat(p.key, label) }, "Close")];
+}
+
 // The full list of private chats in the main pane (gui#172): filterable, room for
 // hundreds, + to start one; closed chats last, back when either of you writes.
 function chatsView() {
@@ -281,7 +306,8 @@ function chatsView() {
   const q = (S.chatFilter || "").trim().toLowerCase();
   const hit = p => !q || (p.label + " " + p.key).toLowerCase().includes(q);
   const open = sb.people.filter(hit);
-  const closed = (sb.contacts || []).filter(c => c.closed && hit(c)).map(c => ({ ...c, id: "contact:" + c.key }));
+  const closed = (sb.contacts || []).filter(c => c.closed && hit(c))
+    .map(c => ({ ...c, id: "contact:" + c.key, contact: true, unread: 0 }));
   const about = "Private chats, one per person - only you and the other person can read them. " +
     "Add people as contacts, or start a chat with +.";
   const head = privateHead("Private chats", "end-to-end encrypted", about, [contactsButton(),
@@ -289,9 +315,9 @@ function chatsView() {
       svg(ICON.plus, 16, 2.5), "Chat with someone")]);
   const body = h("div", { class: "content chats-list" },
     privateFilter("chatFilter", "Filter chats", "Filter by name or key"),
-    open.length ? h("div", { class: "nav" }, open.map(p => personRow(p))) : null,
-    closed.length ? [h("h3", { class: "row-h", text: "Closed - back when one of you writes" }),
-      h("div", { class: "nav" }, closed.map(p => personRow(p)))] : null,
+    open.length ? h("div", { class: "nav" }, open.map(p => listRow(p, "chatrow", chatButtons(p)))) : null,
+    closed.length ? [h("h3", { class: "list-h", text: "Closed - back when one of you writes" }),
+      h("div", { class: "nav" }, closed.map(p => listRow(p, "chatrow closed", chatButtons(p))))] : null,
     !open.length && !closed.length ? h("div", { class: "empty" },
       h("h2", { text: q ? "No chat matches" : "No private chats yet" }), h("p", { text: about })) : null);
   return [head, body];
@@ -309,14 +335,11 @@ function contactsView() {
     h("button", { class: "btn primary", onclick: () => openAddContact("", "") }, svg(ICON.plus, 16, 2.5), "Add a contact")]);
   const body = h("div", { class: "content chats-list contacts-list" },
     privateFilter("contactFilter", "Find a contact", "Find: a name, a key or sonia@lorensen"),
-    list.length ? h("div", { class: "nav" }, list.map(c => h("div", { class: "personrow contactrow" },
-      h("button", { class: "item person", onclick: () => openGroup("contact:" + c.key), title: "Chat with " + c.label },
-        h("span", { class: `av xs c${c.colour}`, "aria-hidden": "true", text: initials(c.label) }),
-        h("span", { class: "nm", text: c.label }),
-        c.names && c.names.length ? h("span", { class: "hint", text: c.names.join(", ") }) : null),
+    list.length ? h("div", { class: "nav" }, list.map(c => listRow({ ...c, contact: true, unread: 0 }, "contactrow", [
       h("button", { class: "btn", onclick: () => openGroup("contact:" + c.key) }, "Chat"),
       h("button", { class: "btn", onclick: () => openPost(c.key, c.label) }, "Post"),
-      contactMenu(c)))) :
+      contactMenu(c)],
+      c.names && c.names.length ? h("span", { class: "hint", text: c.names.join(", ") }) : null))) :
     h("div", { class: "empty" }, h("h2", { text: q ? "No contact matches" : "No contacts yet" }),
       looksLikeKey ? h("div", { class: "row" },
         h("button", { class: "btn primary", onclick: () => openGroup("contact:" + S.contactFilter.trim()) }, "Chat with this key"),
