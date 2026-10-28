@@ -112,7 +112,7 @@ function fromGroup(g) {
     fast: !!g.low_latency, encrypted: ["closed", "inbox", "contact"].includes(g.type),
     unread: g.unread || 0, replies: g.replies || 0, mentions: g.mentions || 0,
     for_you: (g.replies || 0) + (g.mentions || 0),
-    rules_markdown: isMd(g.rules_type), private_reply: g.type === "inbox",
+    charter_markdown: isMd(g.charter_type), private_reply: g.type === "inbox",
     colour: g.key ? colour(g.key) : undefined,
     members: (roles.members || []).map(person), moderators: (roles.moderators || []).map(person),
     posters: (roles.posters || []).map(person), banned: (roles.banned || []).map(person),

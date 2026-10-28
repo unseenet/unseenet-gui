@@ -62,7 +62,7 @@ async function openAbout() {
   render();
 }
 
-// About the group shown: its address, owner, rules, retention, node and settings.
+// About the group shown: its address, owner, charter, retention, node and settings.
 function openInfo() {
   const g = S.data && S.data.group;
   if (!g || !g.type) return;
@@ -84,9 +84,10 @@ function openInfo() {
           h("dd", { text: g.languages.join(", ") + (g.languages.length > 1 ? " (" + g.languages[0] + " first)" : "") })] : null,
         (g.tags || []).length ? [h("dt", { text: "Tags" }), h("dd", { text: g.tags.join(", ") })] : null,
         g.address ? [h("dt", { text: "Address" }), h("dd", { class: "mono", text: g.address })] : null),
-      g.rules ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Rules" }),
-        g.rules_markdown ? h("div", { class: "md rules" }, renderTree(g.rules_tree || []))
-          : h("p", { class: "text", style: "margin:0", text: g.rules })] : null,
+      // the group's charter (UN-RFC 0014): what it asks of you - not your own rules
+      g.charter ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Charter" }),
+        g.charter_markdown ? h("div", { class: "md charter" }, renderTree(g.charter_tree || []))
+          : h("p", { class: "text", style: "margin:0", text: g.charter })] : null,
       g.members && g.members.length ? [h("h3", { style: "margin:4px 0 0;font-size:14px", text: `Members (${g.members.length})` }),
         g.members.map(m => h("div", { class: "member" }, h("span", { class: `av xs c${m.colour}`, text: initials(m.label) }),
           h("span", { class: "mono", text: m.label }),
@@ -99,7 +100,7 @@ function openInfo() {
       // how to report here, and who can act (#74, UN-RFC 0045)
       g.type !== "contact" && g.type !== "inbox" && g.id !== FOR_YOU ? [
         h("h3", { style: "margin:4px 0 0;font-size:14px", text: "Reporting" }),
-        h("p", { class: "muted", style: "margin:0", text: "A post that breaks the rules or the law: Report in its ⋯ menu. " +
+        h("p", { class: "muted", style: "margin:0", text: "A post that goes against the group's charter or the law: Report in its ⋯ menu. " +
           "It goes to those who can act on it - the group's owner and moderators, the hierarchy's maintainer, " +
           "your node's operator and the spam report issuers you follow - with what is wrong, your note and screenshots." }),
         h("button", { class: "link", style: "align-self:flex-start", onclick: () => { closeDialog(); openReportIssuers(); } },

@@ -13,7 +13,7 @@ async function leaveGroup(g) {
   toast("You no longer follow " + g.label + ". G finds it again.");
 }
 
-// The owner's group settings: title, description, rules, view, comments, files, reactions,
+// The owner's group settings: title, description, charter, view, comments, files, reactions,
 // pins and pages - with Help (#178): per setting what it does, whom it affects and what
 // changing it later does, the core's text, as in every client.
 async function openEditGroup() {
@@ -49,18 +49,18 @@ async function openEditGroup() {
   // the settings this dialog shows, in its order, for the help beside it
   const shown = ["title", "view", "kinds", "files", "reactions", site ? "index" : null,
     g.type !== "inbox" ? "report_issuers" : null, g.type !== "inbox" ? "languages" : null,
-    g.type !== "inbox" ? "tags" : null, g.type === "inbox" ? "team_name" : null, "rules"].filter(Boolean);
+    g.type !== "inbox" ? "tags" : null, g.type === "inbox" ? "team_name" : null, "charter"].filter(Boolean);
   const help = S.settingsHelp && Array.isArray(S.settingsHelp.settings) ? S.settingsHelp : null;
   formDialog({ label: "Edit group", title: "Edit " + g.label, focus: "#etitle", button: "Save",
     cls: () => "edit-group" + (S.groupHelp ? " helping" : ""),
     headButtons: help ? () => h("button", { class: "btn small", type: "button", "aria-controls": "settings-help",
       "aria-expanded": S.groupHelp ? "true" : "false", onclick: toggleGroupHelp }, S.groupHelp ? "Hide help" : "Help") : null,
     aside: help ? () => settingsHelp(help, shown) : null,
-    values: { title: g.title || "", description: g.description || "", rules: g.rules || "",
+    values: { title: g.title || "", description: g.description || "", charter: g.charter || "",
       team_name: g.team_name || "", gtags: (g.tags || []).join(", "), glangs: (g.languages || []).join(", "),
       reaction_set: Array.isArray(rset) ? rset.join(" ") : "",
-      // Markdown if the rules already are, or - for new rules - if you write posts in Markdown
-      markdown: g.rules ? !!g.rules_markdown : !(S.sidebar && S.sidebar.markdown === false) },
+      // Markdown if the charter already is, or - for a new one - if you write posts in Markdown
+      markdown: g.charter ? !!g.charter_markdown : !(S.sidebar && S.sidebar.markdown === false) },
     note: "Saved as a new version of the group's manifest, signed with your key and sent to your node. The type, owner and ID cannot change.",
     fields: (vals) => [
       h("label", { for: "etitle", text: "Title" }),
@@ -114,15 +114,15 @@ async function openEditGroup() {
       g.type === "inbox" ? [h("label", { for: "eteam", text: "The name replies go out as (a team inbox)" }),
         h("input", { id: "eteam", name: "team_name", class: "in", maxlength: 64, "data-k": "eteam",
           placeholder: "e.g. Example (operator)", value: vals.team_name || "" })] : null,
-      h("label", { for: "erules", text: "Rules - shown to people before they post" }),
-      h("textarea", { id: "erules", name: "rules", class: "in", "data-k": "erules", style: "min-height:110px", value: vals.rules }),
+      h("label", { for: "echarter", text: "Charter - what the group is for and asks of those who write; shown before they post, never enforced by machines" }),
+      h("textarea", { id: "echarter", name: "charter", class: "in", "data-k": "echarter", style: "min-height:110px", value: vals.charter }),
       h("label", { class: "check" }, h("input", { type: "checkbox", name: "markdown", checked: !!vals.markdown }),
         " Markdown: # headings, - lists, **strong**, [links](https://…), :tada: (no pictures)")],
     submit: async (v) => {
-      const rules = v.rules.trim();
+      const charter = v.charter.trim();
       await api("POST", `/api/groups/${encodeURIComponent(g.id)}/settings`,
-        { title: v.title.trim(), description: v.description.trim(), rules,
-          rules_type: v.markdown && rules ? MARKDOWN : null, view, kinds,
+        { title: v.title.trim(), description: v.description.trim(), charter,
+          charter_type: v.markdown && charter ? MARKDOWN : null, view, kinds,
           reactions: reacts === "own" ? splitOwnSet(v.reaction_set) : reacts,
           ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}),
           ...(issuers.map(i => i.key).join(" ") !== startIssuers ? { report_issuers: issuers.map(i => i.key) } : {}),
@@ -543,7 +543,7 @@ function openReport(m) {
       filePicker(dialog, fg, true, "Add screenshots or PDFs"),
       h("label", { class: "check" }, h("input", { type: "checkbox", checked: st.anonymous,
         onchange: (e) => { st.anonymous = e.target.checked; } }), " Anonymous - they cannot see who reported it or answer you"),
-      h("p", { class: "hint", style: "margin:0", text: "For posts that break the group's rules or the law. In an emergency, " +
+      h("p", { class: "hint", style: "margin:0", text: "For posts that go against the group's charter or the law. In an emergency, " +
         "contact the police: nobody on Unseenet can see who anyone is. Screenshots are saved again without " +
         "where and when they were taken." }),
       st.err ? h("p", { class: "error", role: "alert", text: st.err }) : null),

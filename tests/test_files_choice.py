@@ -30,7 +30,8 @@ def group(gid=CHAT):
     return {"id": gid, "label": "dk.foto.chat@abcd", "type": "open", "view": "chat",
             "owner_view": "chat", "hierarchy": "dk", "may_post": True, "owner": True,
             "kinds": ["chat", "post"], "unread": 0, "files": PICTURES, "node_files": True,
-            "subscribed": True}
+            "subscribed": True, "charter": "Vær søde.", "charter_type": None,
+            "charter_tree": []}
 
 
 class LocalAPI:
@@ -340,3 +341,28 @@ async def test_the_post_composer_has_room_and_a_toolbar(files_page):
     await page.keyboard.press("Escape")
     await page.evaluate("openWrite('ed25519:someone', 'post')")
     await expect(page.locator(".dialog.compose-win.big")).to_be_visible()   # remembered
+
+
+async def test_a_groups_charter_not_rules(files_page):
+    """unseenet#726, #231: the owner's text about the group is its charter - in About this
+    group and in Edit group, sent as charter and charter_type; "rules" is only your own."""
+    page, api, _ = files_page
+    await page.get_by_role("button", name=re.compile("dk.foto.chat")).first.click()
+    await page.evaluate("openInfo()")
+    info = page.locator(".dialog")
+    await expect(info.locator("h3").first).to_have_text("Charter")
+    await expect(info).to_contain_text("Vær søde.")
+    await expect(info).not_to_contain_text("Rules")
+    await page.keyboard.press("Escape")
+    await page.evaluate("openEditGroup()")
+    dialog = page.locator(".dialog.edit-group")
+    box = dialog.locator("#echarter")
+    await expect(box).to_have_value("Vær søde.")
+    await expect(dialog.locator("label[for=echarter]")).to_contain_text("never enforced by machines")
+    await box.fill("# Velkommen\n\n- vær søde")
+    await dialog.locator("input[name=markdown]").check()     # was plain text: ticked here
+    await dialog.get_by_role("button", name="Save", exact=True).click()
+    await expect(page.locator(".toast")).to_contain_text("updated")
+    sent = api.settings[-1]
+    assert sent["charter"] == "# Velkommen\n\n- vær søde" and "rules" not in sent
+    assert sent["charter_type"].startswith("text/markdown")
