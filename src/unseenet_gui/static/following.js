@@ -461,6 +461,41 @@ function moreMenu(m) {
       onclick: (e) => { e.stopPropagation(); S.menuFor = null; render(); run(); } }, label))) : null);
 }
 
+// Whether the post composer opens big (gui#203): this device's choice, kept in the browser.
+function composeBig() {
+  try { return localStorage.getItem("unseenet.composeBig") === "1"; } catch (_) { return false; }
+}
+// Remember big or normal for the next post.
+function setComposeBig(on) {
+  try { localStorage.setItem("unseenet.composeBig", on ? "1" : "0"); } catch (_) { /* this time only */ }
+}
+
+// Put before and after around what is selected in field k (bold: **…**).
+function wrapSelection(k, before, after) {
+  const el = emojiField(k);
+  if (!el) return;
+  const a = el.selectionStart ?? el.value.length, b = el.selectionEnd ?? a;
+  const text = before + (el.value.slice(a, b) || "text") + after;
+  el.focus(); el.setSelectionRange(a, b);
+  if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+    el.setRangeText(text, a, b, "end"); el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+  if (a === b) el.setSelectionRange(a + before.length, a + before.length + 4);   // "text" chosen
+}
+
+// "> " at the start of every selected line (or the line the cursor is on): a quote.
+function quoteSelection(k) {
+  const el = emojiField(k);
+  if (!el) return;
+  const v = el.value, a = v.lastIndexOf("\n", (el.selectionStart ?? 0) - 1) + 1;
+  let b = v.indexOf("\n", el.selectionEnd ?? a); if (b < 0) b = v.length;
+  const text = v.slice(a, b).split("\n").map(ln => "> " + ln).join("\n");
+  el.focus(); el.setSelectionRange(a, b);
+  if (!document.execCommand || !document.execCommand("insertText", false, text)) {
+    el.setRangeText(text, a, b, "end"); el.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+}
+
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo }) {
@@ -553,23 +588,54 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
   };
-  dialog.node = dialogShell({ label: title, wide: true },
+  // room to write (gui#203): bigger by default, and nearly the whole window with ⤢ -
+  // remembered on this device only
+  const big = composeBig();
+  const md = !(S.sidebar && S.sidebar.markdown === false);
+  const fileAbout = takes ? "Pictures are saved again without where and when they were taken." +
+    (fg.files.max_size ? ` Up to ${size(fg.files.max_size)} each.` : "") : "";
+  const quoting = !priv && /(^|\n)>/.test(body || "");
+  const growBtn = h("button", { type: "button", class: "btn icon", "data-k": "cgrow",
+    "aria-label": big ? "Make smaller" : "Make bigger", title: big ? "Make smaller" : "Make bigger",
+    onclick: (e) => {
+      const win = dialog.node.querySelector(".dialog"), now = !win.classList.contains("big");
+      win.classList.toggle("big", now); setComposeBig(now);
+      e.currentTarget.replaceChildren(svg(now ? ICON.shrink : ICON.grow, 16, 2.2));
+      e.currentTarget.title = e.currentTarget.ariaLabel = now ? "Make smaller" : "Make bigger";
+      const ta = dialog.node.querySelector("#body"); if (ta) ta.focus();
+    } }, svg(big ? ICON.shrink : ICON.grow, 16, 2.2));
+  dialog.node = dialogShell({ label: title, wide: true, cls: "compose-win" + (big ? " big" : "") },
     h("div", { class: "dh" }, h("h2", { text: title }),
       h("button", { class: "btn primary dh-send", onclick: go }, priv ? "Send" : "Post"),   // phones: above the keyboard
+      growBtn,
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("form", { class: "db", onsubmit: go, onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
-      h("div", { class: "label-row" }, h("label", { for: "body", text: "Text" }),
-        h("button", { type: "button", class: "btn mini-text", "data-k": "readmore", onclick: () => insertReadMore("cbody"),
-          title: "Where a feed cuts this post for \"… more\" - a line of three dots" }, "Insert read more"),
-        emojiButton("cbody")),
-      h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true", oninput: askWho }),
+      h("label", { for: "body", class: "sr", text: "Text" }),
+      h("div", { class: "editor" },
+        // a thin toolbar above the text (gui#203): bold, quote, emoji, files, read more
+        h("div", { class: "toolbar", role: "toolbar", "aria-label": "Formatting" },
+          md ? h("button", { type: "button", class: "btn icon tbtn", "aria-label": "Bold", title: "Bold: **text**",
+            onclick: () => wrapSelection("cbody", "**", "**") }, h("b", { text: "B" })) : null,
+          h("button", { type: "button", class: "btn icon tbtn", "aria-label": "Quote", title: "Quote: > at the start of the lines",
+            onclick: () => quoteSelection("cbody") }, "❝"),
+          emojiButton("cbody"),
+          takes ? attachButton(carries, fileAbout) : null,
+          h("button", { type: "button", class: "btn mini-text", "data-k": "readmore", onclick: () => insertReadMore("cbody"),
+            title: "Where a feed cuts this post for \"… more\" - a line of three dots" }, "Read more"),
+          h("span", { class: "grow" }),
+          h("span", { class: "hint mdmark", tabindex: "0",
+            title: md ? "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:" : "Plain text: sent and shown as typed",
+            text: md ? "Markdown" : "Plain text" })),
+        h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true", oninput: askWho })),
       N.may ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: N.on,
         onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
-      takes ? filePicker(dialog, fg, carries) : null,
+      takes ? filePicker(dialog, fg, carries, undefined, { toolbar: true }) : null,
+      // language, tags and content warnings on one row (gui#203), each with its explanation
+      h("div", { class: "metarow" },
       (!priv && !edit && g && g.suggested_languages) ? h("div", { class: "langrow" },
         h("span", { class: "llabel", text: "Language" }),
         // the codes as sent, kept in the form; the button shows and changes them
@@ -580,11 +646,11 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       !priv && !edit ? (tagBox = tagField(dialog, () => {
         const f = dialog.node && dialog.node.querySelector("form");
         return f ? f.subject.value + "\n" + f.body.value : "";
-      })) : null,
-      h("p", { class: "hint", style: "margin:0", text: (priv ? "Sealed to them: only they can read it. " :
-        "Cut the quote down to what you answer. Signed with your key; a little proof-of-work is added. ") +
-        (S.sidebar && S.sidebar.markdown === false ? "Plain text." : "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:") })),
-    h("div", { class: "df btns" }, h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
+      })) : null),
+      quoting ? h("p", { class: "hint", style: "margin:0", text: "Cut the quote down to what you answer." }) : null),
+    h("div", { class: "df btns" },
+      h("span", { class: "hint grow", text: priv ? "Sealed to them: only they can read it" : "Signed with your key · proof-of-work added" }),
+      h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
       h("button", { class: "btn primary", onclick: go }, priv ? "Send" : "Post", h("kbd", { text: "Ctrl S" }))));
   S.dialog = dialog;
   render();

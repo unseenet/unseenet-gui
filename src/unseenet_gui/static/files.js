@@ -124,16 +124,19 @@ const FILE_PICKS = [["none", "No files", "text only"], ["pictures", "Pictures", 
 
 // Choosing files for a post: at most four, with a description each; ``label`` on its button. The core saves
 // pictures again without their metadata (GPS, time, camera) before they are sent.
-function filePicker(dialog, g, carries, label = "Add pictures or files") {
+function filePicker(dialog, g, carries, label = "Add pictures or files", { toolbar = false } = {}) {
   if (!carries) return h("p", { class: "hint", style: "margin:0",
     text: "This group takes pictures and files, but your node does not carry them." });
   const max = g.files.max_size || 0, list = h("div", { class: "picklist" });
-  const draw = () => list.replaceChildren(...dialog.files.map((f, i) => h("div", { class: "pick" },
+  const about = "Pictures are saved again without where and when they were taken." + (max ? ` Up to ${size(max)} each.` : "");
+  // in the post composer (gui#203) the paperclip is in the toolbar: here only what is added
+  const hint = h("span", { class: "hint", text: " " + about });
+  const draw = () => { if (toolbar) hint.hidden = !dialog.files.length; list.replaceChildren(...dialog.files.map((f, i) => h("div", { class: "pick" },
     h("span", { class: "fname mono", text: f.name }), h("span", { class: "hint", text: size(f.size) }),
     h("input", { class: "in", placeholder: "Describe it for people who cannot see it", value: f.alt, maxlength: 400,
       "aria-label": "Description of " + f.name, oninput: (e) => { f.alt = e.target.value; } }),
     h("button", { type: "button", class: "btn icon", "aria-label": "Remove " + f.name,
-      onclick: () => { dialog.files.splice(i, 1); draw(); } }, svg(ICON.x)))));
+      onclick: () => { dialog.files.splice(i, 1); draw(); } }, svg(ICON.x))))); };
   const input = h("input", { type: "file", multiple: true, class: "sr", id: "cfiles",
     accept: (g.files.types || []).length ? g.files.types.join(",") : "image/*,application/pdf",
     onchange: async (e) => {
@@ -142,8 +145,14 @@ function filePicker(dialog, g, carries, label = "Add pictures or files") {
       draw();
     } });
   draw();
-  return h("div", { class: "attach" },
-    h("label", { for: "cfiles", class: "btn" }, label), input,
-    h("span", { class: "hint", text: " Pictures are saved again without where and when they were taken." + (max ? ` Up to ${size(max)} each.` : "") }),
-    list);
+  return h("div", { class: "attach" + (toolbar ? " in-toolbar" : "") },
+    toolbar ? null : h("label", { for: "cfiles", class: "btn" }, label), input, hint, list);
+}
+
+// The paperclip for a composer's toolbar (gui#203): opens the file picker's input.
+function attachButton(carries, about) {
+  return carries ? h("label", { for: "cfiles", class: "btn icon tbtn", role: "button", tabindex: "0",
+    "aria-label": "Add pictures or files", title: "Add pictures or files. " + about,
+    onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); document.getElementById("cfiles").click(); } } },
+    svg(ICON.clip, 16, 2.2)) : null;
 }

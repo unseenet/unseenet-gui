@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Room to write a post** (asked for by the maintainer, #203): the post composer is wider
+  and taller, and ⤢ makes it nearly the whole window (remembered on this device); a thin
+  toolbar above the text - bold, quote, emoji, the paperclip, read more, and a *Markdown*
+  mark with the examples on hover; content warnings behind one *Content warning ▾* button,
+  only the chosen ones shown in colour; language, tags and warnings on one row with their
+  explanations; a short footer. Chat lines and comments are unchanged.
 - **A node that does not answer is said plainly** (#206, unseenet#704): the other nodes'
   groups and posts are shown at once, and the status bar says "unseenet-node4 is not
   answering yet" until it does.
