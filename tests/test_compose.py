@@ -57,6 +57,8 @@ class LocalAPI:
         self.mention_error = False
         self.sent = []
         self.unexpected = []
+        self.mine_extra = {}                   # more on your own post's message (#239)
+        self.mine_row_extra = {}               # and on its row
 
     async def events(self, request):
         self.socket = web.WebSocketResponse(protocols=["unseenet"])
@@ -94,7 +96,10 @@ class LocalAPI:
             data = {"post": {"allowed": True}, "chat": {"allowed": True}}
         elif request.method == "GET" and path.startswith("/api/groups/"):
             gid = path.removeprefix("/api/groups/")
-            data = {"group": group(gid), "rows": [row("other", gid), row("mine", gid, True)]}
+            mine = row("mine", gid, True)
+            mine["message"].update(self.mine_extra)
+            mine.update(self.mine_row_extra)
+            data = {"group": group(gid), "rows": [row("other", gid), mine]}
             if self.updated:
                 data["rows"].append(row("incoming", gid))
         elif path == "/api/languages":                    # the core's list (core.languages)
@@ -261,6 +266,7 @@ async def test_draft_survives_events_and_submits_current_text(compose_page, mode
     if mode == "edit":
         assert path == f"/api/groups/{GROUP}/edit"
         expected["id"] = "mine"
+        expected.update(tags=[], languages=[])         # the post's own: none (#239)
     elif mode in {"private", "private-reply"}:
         assert path == "/api/private"
         expected["key"] = OTHER
@@ -439,3 +445,41 @@ async def test_the_language_follows_the_text_until_you_choose(compose_page):
     await page.locator("#body").fill("Still the English text, more of it\n")
     await page.wait_for_timeout(1200)
     await expect(page.locator("#clang")).to_have_value("da")
+
+
+async def test_an_edit_keeps_and_changes_tags_warnings_and_language(compose_page):
+    """#239 (unseenet#733): editing a post starts with its own tags, warnings and
+    language - not the group's suggestion - so fixing a typo keeps them; what you
+    change is sent."""
+    page, api = compose_page
+    api.mine_extra = {"tags": ["spoiler", "finale", "serier"], "languages": ["da", "en"],
+                      "text": "Han dør #serier"}
+    api.mine_row_extra = {"edit_tags": ["spoiler", "finale"]}        # the core's: no #words
+    async with page.expect_response(lambda r: r.request.method == "GET" and "/api/groups/alt.test" in r.url):
+        await api.emit(event="group-updated", group_id=GROUP, new=False)   # the rows again
+    await page.wait_for_timeout(200)
+    await page.evaluate("S.data.group.suggested_languages = {codes: ['en'], from: 'group'}")
+    await open_compose(page, "edit")
+    await expect(page.locator("#clang")).to_have_value("da, en")     # the post's, not 'en'
+    await expect(page.locator(".langrow")).to_contain_text("the post's")
+    await expect(page.locator(".wpick.on.w-spoiler")).to_have_count(1)
+    chips = page.get_by_role("dialog").locator(".tchips.edit .tchip")
+    await expect(chips.locator("xpath=self::*[not(contains(@class,'lab'))]")).to_have_text(["finale×"])
+    await expect(chips.and_(page.locator(".lab"))).to_have_text(["serier"])   # its #word, from the text
+    await page.locator("#body").press("Control+s")                    # nothing changed
+    await expect(page.get_by_role("dialog")).to_have_count(0)
+    path, sent = api.sent[-1]
+    assert path == f"/api/groups/{GROUP}/edit"
+    assert sent["tags"] == ["spoiler", "finale"] and sent["languages"] == ["da", "en"]
+
+    await open_compose(page, "edit")
+    await page.locator(".wpick.on.w-spoiler").click()                 # the warning off
+    await page.locator(".wbtn").click()
+    await page.locator(".wmenu input[data-w=sexual]").check()         # another on
+    await page.locator(".langrow .langbtn").click()
+    await page.locator(".langpop .lpick.none").click()                # no language
+    await page.locator("#body").press("Control+s")
+    await expect(page.get_by_role("dialog")).to_have_count(0)
+    _, sent = api.sent[-1]
+    assert sorted(sent["tags"]) == ["finale", "sexual"] and sent["languages"] == []
+    assert api.unexpected == []
