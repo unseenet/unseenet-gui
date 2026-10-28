@@ -252,8 +252,8 @@ function personRow(p, extra = null) {
     p.closed ? null : chatMenu(p));
 }
 
-// The head every private list has (gui#209): title, a chip, one line, the main action -
-// and Contacts beside it where that helps.
+// The head every private list has (gui#209): title, a chip, one line, the main action.
+// Your contacts is one click away in the sidebar (and C), so no Contacts button here (gui#219).
 function privateHead(title, chip, about, actions) {
   return h("header", { class: "ghead" },
     h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
@@ -270,9 +270,6 @@ function privateFilter(key, label, placeholder) {
       oninput: (e) => { S[key] = e.target.value; render(); },
       onkeydown: (e) => { if (e.key === "Escape") { e.preventDefault(); S[key] = ""; render(); } } }));
 }
-
-const contactsButton = () => h("button", { class: "btn", title: "Your contacts (C)", onclick: openContacts },
-  "Contacts", h("kbd", { text: "C" }));
 
 // One row in the private lists of the main pane (gui#217): the person, then the buttons at
 // the right - the same height, spacing and place in Private chats and Your contacts.
@@ -308,9 +305,8 @@ function chatsView() {
   const open = sb.people.filter(hit);
   const closed = (sb.contacts || []).filter(c => c.closed && hit(c))
     .map(c => ({ ...c, id: "contact:" + c.key, contact: true, unread: 0 }));
-  const about = "Private chats, one per person - only you and the other person can read them. " +
-    "Add people as contacts, or start a chat with +.";
-  const head = privateHead("Private chats", "end-to-end encrypted", about, [contactsButton(),
+  const about = "One chat per person - only the two of you can read it.";
+  const head = privateHead("Private chats", "end-to-end encrypted", about, [   // one action, as the other lists (gui#219)
     h("button", { class: "btn primary", title: "Chat with someone", onclick: () => openWrite("", "chat") },
       svg(ICON.plus, 16, 2.5), "Chat with someone")]);
   const body = h("div", { class: "content chats-list" },
