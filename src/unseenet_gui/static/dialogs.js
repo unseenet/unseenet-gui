@@ -108,6 +108,7 @@ function openInfo() {
     h("div", { class: "df btns wrap" },
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: openInvite }, "Invite someone") : null,
       g.owner ? h("button", { class: "btn", onclick: openEditGroup }, "Edit group") : null,
+      g.owner && g.emoji_possible ? h("button", { class: "btn", onclick: openGroupEmoji }, "Emoji") : null,
       g.owner && g.type !== "closed" ? h("button", { class: "btn", onclick: openRoles }, "Moderators and posters") : null,
       g.owner ? h("button", { class: "btn", onclick: () => openBanned() }, `Banned (${(g.banned || []).length})`) : null,
       g.owner ? h("button", { class: "btn danger", onclick: openRemoveGroup }, "Remove group") : null,

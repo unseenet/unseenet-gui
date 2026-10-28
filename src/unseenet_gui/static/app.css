@@ -1191,3 +1191,11 @@ time.ago { white-space: nowrap; }
   .fd-main { flex-direction: column; }
   .settings-help { flex-basis: auto; max-height: 40vh; border-left: 0; border-top: 1px solid var(--line); }
 }
+
+/* A group's own emoji (#67, UN-RFC 0056): at the height of the text, never bigger */
+img.gemoji { height: 1.25em; width: 1.25em; vertical-align: -0.25em; image-rendering: auto; }
+img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
+.gemoji-list { display: flex; flex-direction: column; gap: 6px; }
+.gemoji-row { align-items: center; gap: 10px; }
+.gemoji-add { display: flex; flex-direction: column; gap: 6px; }
+.emo img.gemoji { height: 24px; width: 24px; }

@@ -362,6 +362,8 @@ function commands() {
     { net: true, name: g && g.type === "closed" ? "Share your profile with this group only" : "Share your profile with this person only", key: "",
       when: !!shareTarget(), run: () => openShareProfile(shareTarget().to, shareTarget().who) },
     { net: true, name: "Take back the profile you shared here", key: "", when: !!shareTarget(), run: () => withdrawShared(shareTarget()) },
+    { net: true, name: "The group's own emoji: add, rename or remove them", key: "", also: "emoji custom",
+      when: g && g.owner && g.emoji_possible, run: openGroupEmoji },          // #67 (gemoji.js)
     { name: "Change passphrase (copies of the vault elsewhere keep the old one)", key: "", run: openPassphrase },
     { name: "PIN on this device - unlock without typing the passphrase", key: "", also: "pin passkey fingerprint face",
       when: devicePinPossible(), run: openDevicePin },                         // #145 (pin.js)

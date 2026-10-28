@@ -58,6 +58,7 @@ async function loadGroup() {
     let site = null;
     if (data.group.view === "pages") site = await loadSite(gid);   // a site: its pages (UN-RFC 0035)
     if (S.gid === gid) S.data = { group: fromGroup(data.group), messages: data.rows.map(fromRow), write: writeOf(data), site };
+    noteGroupEmoji(data.group);                       // its own emoji (UN-RFC 0056)
   } catch (err) { S.status = err.message; }
 }
 

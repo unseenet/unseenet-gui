@@ -127,7 +127,8 @@ function openEmojiPicker(k, button, onPick = null, { stay = false } = {}) {
   const node = h("div", { class: "emoji-picker", role: "dialog", "aria-label": "Choose an emoji" },
     h("p", { class: "hint", text: "Loading emoji …" }));
   // onPick: the emoji itself goes there (a reaction) instead of into a field
-  picker = { k, node, onPick, stay, rect: button.getBoundingClientRect(), tab: recentEmoji().length ? "recent" : 0, q: "" };
+  picker = { k, node, onPick, stay, rect: button.getBoundingClientRect(),
+    tab: !onPick && emojiSetOf(S.gid) ? "group" : recentEmoji().length ? "recent" : 0, q: "" };
   document.body.append(node);
   placePopover(node, picker.rect, 344);
   loadEmoji().then(() => { if (picker && picker.node === node) drawPicker(); },
@@ -146,7 +147,9 @@ function closeEmojiPicker(refocus) {
 function drawPicker() {
   const d = emojiData, P = picker;
   const recent = recentEmoji().filter(c => d.table[c]);
-  const tabs = [...(recent.length ? [{ id: "recent", name: "Recently used", icon: "🕘", codes: recent }] : []),
+  const own = !P.onPick ? emojiSetOf(S.gid) : null;          // the group's own first (UN-RFC 0056 6.2)
+  const tabs = [...(own ? [{ id: "group", name: "This group's own", icon: "★", codes: Object.keys(own).sort(), own }] : []),
+    ...(recent.length ? [{ id: "recent", name: "Recently used", icon: "🕘", codes: recent }] : []),
     ...d.categories.map((c, i) => ({ id: i, name: c.name, icon: d.table[c.codes[0]], codes: c.codes }))];
   const pick = (code) => {
     if (P.stay && P.onPick) {                    // open for the next one; the search keeps the focus
@@ -157,7 +160,10 @@ function drawPicker() {
     closeEmojiPicker();
     if (P.onPick) { rememberEmoji(code); P.onPick(d.table[code]); } else insertEmoji(P.k, code);
   };
-  const cell = (c) => h("button", { type: "button", class: "emo", title: ":" + c + ":", "aria-label": c,
+  const cell = (c) => own && own[c] && !d.table[c]
+    ? h("button", { type: "button", class: "emo", title: ":" + c + ":", "aria-label": c, "data-code": c,
+        onclick: () => { closeEmojiPicker(); insertEmoji(P.k, c); } }, gemojiImg(c, own[c]))
+    : h("button", { type: "button", class: "emo", title: ":" + c + ":", "aria-label": c,
     "data-code": c, onclick: () => pick(c), text: d.table[c] });
   const grid = h("div", { class: "emo-grid", role: "group" });
   const tabRow = h("div", { class: "emo-tabs", role: "tablist", "aria-label": "Categories" });

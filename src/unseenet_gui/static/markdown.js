@@ -101,7 +101,8 @@ function renderChatLine(m) {
 function renderInline(nodes, inLink = false) {
   return nodes.map(n => {
     switch (n.t) {
-      case "text": return inLink ? n.v : linkGroups(n.v);      // never a link inside a link
+      // never a link inside a link; :name: as the group's own emoji (UN-RFC 0056)
+      case "text": return inLink ? n.v : withGroupEmoji(n.v, linkGroups);
       case "br": return h("br");
       case "code": return h("code", { text: n.v });
       case "em": return h("em", {}, renderInline(n.c, inLink));

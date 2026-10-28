@@ -214,6 +214,7 @@ function groupMenu(g, more = []) {
       g.unread ? ["Mark all read", () => markAllRead([g])] : null,
       ["Copy address", () => copyGroupAddress(g)],
       g.owner ? ["Edit group", () => withGroup(g.id, openEditGroup)] : null,
+      g.owner && g.emoji_possible ? ["The group's emoji", () => withGroup(g.id, openGroupEmoji)] : null,
       g.timeline_possible ? [g.in_timeline ? "Take out of the timeline" : "Add to the timeline",
         () => setTimeline(g, !g.in_timeline)] : null,
       ["Leave", () => unsubscribeGroup(g)]]],
