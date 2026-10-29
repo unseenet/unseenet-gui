@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A new vault says where the copy comes** (found in the live test 29 Oct): *Get it
+  from another device* comes after the vault is made, so someone bringing their identity
+  over did not find it. The new-vault screen now says so - wherever a copy can be
+  received (in a browser, only where the entrance passes copies on).
+
 ## [0.3.0] - 2026-10-29
 
 **On unseenet 0.6 (`unseenet[api]>=0.6.1,<0.7`): update the nodes first.** Facebook mode

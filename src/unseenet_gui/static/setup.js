@@ -42,6 +42,12 @@ function unlockScreen() {
         onclick: () => unlockWithDevicePin(pins) }, "Unlock with this device's PIN") : null),
     isNew ? h("p", { class: "hint", text: "Your keys, groups and saved posts are kept in this one file, " +
       "encrypted with the passphrase. Lose both, and they are gone - nobody can reset it." }) : null,
+    // the copy comes after the vault: say so here, where someone bringing an identity
+    // from their other device starts (29 Oct, live test: it was not found)
+    isNew && copyPossible() ? h("p", { class: "hint", "data-k": "copy-hint" },
+      h("strong", { text: "Already on Unseenet on another device? " }),
+      "Create the vault first - then choose ", h("em", { text: "Get it from another device" }),
+      " to bring your identity over.") : null,
     S.state.web ? h("div", { class: "statuscard" },
       h("div", { text: "Your keys stay in this browser: it signs, encrypts and checks signatures here." }),
       h("div", { class: "muted", text: "A web entrance carries the connection to a node over Tor. The entrance sees your IP address " +
