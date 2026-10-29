@@ -18,7 +18,6 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   says *Back again to leave Unseenet* and stays; a second Back within a few seconds
   leaves. Back never closes a window with text you have not sent, and leaving the page
   asks first when there is some. A sideways swipe in a list no longer turns into Back.
-
 - **A new vault says where the copy comes** (found in the live test 29 Oct): *Get it
   from another device* comes after the vault is made, so someone bringing their identity
   over did not find it. The new-vault screen now says so - wherever a copy can be
