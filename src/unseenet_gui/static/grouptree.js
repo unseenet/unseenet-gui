@@ -434,9 +434,19 @@ function mainArea() {
         onclick: () => setTimeline(g, !g.timeline.on) }, "☰ ", g.timeline.on ? "In timeline" : "Add to timeline") : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
       h("button", { class: "btn icon pal-btn", "aria-label": "More: all commands", onclick: () => openPalette() }, "⋯"),
+      // New post (gui#257): in the head on a desktop; on a phone a round + above the tab bar,
+      // or a + in the head of a chat group, whose bottom is the chat line - greyed with the
+      // reason where you may not post, as on the desktop (#13)
       g.type && !["contact", "inbox"].includes(g.type) && g.view !== "pages" && (g.kinds || ["post"]).includes("post") ?
-        h("button", offProps(mayWrite(d, "post"), { class: g.view === "chat" ? "btn" : "btn primary", onclick: () => openCompose(),
+        h("button", offProps(mayWrite(d, "post"), { class: (g.view === "chat" ? "btn" : "btn primary") + " newpost",
+          onclick: () => openCompose(), "aria-label": "New post", "data-k": "newpost",
           title: "A post with a subject (UN-RFC 0028)" }),
-          svg(ICON.plus, 16, 2.5), "New post", h("kbd", { text: "N" })) : null));
+          svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "New post" }), h("kbd", { text: "N" })) : null,
+      // the timeline (gui#257): what you write goes to your own feed, as on Facebook or Mastodon
+      g.id === TIMELINE && S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started ?
+        h("button", { class: "btn primary newpost", "aria-label": "New post in your feed", "data-k": "newpost",
+          title: "A new entry in your own feed",
+          onclick: async () => { await openGroup(S.sidebar.my_feed.id); openCompose(); } },
+          svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "New post" })) : null));
   return [head, g.view === "chat" ? chatView(d) : g.view === "feed" ? feedView(d) : g.view === "pages" ? siteView(d) : threadsView(d)];
 }

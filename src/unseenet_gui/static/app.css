@@ -1276,3 +1276,24 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
   /* the rules are read on a phone, not lined up: they wrap there */
   #rules-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 }
+
+/* ---- a phone: New post always in reach (gui#257) -------------------------------------
+   The desktop's New post in a group's head is, on a phone, a round + at the bottom right
+   above the tab bar, within reach of the thumb - in threads, feeds, channels and the
+   timeline (which writes in your own feed). In a chat group the chat line is at the
+   bottom, so there it is a + in the head. Greyed where you may not post, as on the desktop;
+   gone while you read a post or write, when the tab bar is too. */
+@media (max-width: 760px) {
+  .ghead .actions .btn.newpost:not(.primary):not(.icon) { display: inline-flex; }   /* beats "behind ⋯" above */
+  .ghead .actions .newpost .lbl { display: none; }        /* a + alone; its aria-label says New post */
+  .ghead .actions .newpost:not(.primary) { width: 40px; padding: 0; justify-content: center; }
+  .ghead .actions .newpost.primary { position: fixed; z-index: 5; right: 16px;
+    bottom: calc(56px + 16px + env(safe-area-inset-bottom)); width: 56px; height: 56px; padding: 0;
+    border-radius: 50%; justify-content: center; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+  .ghead .actions .newpost.primary svg { width: 24px; height: 24px; }
+  .ghead .actions .newpost.primary.off { opacity: 0.55; box-shadow: none; }
+  .app.tabs-off .ghead .actions .newpost.primary,
+  .app:has(input[data-k="chat"]:focus, textarea:focus) .ghead .actions .newpost.primary { display: none; }
+  /* room under the last post, so the + never covers it */
+  .app:has(.newpost.primary) .feed, .app:has(.newpost.primary) .ptable { padding-bottom: 88px; }
+}

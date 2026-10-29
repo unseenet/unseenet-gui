@@ -20,57 +20,16 @@ tools/gallery.py to lay side by side.
 Run with: pip install -e '.[dev]' playwright; playwright install chromium;
 python -m pytest -q tests/test_layout.py
 """
-import json
 import os
 from pathlib import Path
 
 import pytest
-from aiohttp import web
 from aiohttp.test_utils import TestServer
 
 from layout_screens import CHECK, DIALOGS, FOCUS_FIELD, KEYBOARD, RESET, SIZES, VIEWS, script
-from unseenet_gui.server import STATIC
+from replay import TOKEN, replay_app
 
 playwright = pytest.importorskip("playwright.async_api")
-
-ANSWERS = json.loads((Path(__file__).parent / "data" / "layout_api.json").read_text())
-
-
-async def _replay(request):
-    """The recorded answer to this request (an error as the error it was), else to its path
-    without the query; a GET nobody recorded is not found, anything else just done ({})."""
-    for key in (f"{request.method} {request.path_qs}", f"{request.method} {request.path}"):
-        if key in ANSWERS:
-            a = ANSWERS[key]
-            if isinstance(a, dict) and "__status" in a:
-                return web.json_response(a["body"], status=a["__status"])
-            return web.json_response(a)
-    if request.method == "GET":
-        return web.json_response({"error": "not recorded: " + request.path_qs}, status=404)
-    return web.json_response({})
-
-
-async def _events(request):
-    ws = web.WebSocketResponse(protocols=["unseenet"])
-    await ws.prepare(request)
-    async for _ in ws:
-        pass
-    return ws
-
-
-def _app():
-    app = web.Application()
-
-    async def index(_request):
-        return web.FileResponse(STATIC / "index.html")
-
-    app.router.add_get("/", index)
-    app.router.add_static("/static/", STATIC)
-    app.router.add_get("/api/events", _events)
-    app.router.add_route("*", "/api/{path:.*}", _replay)
-    app.router.add_route("*", "/x/gui/{path:.*}", _replay)
-    return app
-
 
 CASES = [(size, scheme) for size in SIZES for scheme in ("dark", "light")]
 
@@ -80,7 +39,7 @@ async def test_every_screen_and_dialog_fits(size, scheme):
     width, height, mobile = SIZES[size]
     shots = Path(os.environ["SHOTS"]) if os.environ.get("SHOTS") else None
     problems = []
-    async with TestServer(_app(), host="127.0.0.1") as server, playwright.async_playwright() as p:
+    async with TestServer(replay_app(), host="127.0.0.1") as server, playwright.async_playwright() as p:
         browser = await p.chromium.launch()
         ctx = await browser.new_context(viewport={"width": width, "height": height}, is_mobile=mobile,
                                         has_touch=mobile, color_scheme=scheme)
@@ -89,7 +48,7 @@ async def test_every_screen_and_dialog_fits(size, scheme):
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.on("console", lambda m: m.type == "error" and errors.append(m.text))
         try:
-            await page.goto(str(server.make_url("/")) + "#t=" + "t" * 43)
+            await page.goto(str(server.make_url("/")) + "#t=" + TOKEN)
             await page.wait_for_selector(".app", timeout=15000)
             await page.wait_for_load_state("networkidle")
             for kind, items in (("view", VIEWS), ("dialog", DIALOGS)):
