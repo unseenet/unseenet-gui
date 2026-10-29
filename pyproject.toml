@@ -24,7 +24,7 @@ classifiers = [
 
 [project.optional-dependencies]
 window = ["pywebview>=5"]
-dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+dev = ["pytest>=8", "pytest-asyncio>=0.23", "zxing-cpp>=2"]   # zxing: reads the QR code back (#247)
 
 [project.scripts]
 unseenet-gui = "unseenet_gui.__main__:main"
