@@ -344,6 +344,7 @@ async function receiveCopy(code, node) {
 // only where its entrance passes the copy on (UN-RFC 0043 4.5: "copy": true in what the
 // entrance says about itself). null until asked.
 let copyAllowed = null;
+// Ask the entrance once whether it passes a copy on; true, false.
 async function loadCopyAllowed() {
   if (!(S.state && S.state.web)) { copyAllowed = true; return true; }
   try {
