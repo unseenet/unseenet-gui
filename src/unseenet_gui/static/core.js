@@ -590,6 +590,11 @@ function renderNow() {
   // the selected row stays where it was on screen when posts come in above it
   const row = root.querySelector(".ptable .prow.on");
   const anchor = row ? { id: row.dataset.id, off: row.offsetTop - row.parentElement.scrollTop } : null;
+  // and so does the field you are typing in (gui#258): a comment under an entry in a feed
+  // must not jump away while posts arrive or a phone's keyboard has just moved it into sight
+  const fieldBox = key && typing(active) ? active.closest("[data-scroll]") : null;
+  const field = fieldBox ? { box: fieldBox.dataset.scroll,
+    off: active.getBoundingClientRect().top - fieldBox.getBoundingClientRect().top } : null;
   // what you typed survives a redraw (#53): a field you changed gets it back, if the
   // same field (data-k) comes back with the same starting value - not a new window's
   const typed = [];
@@ -618,6 +623,11 @@ function renderNow() {
   });
   const now = root.querySelector(".ptable .prow.on");
   if (anchor && now && now.dataset.id === anchor.id) now.parentElement.scrollTop = now.offsetTop - anchor.off;
+  if (field) {
+    const box = root.querySelector(`[data-scroll="${CSS.escape(field.box)}"]`);
+    const f = box && box.querySelector(`[data-k="${CSS.escape(key)}"]`);
+    if (f) box.scrollTop += f.getBoundingClientRect().top - box.getBoundingClientRect().top - field.off;
+  }
   if (keepDialog && dialogNode.contains(active)) return;
   if (active && active.closest && active.closest(".emoji-picker")) return;      // searching for an emoji (#21)
   // A dialog takes the focus from the page behind it; inside a dialog, keep the field you were in.

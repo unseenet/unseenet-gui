@@ -58,6 +58,7 @@ async function doSend(path, gid, body, local) {
   const id = "local" + (++localSeq);
   const p = S.pending[id] = { group: gid, state: "queued", body, path, ...local };
   render();
+  revealSent(id);
   try {
     let r;
     try { r = await api("POST", path, sent); }
@@ -75,6 +76,14 @@ async function doSend(path, gid, body, local) {
     p.state = "failed"; p.error = err.message;
   }
   render();
+}
+
+// What you just sent is in sight (gui#258): a comment lands under its entry, far from the
+// bottom of a feed or the timeline, where sticking to the bottom (chats) does not help. Shown
+// as being sent until it is, which marks it.
+function revealSent(job) {
+  const el = document.querySelector(`[data-job="${CSS.escape(job)}"]`);
+  if (el) el.scrollIntoView({ block: "nearest" });
 }
 
 // Send a post again that was not sent.
