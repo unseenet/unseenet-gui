@@ -11,6 +11,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   `viewBox` into a 220 px box, which cut off two of its three corner marks - no phone
   could read it. It now scales to its box, crisp, with its quiet zone; a test reads the
   code on screen back, on a desktop and a phone.
+- **Back goes up one level, never to the unlock page** (#249): the app's levels are now the
+  browser's history - a group and a post on a phone, full screen, a dialog - so a phone's
+  back swipe or button, the browser's Back, Alt+Left and a mouse's back button do what
+  Esc and the on-screen back buttons do, on phones and desktops alike. At the top, Back
+  says *Back again to leave Unseenet* and stays; a second Back within a few seconds
+  leaves. Back never closes a window with text you have not sent, and leaving the page
+  asks first when there is some. A sideways swipe in a list no longer turns into Back.
 
 - **A new vault says where the copy comes** (found in the live test 29 Oct): *Get it
   from another device* comes after the vault is made, so someone bringing their identity

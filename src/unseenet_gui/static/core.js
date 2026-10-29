@@ -470,8 +470,113 @@ function whoEl(m) {
 }
 const typing = (el) => el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
 
+// ---- back: the app's levels are the browser's history (#249) ---------------
+// The edge swipe, a phone's back button, the browser's Back, Alt+Left and a mouse's back
+// button all go up one level - dialog, full screen, a post (phone), the group (phone) -
+// the same way Esc and the on-screen back buttons do, on every screen. The unlock page is
+// never behind you: after it one "guard" entry; Back at the top shows a note, and only a
+// second Back within a few seconds leaves.
+const NAV = { depth: 0, guard: false, skip: 0, atBase: false, timer: null, queued: false };
+
+// How deep you are now; -1 outside the app (starting, locked, setting up).
+function navDepth() {
+  if (!S.state || !S.state.unlocked || S.state.setup) return -1;
+  const phone = typeof PHONE !== "undefined" && PHONE.matches;
+  let d = 0;
+  if (phone && S.gid && S.pane !== "groups") d++;
+  if (phone && S.mobileReading) d++;
+  if (S.full) d++;
+  if (S.dialog) d++;
+  return d;
+}
+
+// Text typed and not sent in ``scope``: a compose window, a chat line.
+function unsentText(scope) {
+  if (!scope) return false;
+  return [...scope.querySelectorAll("textarea[data-k], input[data-k=chat]")]
+    .some(el => el.value.trim() && el.value !== (el._v0 ?? ""));
+}
+
+// One level up, as Back means it.
+function navUp() {
+  if (S.dialog) {
+    if (unsentText(S.dialog.node)) { toast("Not sent yet - Cancel closes it."); render(); return; }
+    closeDialog(); return;
+  }
+  if (S.full) { S.full = false; render(); return; }
+  const phone = typeof PHONE !== "undefined" && PHONE.matches;
+  if (phone && S.mobileReading) { S.mobileReading = false; render(); return; }
+  if (phone && S.gid && S.pane !== "groups") { S.pane = "groups"; render(); return; }
+  render();
+}
+
+// After each render, once the moment has passed: as many history entries as levels. A
+// dialog that closes as another opens (the palette, then what you chose) is one step, not
+// a Back and a push racing each other (history.go is not at once).
+function navSync() {
+  if (NAV.queued) return;
+  NAV.queued = true;
+  setTimeout(() => { NAV.queued = false; navApply(); }, 0);
+}
+
+// The history brought in step with how deep you are now.
+function navApply() {
+  const want = navDepth();
+  if (want < 0) return;
+  if (!NAV.guard) {                     // just into the app: the unlock page is not behind us
+    history.replaceState({ u: "base" }, "");
+    history.pushState({ u: "guard" }, "");
+    NAV.guard = true; NAV.depth = 0;
+  }
+  if (NAV.atBase) {                     // Back at the top, then going on in the app
+    clearTimeout(NAV.timer); NAV.atBase = false;
+    history.pushState({ u: "guard" }, "");
+  }
+  if (want > NAV.depth) {
+    for (let d = NAV.depth + 1; d <= want; d++) history.pushState({ u: "level", d }, "");
+    NAV.depth = want;
+  } else if (want < NAV.depth) {        // gone up in the app: take the entries back
+    NAV.skip++;
+    history.go(want - NAV.depth);
+    NAV.depth = want;
+  }
+}
+
+window.addEventListener("popstate", (e) => {
+  if (NAV.skip) { NAV.skip--; return; }
+  if (!NAV.guard) return;
+  const st = e.state || {};
+  if (st.u === "base") {                // Back at the top: stay, and say how to leave
+    toast("Back again to leave Unseenet.");
+    NAV.atBase = true; NAV.depth = 0;
+    clearTimeout(NAV.timer);
+    NAV.timer = setTimeout(() => {
+      if (NAV.atBase) { NAV.atBase = false; history.pushState({ u: "guard" }, ""); }
+    }, 3000);
+    return;
+  }
+  const now = st.u === "level" ? st.d : 0;
+  if (now > NAV.depth) {                // Forward: there is nothing to go forward to
+    NAV.skip++; history.go(NAV.depth - now); return;
+  }
+  NAV.depth = now;
+  navUp();
+});
+
+// An unsent post or chat line is not lost by leaving the page by mistake.
+window.addEventListener("beforeunload", (e) => {
+  if (unsentText(document.getElementById("root"))) { e.preventDefault(); e.returnValue = ""; }
+});
+
 // ---- rendering with focus and scroll kept --------------------------------
+// Draw the page for the state it is in, and keep the history in step with it.
 function render() {
+  renderNow();
+  navSync();
+}
+
+// The page drawn again, keeping focus, selection, scroll and what you typed.
+function renderNow() {
   const root = document.getElementById("root");
   const active = document.activeElement;
   const key = active && active.dataset ? active.dataset.k : null;
