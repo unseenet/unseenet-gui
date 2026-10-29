@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-10-29
+
+**Every screen fits a phone, and writing works there.** A test now opens every screen and
+dialog at phone, laptop and desktop sizes; what it found is fixed (Your nodes first). New
+post is a round + always in reach, and a comment you write keeps still and stays in sight
+once sent.
+
 - **Writing keeps still, and what you sent is in sight** (#258): while you typed a comment
   under an entry in a feed or the timeline, posts arriving above it - and on a phone the
   keyboard - moved the field away, since redrawing kept the list's scroll, not your
@@ -667,7 +674,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/unseenet/unseenet-gui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/unseenet/unseenet-gui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/unseenet/unseenet-gui/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/unseenet/unseenet-gui/compare/v0.1.2...v0.2.0
