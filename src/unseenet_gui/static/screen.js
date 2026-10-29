@@ -70,8 +70,8 @@ function olderButton(d) {
 async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
-  if (gid === CHATS || gid === CONTACTS) {            // lists drawn from the sidebar (gui#172, #209)
-    S.data = { group: { id: gid, label: gid === CHATS ? "Private chats" : "Your contacts", view: "list" },
+  if (gid === CHATS || gid === CONTACTS || gid === YOU) {   // drawn here (gui#172, #209, #248)
+    S.data = { group: { id: gid, label: gid === CHATS ? "Private chats" : gid === YOU ? "You" : "Your contacts", view: "list" },
       messages: [], write: {} };
     return;
   }
@@ -155,10 +155,105 @@ function reading() {
 // The app: the sidebar and the group shown (on a phone one of them at a time).
 function appScreen() {
   const pane = S.gid && S.pane !== "groups" ? "group" : "groups";   // phones show one (app.css)
-  return h("div", { class: "app pane-" + pane + (reading() ? " reading-full" : "") },
+  // the tab bar steps aside while you read a post or write (gui#248)
+  const tabsOff = S.mobileReading || S.full || reading();
+  return h("div", { class: "app pane-" + pane + (reading() ? " reading-full" : "") + (tabsOff ? " tabs-off" : "") },
     ripeningBanner(),
+    netBanner(),
     h("div", { class: "body" }, sidebar(), h("main", { class: "main" }, mainArea())),
-    statusbar());
+    statusbar(),
+    tabBar());
+}
+
+// ---- a phone: the tab bar at the bottom (gui#248) --------------------------------------
+// The same places as the desktop's sidebar, account box and status bar, under the same
+// names and icons, in the same order - placed for a thumb. Shown by app.css below 760px.
+
+// Which tab the place you are in belongs to.
+function currentTab() {
+  if (!S.gid || S.pane === "groups") return "groups";
+  const sb = S.sidebar || {};
+  if (S.gid === FOR_YOU) return "foryou";
+  if (S.gid === TIMELINE) return "timeline";
+  if (S.gid === YOU) return "you";
+  if (S.gid === CHATS || S.gid === CONTACTS || (sb.inbox && S.gid === sb.inbox.id) ||
+      String(S.gid).startsWith("contact:")) return "chats";
+  return "groups";
+}
+
+// Something you should know about, shown as a dot on the You tab: not connected, a node not
+// answering, an update ready, posts to approve, name requests.
+function youNeedsLook() {
+  const sb = S.sidebar || {};
+  return !S.state.connected || (S.state.slow || []).length > 0 || !!S.state.update ||
+    !!sb.moderation || !!sb.name_requests;
+}
+
+// The bar of tabs: Groups, For you, Timeline (when you follow feeds), Chats, You.
+function tabBar() {
+  const sb = S.sidebar;
+  if (!sb) return null;
+  const at = currentTab();
+  const groupsUnread = allGroups().reduce((n, g) => n + (g.unread || 0), 0);
+  const chatsUnread = sb.people.reduce((n, p) => n + (p.unread || 0), 0) + ((sb.inbox && sb.inbox.unread) || 0);
+  const me = S.state.me || {};
+  const tab = (key, label, icon, go, badge = null) => h("button", {
+    class: "tab" + (at === key ? " on" : ""), "aria-current": at === key ? "page" : null,
+    "data-tab": key, onclick: go },
+    h("span", { class: "tab-ic" }, icon), h("span", { class: "tab-nm", text: label }), badge);
+  const count = (n, cls = "") => n ? h("span", { class: "tab-count" + cls, text: n > 99 ? "99+" : n }) : null;
+  return h("nav", { class: "tabbar", "aria-label": "Sections" },
+    tab("groups", "Groups", svg(ICON.groups, 18, 2), () => { S.pane = "groups"; render(); }, count(groupsUnread)),
+    tab("foryou", "For you", h("span", { text: "◄" }), () => openGroup(FOR_YOU), count(sb.for_you, " amber")),
+    sb.timeline && sb.timeline.feeds ? tab("timeline", "Timeline", h("span", { text: "☰" }), () => openGroup(TIMELINE)) : null,
+    tab("chats", "Chats", svg(ICON.bubble, 18, 2.2), () => openGroup(CHATS), count(chatsUnread)),
+    tab("you", "You", avatar({ key: me.key, who: me.display, colour: 4 }, true), () => openGroup(YOU),
+      youNeedsLook() ? h("span", { class: "tab-dot", "aria-label": "Something to look at" }) : null));
+}
+
+// A thin line at the top of a phone while you are not connected or a node is not answering;
+// the desktop says it in the status bar.
+function netBanner() {
+  const slow = S.state.slow || [];
+  if (S.state.connected && !slow.length) return null;
+  return h("div", { class: "netbanner", role: "status",
+    text: !S.state.connected ? (S.state.status || "Not connected") :
+      slow.map(nodeLabel).join(", ") + (slow.length === 1 ? " is" : " are") + " not answering yet" });
+}
+
+// The You page on a phone: what the desktop keeps in the account box and the status bar.
+function youView() {
+  const sb = S.sidebar || {}, me = S.state.me || {};
+  const row = (label, ic, go, extra = null, title = null) => h("button", { class: "item", onclick: go, title },
+    h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
+  const own = ([m, ic, kind, start]) => !m ? null : m.started
+    ? row("Your " + kind, ic, () => openGroup(m.id), m.unread ? h("span", { class: "count", text: m.unread }) : null)
+    : row("Start your " + kind, ic, start);
+  return [h("header", { class: "ghead" }, h("div", { class: "t" }, h("h1", { text: "You" }))),
+    h("div", { class: "content you" },
+      h("div", { class: "me you-me" },
+        h("button", { class: "me-open", "aria-label": "Your profile", onclick: openMyProfile },
+          avatar({ key: me.key, who: me.display, colour: 4 }, true)),
+        h("div", { class: "who" }, h("div", {}, h("button", { class: "me-name", onclick: openMyProfile,
+            text: me.label || me.display || "" })), nodeLink(), ripeLine()),
+        h("button", { class: "btn icon", "aria-label": "Show your key", onclick: openKey, text: "K" })),
+      h("div", { class: "nav" },
+        own([sb.my_feed, "☰", "feed", openMyFeed]),
+        own([sb.my_site, "▤", "site", openMySite]),
+        sb.moderation ? row("To approve", "✓", openModeration, h("span", { class: "count", text: sb.moderation })) : null,
+        sb.name_requests ? row("Name requests", "@", openNames, h("span", { class: "count", text: sb.name_requests })) : null),
+      h("h3", { class: "list-h", text: "Status" }),
+      h("div", { class: "you-status" },
+        h("div", { class: "st" }, h("span", { class: "dot" + (S.state.connected ? " ok" : "") }),
+          h("span", { text: S.state.connected ? (S.state.status || "Connected") : (S.state.status || "Not connected") })),
+        (S.state.slow || []).length ? h("div", { class: "slow-node", text: S.state.slow.map(nodeLabel).join(", ") +
+          (S.state.slow.length === 1 ? " is" : " are") + " not answering yet" }) : null,
+        S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
+        S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
+        h("div", { class: "muted", text: "pre-alpha" })),
+      h("div", { class: "nav" },
+        row("Commands and search", "⌘", () => openPalette()),
+        row("About Unseenet", "?", openAbout)))];
 }
 
 // replies to you (◄) and posts naming you (♦), counted apart (unseenet #170)
@@ -333,7 +428,14 @@ function chatsView() {
   const head = privateHead("Private chats", "end-to-end encrypted", about, [   // one action, as the other lists (gui#219)
     h("button", { class: "btn primary", title: "Chat with someone", onclick: () => openWrite("", "chat") },
       svg(ICON.plus, 16, 2.5), "Chat with someone")]);
+  const phoneTop = h("div", { class: "nav phone-only" },     // on a phone: the rest of Private (gui#248)
+    sb.inbox && sb.inbox.id ? h("button", { class: "item", onclick: () => openGroup(sb.inbox.id) },
+      h("span", { class: "ic" }, svg(ICON.mail, 14, 2.2)), h("span", { class: "nm", text: "Private posts" }),
+      sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
+    h("button", { class: "item", onclick: () => openGroup(CONTACTS) },
+      h("span", { class: "ic" }, svg(ICON.people, 14, 2.2)), h("span", { class: "nm", text: "Your contacts" })));
   const body = h("div", { class: "content chats-list" },
+    phoneTop,
     privateFilter("chatFilter", "Filter chats", "Filter by name or key"),
     open.length ? h("div", { class: "nav" }, open.map(p => listRow(p, "chatrow", chatButtons(p)))) : null,
     closed.length ? [h("h3", { class: "list-h", text: "Closed - back when one of you writes" }),

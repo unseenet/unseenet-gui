@@ -1203,3 +1203,36 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
 .gemoji-row { align-items: center; gap: 10px; }
 .gemoji-add { display: flex; flex-direction: column; gap: 6px; }
 .emo img.gemoji { height: 24px; width: 24px; }
+
+/* ---- a phone: the tab bar at the bottom (gui#248) ------------------------------------
+   The same places as the desktop's sidebar top, account box and status bar - placed for a
+   thumb, so the groups get the screen. Above 760px none of this shows. */
+.tabbar, .netbanner, .phone-only { display: none; }
+@media (max-width: 760px) {
+  .side-top .nav, nav.side > .me, .statusbar { display: none; }
+  .phone-only { display: flex; flex-direction: column; }
+  .tabbar { display: flex; flex: none; border-top: 1px solid var(--line-2); background: var(--ink);
+    padding-bottom: env(safe-area-inset-bottom); }
+  .app.tabs-off .tabbar { display: none; }
+  /* writing: the keyboard is up, the bar would only take the room */
+  .app:has(input[data-k="chat"]:focus, textarea:focus) .tabbar { display: none; }
+  .tab { flex: 1 1 0; min-width: 0; min-height: 56px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; position: relative; border: 0; background: none; color: var(--muted);
+    font: inherit; font-size: 11px; cursor: pointer; padding: 6px 2px; }
+  .tab.on { color: var(--green); }
+  .tab-ic { display: flex; align-items: center; justify-content: center; height: 24px; font-size: 18px; line-height: 1; }
+  .tab-ic .av { width: 24px; height: 24px; min-width: 24px; font-size: 10px; }
+  .tab.on .tab-ic .av { box-shadow: 0 0 0 2px var(--green); }
+  .tab-nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+  .tab-count { position: absolute; top: 4px; left: calc(50% + 6px); font-family: var(--mono); font-size: 10px;
+    font-weight: 700; padding: 0 5px; border-radius: 99px; background: var(--green); color: var(--ink); }
+  .tab-count.amber { background: var(--amber); }
+  .tab-dot { position: absolute; top: 6px; left: calc(50% + 8px); width: 9px; height: 9px; border-radius: 50%;
+    background: var(--amber); }
+  .netbanner { display: block; flex: none; padding: 4px 12px; font-size: 12px; background: var(--amber);
+    color: var(--on-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .content.you { padding: 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+  .you .you-me { display: flex; margin-top: 0; flex: none; }
+  .you-status { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; font-size: 14px; }
+  .you-status .st { display: flex; align-items: center; gap: 8px; }
+}

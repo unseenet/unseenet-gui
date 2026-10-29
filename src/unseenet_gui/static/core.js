@@ -82,6 +82,7 @@ const FOR_YOU = "for-you:";                          // the core's pseudo group 
 const TIMELINE = "timeline:";                        // every feed you follow (threads.TIMELINE)
 const CHATS = "chats:";                              // the list of private chats, drawn here (gui#172)
 const CONTACTS = "contacts:";                        // your contacts, drawn here (gui#209)
+const YOU = "you:";                                  // you and the state of things, on a phone (gui#248)
 const TAGGED = "tag:";                               // + a tag: everything with it (threads.TAGGED)
 // Posts from many groups, each in its own: the timeline and a tag's view.
 const isMixed = (g) => !!g && (g.id === TIMELINE || String(g.id).startsWith(TAGGED));
@@ -262,6 +263,7 @@ function svg(path, size = 16, width = 2) {
 }
 const ICON = {
   search: "M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-3.5-3.5",
+  groups: "M4 5h16v4H4zM4 10.5h16v4H4zM4 16h16v4H4z",    // the Groups tab on a phone (gui#248)
   cmd: "M5 7l5 5-5 5M12 17h7",
   plus: "M12 5v14M5 12h14",
   flag: "M5 21V4M5 4h11l-2 4 2 4H5",                 // report a post
