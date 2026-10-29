@@ -251,3 +251,44 @@ async def test_in_a_browser_copy_is_offered_only_where_the_entrance_relays_it(br
         await page.wait_for_timeout(500)                 # the entrance has answered
         assert await page.get_by_role("button", name="Get it from another device").count() == (1 if copy else 0)
         assert errors == []
+
+
+class LockedAPI(FakeAPI):
+    """A vault not opened yet: new (``exists`` False) or one to unlock."""
+    def __init__(self, exists, web=False, copy=True):
+        super().__init__(setup=True)
+        self.exists, self.web, self.copy = exists, web, copy
+
+    async def handle(self, request):
+        if request.path == "/api/state":
+            return web.json_response({"api": 1, "unlocked": False, "vault_exists": self.exists,
+                                      "vault": "unseenet.vault", "setup": True})
+        if request.path == "/x/gui/state":
+            return web.json_response({"bootable": False, "web": self.web, "identities": []})
+        return await super().handle(request)
+
+
+@pytest.mark.parametrize("exists,in_browser,copy,shown", [
+    (False, False, True, True),         # the app, a new vault: say where the copy comes
+    (False, True, True, True),          # a browser whose entrance passes copies on
+    (False, True, False, False),        # one whose entrance does not: not offered at all
+    (True, False, True, False),         # unlocking a vault: nothing to bring over
+])
+async def test_the_new_vault_says_the_copy_comes_next(browser, exists, in_browser, copy, shown):
+    """29 Oct, live: someone bringing an identity from another device did not find
+    *Get it from another device*, which comes after the vault is made."""
+    app = await _page(LockedAPI(exists, in_browser, copy))
+
+    async def info(_request):
+        return web.json_response({"operator": "", "copy": copy})
+    app.router.add_get("/.well-known/unseenet-entrance", info)
+    async with TestServer(app, host="127.0.0.1") as server:
+        page = await browser.new_page(viewport={"width": 1100, "height": 900})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        await page.goto(str(server.make_url("/")) + "#t=" + TOKEN)
+        await expect(page.locator("#pass")).to_be_visible()
+        await page.wait_for_timeout(500)
+        assert await page.locator("[data-k=copy-hint]").count() == (1 if shown else 0)
+        assert errors == []
+
