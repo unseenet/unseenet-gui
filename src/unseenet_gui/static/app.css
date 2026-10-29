@@ -1244,11 +1244,14 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
     background: var(--amber); }
   .netbanner { display: block; flex: none; padding: 4px 12px; font-size: 12px; background: var(--amber);
     color: var(--on-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .content.you { padding: 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
-  .you .you-me { display: flex; margin-top: 0; flex: none; }
-  .you-status { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; font-size: 14px; }
-  .you-status .st { display: flex; align-items: center; gap: 8px; }
 }
+/* You (the phone's tab) stays one column at any width: a phone turned on its side or a
+   window made wider while You is open laid its parts side by side, 740 px at least, too
+   wide for a small laptop (gui#264) */
+.content.you { padding: 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.you .you-me { display: flex; margin-top: 0; flex: none; }
+.you-status { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; font-size: 14px; }
+.you-status .st { display: flex; align-items: center; gap: 8px; }
 
 /* ---- a phone: everything you tap is big enough for a thumb (gui#264) ----------------
    Controls at least 40x40; links that read as text (a name in a post's head, "… more")

@@ -24,6 +24,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   folds of the group list, Back, small buttons and choice chips are at least 40x40; names
   in a post's head and other text links at least 24 high. Your rules wrap on a phone
   instead of scrolling sideways.
+- **You stays one column at any width** (#264): opened in a wider window (a phone turned
+  on its side, a window made wider), the You tab laid its parts side by side, at least
+  740 px - wider than a 1024 laptop's main pane with some fonts.
 
 ## [0.3.1] - 2026-10-29
 
