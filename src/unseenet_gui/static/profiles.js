@@ -397,6 +397,17 @@ function commands() {
   return cmds.concat(allGroups().map(x => ({ name: x.label, group: x, key: "", run: () => openGroup(x.id) })));
 }
 
+// The command palette's one name, wherever it opens (gui#263).
+const PALETTE_NAME = "Commands and search";
+
+// The one button for the command palette (gui#263): the same icon and name wherever it is
+// - the sidebar's top, a phone's group head, the You tab. ⋯ is kept for the menu of one
+// thing (a post, a person, a chat).
+function paletteButton(cls = "btn icon") {
+  return h("button", { class: cls + " pal-open", "aria-label": PALETTE_NAME, title: PALETTE_NAME + " (Ctrl P)",
+    onclick: () => openPalette() }, svg(ICON.cmd, 16, 2.5));
+}
+
 // The command palette: type to find a command, Enter to run it.
 function openPalette() {
   let q = "", sel = 0;

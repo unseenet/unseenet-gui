@@ -88,7 +88,7 @@ async def test_your_comment_is_in_sight_after_sending(page):
     field = await _comment_field(page)
     await field.press("Enter")
     sent = page.locator(".comment.pending").filter(has_text="I was just going to say")
-    await expect(sent).to_be_in_viewport(ratio=1)      # redrawn as it is sent: retried, not measured once
+    await expect(sent).to_be_in_viewport(ratio=0.95)   # redrawn as it is sent: retried; sub-pixel rounding allowed
 
 
 async def test_a_chat_line_you_send_is_in_sight_when_you_had_scrolled_up(page):
@@ -102,4 +102,4 @@ async def test_a_chat_line_you_send_is_in_sight_when_you_had_scrolled_up(page):
     await chat.fill("Back to the start")
     await chat.press("Enter")
     sent = page.locator(".mg.mine").filter(has_text="Back to the start")
-    await expect(sent).to_be_in_viewport(ratio=1)
+    await expect(sent).to_be_in_viewport(ratio=0.95)

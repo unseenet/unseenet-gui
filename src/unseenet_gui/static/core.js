@@ -82,6 +82,7 @@ const FOR_YOU = "for-you:";                          // the core's pseudo group 
 const TIMELINE = "timeline:";                        // every feed you follow (threads.TIMELINE)
 const CHATS = "chats:";                              // the list of private chats, drawn here (gui#172)
 const CONTACTS = "contacts:";                        // your contacts, drawn here (gui#209)
+const PRIVATE = "private:";                          // Private on a phone: the desktop's three rows (gui#256)
 const YOU = "you:";                                  // you and the state of things, on a phone (gui#248)
 const TAGGED = "tag:";                               // + a tag: everything with it (threads.TAGGED)
 // Posts from many groups, each in its own: the timeline and a tag's view.
@@ -209,7 +210,10 @@ async function loadState(st) {
   st = st || await api("GET", "/api/state");
   try { GUI = await api("GET", "/x/gui/state"); } catch (_) { /* the core's state is enough */ }
   const id = st.identity;
+  const before = S.state && S.state.me && S.state.me.key;
   S.state = { ...st, ...GUI, me: id ? { display: id.display, key: id.key, label: id.label, fp: GUI.fp || "" } : null };
+  // another key now (a copy, restored words): nothing of the last one's ripening or pace (gui#262)
+  if (before && id && id.key !== before) { S.ripening = null; ripeSamples = []; }
   if (st.ripening) setRipening(st.ripening, false);   // with "paused" from a core that has it (unseenet#337)
   return S.state;
 }
@@ -623,6 +627,9 @@ function renderNow() {
   });
   const now = root.querySelector(".ptable .prow.on");
   if (anchor && now && now.dataset.id === anchor.id) now.parentElement.scrollTop = now.offsetTop - anchor.off;
+  // a phone's round + sits above the chat line where there is one (gui#260)
+  const bar = root.querySelector(".main .chatbar:not(.notebar)");
+  root.style.setProperty("--chatbar", (bar ? bar.offsetHeight : 0) + "px");
   if (field) {
     const box = root.querySelector(`[data-scroll="${CSS.escape(field.box)}"]`);
     const f = box && box.querySelector(`[data-k="${CSS.escape(key)}"]`);

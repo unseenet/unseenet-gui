@@ -70,10 +70,41 @@ async def test_a_round_plus_above_the_tab_bar(page, group):
 
 
 @pytest.mark.parametrize("page", [(390, 844)], indirect=True)
-async def test_a_plus_in_the_head_of_a_chat_group(page):
+async def test_in_a_chat_group_the_plus_sits_above_the_chat_line(page):
+    # gui#260: the same round + in every view, not one in the head of a chat group
     await _open(page, "openGroup(G('dk.snak.chat'))")
-    plus = page.locator(".ghead [data-k=newpost]")
+    plus = page.locator("[data-k=newpost]")
+    box, bar = await plus.bounding_box(), await page.locator(".main .chatbar").bounding_box()
+    assert box["y"] + box["height"] <= bar["y"]
+    assert box["width"] == 56
     assert (await _in_reach(page, plus)).startswith("New post in dk.snak.chat")
+
+
+HEAD = """() => { const a = document.querySelector('.main .ghead .actions');
+  return [...document.querySelectorAll('.main .ghead button, .main .ghead [role=button]')]
+    .filter(b => { const s = getComputedStyle(b), r = b.getBoundingClientRect();
+      return s.display !== 'none' && r.width > 0 && !b.classList.contains('fab'); })
+    .map(b => b.getAttribute('aria-label') || b.textContent.trim()); }"""
+
+
+@pytest.mark.parametrize("page", [(360, 740), (390, 844)], indirect=True)
+@pytest.mark.parametrize("view", ["openGroup(G('unseenet'))", "openGroup(G('dk.snak.chat'))",
+                                  "openGroup(G('dev.news'))", "openGroup(TIMELINE)", "openGroup(CHATS)",
+                                  "openGroup(CONTACTS)", "openGroup(S.sidebar.inbox.id)"])
+async def test_one_head_back_name_and_palette(page, view):
+    """gui#260: on a phone a head has the back arrow, the name and the palette - nothing else -
+    in every view; its one action is the round +."""
+    await _open(page, view)
+    assert await page.evaluate(HEAD) == ["Back to your groups", "Commands and search"]
+
+
+@pytest.mark.parametrize("page", [(360, 740)], indirect=True)
+async def test_a_long_name_can_be_read(page):
+    await _open(page, "openGroup(G('unseenet'))")
+    await page.evaluate("() => { S.data.group.label = 'alt.history.onthisday.and.a.bit.more'; render(); }")
+    h1 = page.locator(".main .ghead h1")
+    assert await h1.evaluate("e => e.scrollWidth <= e.clientWidth && e.scrollHeight <= e.clientHeight + 1")
+    assert (await h1.bounding_box())["height"] > 30          # on two lines, not cut to one
 
 
 @pytest.mark.parametrize("page", [(390, 844), (1280, 800)], indirect=True)

@@ -7,6 +7,27 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **One head on a phone, everywhere** (#260): the back arrow, the name - on two lines
+  before it is cut, so `alt.history.onthisday` can be read - and the palette; nothing else.
+  The head's one action (New post, Write a private post, Chat with someone, Add a contact)
+  is the round + at the bottom right, in every view - in a chat just above the chat line.
+  The rest of the desktop's head is in the palette.
+- **One icon for the command palette** (#263): `>_` and *Commands and search* wherever it
+  opens - the sidebar's top, a phone's head, the You tab - where it was >_, ⋯ and ⌘. ⋯ is
+  only the menu of one thing: a post, a person, a chat.
+- **The chat line on a phone** (#259): the field takes the whole width with the green Send
+  at its right end; the language, emoji and pictures are on a low line under it. The
+  lines of a chat stay compact: ☺+ and Pin show under the line you tap, not under every
+  line (the 40x40 targets of 0.3.2 had made each bubble twice as high).
+- **Private on a phone** (#256): the tab is *Private* (it was *Chats*) and shows the
+  desktop's three rows - Your contacts, Private posts, Private chats - in the same order,
+  with the same names, icons and counts, where Private posts and Your contacts were small
+  links above the chats and were not found.
+- **A copied key's ripening shows at once** (#262): right after a copy, a segment the new
+  vault's own key was still working on finished, and its event set *0%* beside the copied
+  key's *level 2, on its way to 3*. Only your own key's ripening events count now, and
+  another key's pace is forgotten when the key in use changes.
+
 ## [0.3.2] - 2026-10-29
 
 **Every screen fits a phone, and writing works there.** A test now opens every screen and

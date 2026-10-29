@@ -70,8 +70,8 @@ function olderButton(d) {
 async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
-  if (gid === CHATS || gid === CONTACTS || gid === YOU) {   // drawn here (gui#172, #209, #248)
-    S.data = { group: { id: gid, label: gid === CHATS ? "Private chats" : gid === YOU ? "You" : "Your contacts", view: "list" },
+  if (gid === CHATS || gid === CONTACTS || gid === YOU || gid === PRIVATE) {   // drawn here (gui#172, #209, #248)
+    S.data = { group: { id: gid, label: gid === CHATS ? "Private chats" : gid === YOU ? "You" : gid === PRIVATE ? "Private" : "Your contacts", view: "list" },
       messages: [], write: {} };
     return;
   }
@@ -176,8 +176,8 @@ function currentTab() {
   if (S.gid === FOR_YOU) return "foryou";
   if (S.gid === TIMELINE) return "timeline";
   if (S.gid === YOU) return "you";
-  if (S.gid === CHATS || S.gid === CONTACTS || (sb.inbox && S.gid === sb.inbox.id) ||
-      String(S.gid).startsWith("contact:")) return "chats";
+  if (S.gid === PRIVATE || S.gid === CHATS || S.gid === CONTACTS || (sb.inbox && S.gid === sb.inbox.id) ||
+      String(S.gid).startsWith("contact:")) return "private";
   return "groups";
 }
 
@@ -206,7 +206,8 @@ function tabBar() {
     tab("groups", "Groups", svg(ICON.groups, 18, 2), () => { S.pane = "groups"; render(); }, count(groupsUnread)),
     tab("foryou", "For you", h("span", { text: "◄" }), () => openGroup(FOR_YOU), count(sb.for_you, " amber")),
     sb.timeline && sb.timeline.feeds ? tab("timeline", "Timeline", h("span", { text: "☰" }), () => openGroup(TIMELINE)) : null,
-    tab("chats", "Chats", svg(ICON.bubble, 18, 2.2), () => openGroup(CHATS), count(chatsUnread)),
+    // Private: your contacts, private posts and private chats, as the desktop's sidebar has them (gui#256)
+    tab("private", "Private", svg(ICON.lock, 18, 2.2), () => openGroup(PRIVATE), count(chatsUnread)),
     tab("you", "You", avatar({ key: me.key, who: me.display, colour: 4 }, true), () => openGroup(YOU),
       youNeedsLook() ? h("span", { class: "tab-dot", "aria-label": "Something to look at" }) : null));
 }
@@ -225,7 +226,7 @@ function netBanner() {
 function youView() {
   const sb = S.sidebar || {}, me = S.state.me || {};
   const row = (label, ic, go, extra = null, title = null) => h("button", { class: "item", onclick: go, title },
-    h("span", { class: "ic", text: ic }), h("span", { class: "nm", text: label }), extra);
+    h("span", { class: "ic" }, ic), h("span", { class: "nm", text: label }), extra);
   const own = ([m, ic, kind, start]) => !m ? null : m.started
     ? row("Your " + kind, ic, () => openGroup(m.id), m.unread ? h("span", { class: "count", text: m.unread }) : null)
     : row("Start your " + kind, ic, start);
@@ -252,7 +253,7 @@ function youView() {
         S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
         h("div", { class: "muted", text: "pre-alpha" })),
       h("div", { class: "nav" },
-        row("Commands and search", "⌘", () => openPalette()),
+        row(PALETTE_NAME, svg(ICON.cmd, 14, 2.5), () => openPalette()),   // as everywhere (gui#263)
         row("About Unseenet", "?", openAbout)))];
 }
 
@@ -282,8 +283,7 @@ function sidebar() {
     // the top stays put while the groups scroll, as the account box at the bottom (#144)
     h("div", { class: "side-top" },
     h("div", { class: "brand" }, logo(30), h("span", { class: "grow", text: "Unseenet" }),
-      h("button", { class: "mini cmd-btn", "aria-label": "Commands", title: "Commands and search (Ctrl P)",
-        onclick: () => openPalette() }, svg(ICON.cmd, 16, 2.5))),
+      paletteButton("mini cmd-btn")),
     // a filter for what the sidebar lists, as / in the terminal client; Esc clears it
     h("div", { class: "side-filter" }, svg(ICON.search, 16),
       h("label", { for: "sidefilter", class: "sr", text: "Filter groups and people" }),
@@ -378,7 +378,7 @@ function privateHead(title, chip, about, actions) {
     h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
     h("div", { class: "t" }, h("div", { class: "row" }, h("h1", { text: title }),
       h("span", { class: "chip" }, svg(ICON.lock, 12, 2.5), chip)), h("p", { text: about })),
-    h("div", { class: "actions" }, actions));
+    h("div", { class: "actions" }, actions, paletteButton("btn icon pal-btn")));   // the same head everywhere (gui#260)
 }
 
 // A filter field for a private list, kept in S[key].
@@ -426,16 +426,9 @@ function chatsView() {
     .map(c => ({ ...c, id: "contact:" + c.key, contact: true, unread: 0 }));
   const about = "One chat per person - only the two of you can read it.";
   const head = privateHead("Private chats", "end-to-end encrypted", about, [   // one action, as the other lists (gui#219)
-    h("button", { class: "btn primary", title: "Chat with someone", onclick: () => openWrite("", "chat") },
-      svg(ICON.plus, 16, 2.5), "Chat with someone")]);
-  const phoneTop = h("div", { class: "nav phone-only" },     // on a phone: the rest of Private (gui#248)
-    sb.inbox && sb.inbox.id ? h("button", { class: "item", onclick: () => openGroup(sb.inbox.id) },
-      h("span", { class: "ic" }, svg(ICON.mail, 14, 2.2)), h("span", { class: "nm", text: "Private posts" }),
-      sb.inbox.unread ? h("span", { class: "count", text: sb.inbox.unread }) : null) : null,
-    h("button", { class: "item", onclick: () => openGroup(CONTACTS) },
-      h("span", { class: "ic" }, svg(ICON.people, 14, 2.2)), h("span", { class: "nm", text: "Your contacts" })));
+    h("button", { class: "btn primary fab", "aria-label": "Chat with someone", title: "Chat with someone", onclick: () => openWrite("", "chat") },
+      svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "Chat with someone" }))]);
   const body = h("div", { class: "content chats-list" },
-    phoneTop,
     privateFilter("chatFilter", "Filter chats", "Filter by name or key"),
     open.length ? h("div", { class: "nav" }, open.map(p => listRow(p, "chatrow", chatButtons(p)))) : null,
     closed.length ? [h("h3", { class: "list-h", text: "Closed - back when one of you writes" }),
@@ -443,6 +436,16 @@ function chatsView() {
     !open.length && !closed.length ? h("div", { class: "empty" },
       h("h2", { text: q ? "No chat matches" : "No private chats yet" }), h("p", { text: about })) : null);
   return [head, body];
+}
+
+// Private, a phone's tab (gui#256): the same three rows as the desktop's sidebar - Your
+// contacts, Private posts, Private chats - in the same order, with the same names, icons
+// and counts, and the unread chats under Private chats.
+function privateView() {
+  const sb = S.sidebar || { people: [], contacts: [], inbox: {} };
+  const head = privateHead("Private", "end-to-end encrypted",
+    "Your contacts, posts sealed to you, and chats - only you and the other person can read them.", []);
+  return [head, h("div", { class: "content you private-top" }, h("div", { class: "nav" }, privateItems(sb)))];
 }
 
 // Your contacts in the main pane (gui#209, instead of the old dialog): find one, chat,
@@ -454,7 +457,8 @@ function contactsView() {
   const looksLikeKey = /^ed25519:[a-z2-7]{20,}$/i.test((S.contactFilter || "").trim());
   const about = "The people you gave a name. The names are yours: only you see them, and nobody is told.";
   const head = privateHead("Your contacts", "names only you see", about, [
-    h("button", { class: "btn primary", onclick: () => openAddContact("", "") }, svg(ICON.plus, 16, 2.5), "Add a contact")]);
+    h("button", { class: "btn primary fab", "aria-label": "Add a contact", onclick: () => openAddContact("", "") },
+      svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "Add a contact" }))]);
   const body = h("div", { class: "content chats-list contacts-list" },
     privateFilter("contactFilter", "Find a contact", "Find: a name, a key or sonia@lorensen"),
     // the name opens their profile (gui#215) - feed, site, follow, chat, post from there

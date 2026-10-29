@@ -84,6 +84,10 @@ function connectEvents() {
         if (st) st.replaceWith(statusbar());
       }
     } else if (type === "ripening") {
+      // only your own key's (gui#262): right after a copy, a segment the vault's first key
+      // was still working on finished and set "0%" over the copied key's level 2
+      const me = S.state && S.state.me;
+      if (e.key && me && me.key && e.key !== me.key) return;
       setRipening({ level: e.level, next_at: e.next_at, t: e.t }, true);
       render();                                                 // the sidebar's level, a waiting message, the web's banner
     } else if (type === "ripening-target") {                    // level 4 chosen or not (unseenet#740)

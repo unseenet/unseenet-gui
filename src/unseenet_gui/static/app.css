@@ -1277,23 +1277,57 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
   #rules-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 
-/* ---- a phone: New post always in reach (gui#257) -------------------------------------
-   The desktop's New post in a group's head is, on a phone, a round + at the bottom right
-   above the tab bar, within reach of the thumb - in threads, feeds, channels and the
-   timeline (which writes in your own feed). In a chat group the chat line is at the
-   bottom, so there it is a + in the head. Greyed where you may not post, as on the desktop;
-   gone while you read a post or write, when the tab bar is too. */
+/* ---- a phone: one head everywhere, and its action always in reach (gui#257, gui#260) ----
+   A group's or a list's head on a phone holds the back arrow, the name - two lines before
+   it is cut - and the palette (gui#263): nothing else. Its one action (New post, Write a
+   private post, Chat with someone, Add a contact - marked .fab) is a round + at the bottom
+   right, within reach of the thumb: above the tab bar, and above the chat line where there
+   is one (--chatbar, measured as the page is drawn). Greyed where you may not post, as on
+   the desktop; gone while you read a post or write, when the tab bar is too. The other
+   actions of the desktop's head are in the palette. */
 @media (max-width: 760px) {
-  .ghead .actions .btn.newpost:not(.primary):not(.icon) { display: inline-flex; }   /* beats "behind ⋯" above */
-  .ghead .actions .newpost .lbl { display: none; }        /* a + alone; its aria-label says New post */
-  .ghead .actions .newpost:not(.primary) { width: 40px; padding: 0; justify-content: center; }
-  .ghead .actions .newpost.primary { position: fixed; z-index: 5; right: 16px;
-    bottom: calc(56px + 16px + env(safe-area-inset-bottom)); width: 56px; height: 56px; padding: 0;
-    border-radius: 50%; justify-content: center; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
-  .ghead .actions .newpost.primary svg { width: 24px; height: 24px; }
-  .ghead .actions .newpost.primary.off { opacity: 0.55; box-shadow: none; }
-  .app.tabs-off .ghead .actions .newpost.primary,
-  .app:has(input[data-k="chat"]:focus, textarea:focus) .ghead .actions .newpost.primary { display: none; }
-  /* room under the last post, so the + never covers it */
-  .app:has(.newpost.primary) .feed, .app:has(.newpost.primary) .ptable { padding-bottom: 88px; }
+  .ghead h1 { white-space: normal; overflow: hidden; overflow-wrap: anywhere; line-height: 1.25;
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .ghead .actions > :not(.pal-btn):not(.fab) { display: none !important; }
+  /* :not()s: beat "behind the palette" for buttons that are not primary (a chat group's New post) */
+  .ghead .actions .btn.fab:not(.pal-btn):not(.icon) { display: inline-flex; }
+  .ghead .actions .fab { position: fixed; z-index: 5; right: 16px;
+    bottom: calc(56px + var(--chatbar, 0px) + 16px + env(safe-area-inset-bottom));
+    width: 56px; height: 56px; padding: 0; border-radius: 50%; justify-content: center;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+  .ghead .actions .fab:not(.primary) { background: var(--green); color: var(--on-green); border-color: var(--green); }
+  .ghead .actions .fab .lbl, .ghead .actions .fab kbd { display: none; }   /* a + alone; aria-label names it */
+  .ghead .actions .fab svg { width: 24px; height: 24px; margin: 0; }
+  .ghead .actions .fab.off { opacity: 0.55; box-shadow: none; }
+  .app.tabs-off .ghead .actions .fab,
+  .app:has(input[data-k="chat"]:focus, textarea:focus) .ghead .actions .fab { display: none !important; }
+  /* room under the last post or line, so the + never covers it */
+  .app:has(.fab) .feed, .app:has(.fab) .ptable, .app:has(.fab) .msgs,
+  .app:has(.fab) .chats-list { padding-bottom: 88px; }
+}
+
+/* ---- a phone: the chat line (gui#259) -----------------------------------------------
+   The field takes the whole width with the green Send at its right end; the language,
+   emoji and pictures are on a low line under it - so you see what you write. The desktop
+   keeps its one row. */
+@media (max-width: 760px) {
+  .chatbar:not(.off) .row { flex-wrap: wrap; gap: 4px 8px; }
+  .chatbar:not(.off) .row > textarea, .chatbar:not(.off) .row > input { order: 0; flex: 1 1 calc(100% - 56px); }
+  .chatbar:not(.off) .row > .send { order: 1; }
+  .chatbar:not(.off) .row > .langchip-slot { order: 2; }
+  .chatbar:not(.off) .row > .emoji-btn { order: 3; }
+  .chatbar:not(.off) .row > .attachbtn { order: 4; }
+  .chatbar .row > .langchip-slot .langbtn { min-height: 40px; }
+}
+
+/* ---- a phone: chat lines stay compact (gui#259) ---------------------------------------
+   With 40x40 targets, ☺+ and Pin under every line made each bubble twice as high. On a
+   touch screen they show under the line you tap (it takes the focus); the reactions
+   others gave always show. */
+@media (hover: none), (max-width: 760px) {
+  .bubble .pinact, .bubble .react.add { display: none; }
+  .bubble:focus-within .pinact { display: block; }
+  .bubble:focus-within .react.add { display: inline-flex; }
+  .bubble .reacts:not(:has(.react:not(.add))) { margin: 0; }
+  .bubble:focus { outline: none; box-shadow: inset 0 0 0 1px var(--green); }
 }
