@@ -386,7 +386,8 @@ function mainArea() {
   }
   if (S.gid === CHATS) return chatsView();             // the list of private chats (gui#172)
   if (S.gid === CONTACTS) return contactsView();       // your contacts (gui#209)
-  if (S.gid === YOU) return youView();                 // you and the state of things (gui#248)
+  if (S.gid === YOU) return youView();
+  if (S.gid === PRIVATE) return privateView();         // a phone's Private tab (gui#256)                 // you and the state of things (gui#248)
   const g = d.group;
   const chips = [
     h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : g.view === "feed" ? "☰ feed" : g.view === "pages" ? "⌂ site" : "≡ threads" }),
@@ -417,12 +418,13 @@ function mainArea() {
         h("button", { class: "btn", title: "Off the list of chats; it comes back when one of you writes",
           onclick: () => closeChat(g.key, g.label.replace(/ √$/, "")) }, "Close chat"),
         h("button", { class: "btn", onclick: () => copy(g.key, "Their key is copied.") }, "Copy key"),
-        h("button", { class: "btn primary", title: "A post with a subject instead of a chat line (N)",
-          onclick: () => openPost(g.key, g.label.replace(/ √$/, "")) }, "Write a post", h("kbd", { text: "N" }))] : null,
+        h("button", { class: "btn primary fab", "aria-label": "Write a post", title: "A post with a subject instead of a chat line (N)",
+          onclick: () => openPost(g.key, g.label.replace(/ √$/, "")) },
+          svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "Write a post" }), h("kbd", { text: "N" }))] : null,
       // your private posts: the same head as the other private lists, one action (gui#209, gui#219)
       S.sidebar && g.id === S.sidebar.inbox.id ? [
-        h("button", { class: "btn primary", onclick: () => openWrite("", "post") },
-          svg(ICON.plus, 16, 2.5), "Write a private post", h("kbd", { text: "M" }))] : null,
+        h("button", { class: "btn primary fab", "aria-label": "Write a private post", onclick: () => openWrite("", "post") },
+          svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "Write a private post" }), h("kbd", { text: "M" }))] : null,
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         "Show as " + nextView(g), h("kbd", { text: "V" })) : null,
@@ -433,18 +435,18 @@ function mainArea() {
           : "Bring its new " + (g.view === "feed" ? "entries" : "threads") + " into your timeline, with the answers under them",
         onclick: () => setTimeline(g, !g.timeline.on) }, "☰ ", g.timeline.on ? "In timeline" : "Add to timeline") : null,
       g.type ? h("button", { class: "btn icon", "aria-label": "About this group", title: "About this group (?)", onclick: openInfo, text: "?" }) : null,
-      h("button", { class: "btn icon pal-btn", "aria-label": "More: all commands", onclick: () => openPalette() }, "⋯"),
+      paletteButton("btn icon pal-btn"),               // phones: the palette, one icon everywhere (gui#263)
       // New post (gui#257): in the head on a desktop; on a phone a round + above the tab bar,
       // or a + in the head of a chat group, whose bottom is the chat line - greyed with the
       // reason where you may not post, as on the desktop (#13)
       g.type && !["contact", "inbox"].includes(g.type) && g.view !== "pages" && (g.kinds || ["post"]).includes("post") ?
-        h("button", offProps(mayWrite(d, "post"), { class: (g.view === "chat" ? "btn" : "btn primary") + " newpost",
+        h("button", offProps(mayWrite(d, "post"), { class: (g.view === "chat" ? "btn" : "btn primary") + " newpost fab",
           onclick: () => openCompose(), "aria-label": "New post", "data-k": "newpost",
           title: "A post with a subject (UN-RFC 0028)" }),
           svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "New post" }), h("kbd", { text: "N" })) : null,
       // the timeline (gui#257): what you write goes to your own feed, as on Facebook or Mastodon
       g.id === TIMELINE && S.sidebar && S.sidebar.my_feed && S.sidebar.my_feed.started ?
-        h("button", { class: "btn primary newpost", "aria-label": "New post in your feed", "data-k": "newpost",
+        h("button", { class: "btn primary newpost fab", "aria-label": "New post in your feed", "data-k": "newpost",
           title: "A new entry in your own feed",
           onclick: async () => { await openGroup(S.sidebar.my_feed.id); openCompose(); } },
           svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "New post" })) : null));

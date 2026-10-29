@@ -1,4 +1,4 @@
-"""A phone's tab bar (#248): Groups, For you, Timeline, Chats, You at the bottom, so the
+"""A phone's tab bar (#248): Groups, For you, Timeline, Private (gui#256), You at the bottom, so the
 groups get the screen; what the desktop keeps in the sidebar top, the account box and the
 status bar is at most two taps away; the desktop is unchanged.
 
@@ -119,7 +119,7 @@ async def test_the_groups_get_the_screen(phone):
     page = phone
     bar = page.get_by_role("navigation", name="Sections")
     await expect(bar).to_be_visible()
-    for key in ("groups", "foryou", "timeline", "chats", "you"):
+    for key in ("groups", "foryou", "timeline", "private", "you"):
         await expect(bar.locator(f'.tab[data-tab="{key}"]')).to_be_visible()
     await expect(page.locator(".statusbar")).to_be_hidden()
     await expect(page.locator("nav.side > .me")).to_be_hidden()
@@ -136,10 +136,11 @@ async def test_every_place_is_at_most_two_taps_away(phone):
     bar = page.get_by_role("navigation", name="Sections")
     await bar.locator('.tab[data-tab="foryou"]').click()          # one tap
     await expect(bar.locator(".tab.on")).to_have_text("◄For you3")
-    await bar.locator('.tab[data-tab="chats"]').click()
-    await expect(page.locator(".phone-only").get_by_role("button", name="Private posts")).to_be_visible()
-    await expect(page.locator(".phone-only").get_by_role("button", name="Your contacts")).to_be_visible()
-    await _shot(page, "phone-chats")
+    # Private (gui#256): the desktop's three rows, in its order, as equals
+    await bar.locator('.tab[data-tab="private"]').click()
+    rows = page.locator(".main .private-top .private-item .nm")
+    await expect(rows).to_have_text(["Your contacts", "Private posts", "Private chats"])
+    await _shot(page, "phone-private")
     await bar.locator('.tab[data-tab="you"]').click()
     you = page.locator(".content.you")
     for label in ("Your feed", "Start your site", "Commands and search", "About Unseenet"):

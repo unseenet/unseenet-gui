@@ -30,7 +30,9 @@ function chatView(d) {
     grp.at = d0 || grp.at;
     const quoted = m.references.length && byId[m.references[m.references.length - 1]];
     const isPost = m.readable && m.kind !== "chat";     // a post among chat lines stands out (UN-RFC 0028)
+    // tabindex and data-k: on a phone a tap picks the line, which shows ☺+ and Pin (gui#259)
     grp.col.append(h("div", { class: "bubble" + (isPost ? " is-post" : "") + (m.pinned ? " pinned" : ""), "data-id": m.id,
+      tabindex: "0", "data-k": "line:" + m.id,
       title: when(m.date) + (m.origin ? " · " + originText(m) : "") + (m.encrypted ? " · encrypted" : "") + (m.pinned ? " · pinned" : "") },
       moreMenu(m),
       m.pinned ? h("span", { class: "pinmark", "aria-label": "Pinned", text: PIN + " " }) : null,

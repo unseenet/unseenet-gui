@@ -31,6 +31,7 @@ VIEWS = {
     "chats": "openGroup(CHATS)",
     "contacts": "openGroup(CONTACTS)",
     "you": "openGroup(YOU)",
+    "private": "openGroup(PRIVATE)",
 }
 
 DIALOGS = {
