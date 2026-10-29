@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Writing keeps still, and what you sent is in sight** (#258): while you typed a comment
+  under an entry in a feed or the timeline, posts arriving above it - and on a phone the
+  keyboard - moved the field away, since redrawing kept the list's scroll, not your
+  place in it. The field you type in now stays where it is on screen. After sending, your
+  comment (under its entry, far from the bottom) or chat line (also when you had
+  scrolled up) is brought into sight, shown as being sent until it is.
 - **New post is always one tap away on a phone** (#257): the desktop's New post was hidden
   on phones in chat groups, and nowhere in the timeline. Now, on a phone, it is a round +
   at the bottom right above the tab bar in threads, channels and feeds - within reach of
