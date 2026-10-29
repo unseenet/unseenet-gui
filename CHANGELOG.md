@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-29
+
+**Better on a phone.** A tab bar at the bottom gives the groups the screen, Back goes up
+one level instead of leaving the app, and the QR code for copying an identity can be
+scanned at last.
+
 - **A tab bar on phones** (#248): Groups, For you, Timeline, Chats and You at the bottom,
   within reach of the thumb, so the groups get the screen - at 360x740 thirteen rows
   instead of two or three. Chats has Private posts and Your contacts at its top; You has
@@ -627,7 +633,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/unseenet/unseenet-gui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/unseenet/unseenet-gui/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/unseenet/unseenet-gui/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/unseenet/unseenet-gui/compare/v0.1.1...v0.1.2
