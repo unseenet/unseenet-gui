@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **New post is always one tap away on a phone** (#257): the desktop's New post was hidden
+  on phones in chat groups, and nowhere in the timeline. Now, on a phone, it is a round +
+  at the bottom right above the tab bar in threads, channels and feeds - within reach of
+  the thumb, gone while you read a post or write - and a + in the head of a chat group,
+  whose bottom is the chat line. Greyed where you may not post; a tap says why.
+- **New post in the timeline** (#257): writes in your own feed, once you have started one -
+  on the desktop and the phone alike.
 - **Every screen and dialog fits, on phones and desktops, and a test keeps it so** (#264):
   `tests/test_layout.py` opens 11 screens and 37 dialogs at 360x740, 390x844, 1024x640,
   1280x800 and 1920x1080, light and dark, and fails if anything is wider than the
