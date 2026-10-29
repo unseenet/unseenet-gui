@@ -791,7 +791,9 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .me .node-link:hover, .me .node-link:focus-visible { text-decoration: underline; }
 .btn.small { min-height: 30px; padding: 2px 10px; font-size: 13px; }
 .choice small.addr, .cmd small.addr { display: block; font-size: 11px; overflow-wrap: anywhere; }
-.node-row { border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px; }
+/* one column that never grows past the dialog: a long onion address wraps (gui#261) */
+.node-row { border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; display: grid; gap: 6px;
+  grid-template-columns: minmax(0, 1fr); }
 .node-row.default { border-color: var(--green-deep); }
 .node-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .node-head .ic { width: 14px; color: var(--green); }
@@ -800,10 +802,21 @@ figure.pic.inline, .pic.inline { display: inline-block; vertical-align: top; mar
 .node-addr code { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; flex: 1; min-width: 0; }
 .node-row .btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .node-info .kv dd { font-size: 12px; }
-.node-add { display: grid; gap: 8px; margin-top: 6px; }
+.node-add { display: grid; gap: 8px; margin-top: 6px; grid-template-columns: minmax(0, 1fr); }
+/* a known node: its name, what it says about itself and its address on lines of their own */
+.node-add .cmd { align-items: flex-start; padding: 8px 12px; }
+.node-add .cmd .nm { white-space: normal; overflow: visible; }
+.node-add .cmd .nm small:not(.addr) { display: block; }
+.node-add .cmd .btn { flex: none; }
 .node-add h3 { margin: 6px 0 0; font-size: 14px; }
 .node-other { display: flex; gap: 8px; }
 .node-other .field { flex: 1; min-width: 0; font-size: 14px; min-height: 0; padding: 8px 12px; }
+@media (max-width: 760px) {
+  .btn.small { min-height: 40px; }                       /* a thumb, not a pointer (gui#264) */
+  .node-other .field { min-height: 44px; font-size: 16px; }
+  .node-head { gap: 4px 10px; }
+  .node-head .nm { flex-basis: calc(100% - 24px); }       /* the name a line of its own, how it does under it */
+}
 /* ---- the sidebar, tidier (unseenet-gui#114): a filter instead of the big palette
    button, headings that look and act like folds, and denser rows ---------------- */
 .brand .grow { flex: 1; }
@@ -1231,8 +1244,35 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
     background: var(--amber); }
   .netbanner { display: block; flex: none; padding: 4px 12px; font-size: 12px; background: var(--amber);
     color: var(--on-green); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .content.you { padding: 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
-  .you .you-me { display: flex; margin-top: 0; flex: none; }
-  .you-status { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; font-size: 14px; }
-  .you-status .st { display: flex; align-items: center; gap: 8px; }
+}
+/* You (the phone's tab) stays one column at any width: a phone turned on its side or a
+   window made wider while You is open laid its parts side by side, 740 px at least, too
+   wide for a small laptop (gui#264) */
+.content.you { padding: 12px; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; }
+.you .you-me { display: flex; margin-top: 0; flex: none; }
+.you-status { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; font-size: 14px; }
+.you-status .st { display: flex; align-items: center; gap: 8px; }
+
+/* ---- a phone: everything you tap is big enough for a thumb (gui#264) ----------------
+   Controls at least 40x40; links that read as text (a name in a post's head, "… more")
+   at least 24 high (WCAG 2.5.8), so the lines they sit in keep together.
+   tests/test_layout.py checks it on every screen and dialog. */
+@media (max-width: 760px) {
+  .btn.icon { flex: none; }
+  .morebtn { min-width: 40px; min-height: 40px; }
+  .car-btn { flex: 0 0 40px; }
+  .mini, .cmd-btn { width: 40px; height: 40px; }
+  .me-open { min-width: 40px; min-height: 40px; align-items: center; justify-content: center; }
+  .segbtn { min-height: 40px; }
+  .langbtn, .langbtn.small { min-height: 40px; }
+  .react { height: 40px; min-width: 40px; justify-content: center; }
+  .iconlink { min-height: 40px; min-width: 40px; justify-content: center; }
+  .comment .iconlink { padding: 2px 8px; }
+  .cbar .send { width: 40px; height: 40px; }
+  .dialog button.chip { min-height: 40px; }                /* a chip you tap, not a label */
+  .name-btn, .me-name, .node-link { min-height: 24px; }
+  .dialog label:has(> input[type=checkbox]), .dialog label:has(> input[type=radio]) {
+    display: flex; align-items: center; gap: 8px; min-height: 40px; }
+  /* the rules are read on a phone, not lined up: they wrap there */
+  #rules-text { white-space: pre-wrap; overflow-wrap: anywhere; }
 }

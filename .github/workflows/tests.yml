@@ -19,7 +19,18 @@ jobs:
       - run: pip install . pytest pytest-asyncio playwright
       - run: python -m playwright install --with-deps chromium
       - run: python -m pytest -q
+        env:
+          SHOTS: shots                     # every screen x size x theme, for the gallery (#264)
       - run: for f in src/unseenet_gui/static/*.js; do node --check "$f" || exit 1; done   # every script (#152)
+      # every screen and dialog, phone beside desktop, to check both are the same app (#264)
+      - if: always()
+        run: python tools/gallery.py shots gallery.html dark && python tools/gallery.py shots gallery-light.html light
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gallery
+          path: gallery*.html
+          if-no-files-found: ignore
 
   docs:
     # docs/ checked strictly, as unseenet-docs gathers it into unseenet.org

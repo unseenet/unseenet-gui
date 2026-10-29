@@ -7,6 +7,27 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Every screen and dialog fits, on phones and desktops, and a test keeps it so** (#264):
+  `tests/test_layout.py` opens 11 screens and 37 dialogs at 360x740, 390x844, 1024x640,
+  1280x800 and 1920x1080, light and dark, and fails if anything is wider than the
+  screen, a dialog or its ✕ or primary button is off screen (on a phone also with the
+  keyboard up), a heading or button is cut off, something you tap on a phone is smaller
+  than 40x40 (a link that reads as text: 24 high), or the console shows an error. It
+  talks to answers recorded from a real core (`tools/layout_audit.py` records them
+  against the playground). CI also makes `gallery.html` - every screen, phone beside
+  desktop - to check that both are recognisably the same app (`tools/gallery.py`).
+- **Your nodes fits a phone** (#261): a known node's description and its onion address no
+  longer stretch the dialog to 700 px, pushing *Add* off screen - each is on a line of
+  its own and the address wraps; the name of a node has its own line, how it is doing
+  under it.
+- **Bigger targets on phones** (#264): ⋯, Chat/Post, reactions, the language button, the
+  folds of the group list, Back, small buttons and choice chips are at least 40x40; names
+  in a post's head and other text links at least 24 high. Your rules wrap on a phone
+  instead of scrolling sideways.
+- **You stays one column at any width** (#264): opened in a wider window (a phone turned
+  on its side, a window made wider), the You tab laid its parts side by side, at least
+  740 px - wider than a 1024 laptop's main pane with some fonts.
+
 ## [0.3.1] - 2026-10-29
 
 **Better on a phone.** A tab bar at the bottom gives the groups the screen, Back goes up
