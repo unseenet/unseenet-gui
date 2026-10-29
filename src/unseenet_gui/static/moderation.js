@@ -28,6 +28,8 @@ async function openEditGroup() {
   // reactions (UN-RFC 0048 section 4): the view's default, none, any, or your own set
   const rset = (g.reactions && g.reactions.setting) || "default";
   let reacts = Array.isArray(rset) ? "own" : rset;
+  // comments (UN-RFC 0030): a channel's whether, and how long threads take them (3.3)
+  let comments = g.comments || "none";
   // a site: whether search engines may index it through its web form (UN-RFC 0035 section 3)
   const site = S.data && S.data.site;
   let index = site ? (site.index || "no") : null;
@@ -44,6 +46,7 @@ async function openEditGroup() {
   };
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
     onclick: () => { if (name === "kinds") kinds = value; else if (name === "files") files = value;
+      else if (name === "comments") comments = value;
       else if (name === "reactions") reacts = value; else if (name === "index") index = value; else view = value; redrawDialog(); } },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
   // the settings this dialog shows, in its order, for the help beside it
@@ -58,7 +61,7 @@ async function openEditGroup() {
     aside: help ? () => settingsHelp(help, shown) : null,
     values: { title: g.title || "", description: g.description || "", charter: g.charter || "",
       team_name: g.team_name || "", gtags: (g.tags || []).join(", "), glangs: (g.languages || []).join(", "),
-      reaction_set: Array.isArray(rset) ? rset.join(" ") : "",
+      reaction_set: Array.isArray(rset) ? rset.join(" ") : "", comment_days: g.comment_days || "",
       // Markdown if the charter already is, or - for a new one - if you write posts in Markdown
       markdown: g.charter ? !!g.charter_markdown : !(S.sidebar && S.sidebar.markdown === false) },
     note: "Saved as a new version of the group's manifest, signed with your key and sent to your node. The type, owner and ID cannot change.",
@@ -77,6 +80,16 @@ async function openEditGroup() {
       h("label", { text: "Files" }),
       h("div", { class: "choices row" }, FILE_PICKS.map(([v, l, s]) => pick("files", v, files, l, s)),
         files === "custom" ? pick("files", "custom", files, "As it is now", "limits set elsewhere") : null),
+      g.type === "channel" ? [h("label", { text: "Comments" }),
+        h("div", { class: "choices row" },
+          pick("comments", "open", comments, "Anyone may comment", "under each entry"),
+          pick("comments", "none", comments, "No comments", "announcements"))] : null,
+      g.comment_days_possible && !(g.type === "channel" && comments === "none") ? [
+        h("label", { for: "edays", text: g.type === "channel" ? "Comments close after … days" : "Replies close after … days" }),
+        h("input", { id: "edays", name: "comment_days", type: "number", min: 1, class: "in", "data-k": "edays",
+          value: vals.comment_days, placeholder: "empty: never" }),
+        h("p", { class: "hint", style: "margin:0", text: "A change counts for comments that come from now on; " +
+          "those already there stay. Shorter also shortens what writers chose for their own threads." })] : null,
       h("label", { text: "Reactions" }),
       h("div", { class: "choices row" },
         pick("reactions", "default", reacts, "As the view has them", "feeds, chat: 👍 👎 ❤️ 😂 😮 😢; discussion: none"),
@@ -125,6 +138,9 @@ async function openEditGroup() {
           charter_type: v.markdown && charter ? MARKDOWN : null, view, kinds,
           reactions: reacts === "own" ? splitOwnSet(v.reaction_set) : reacts,
           ...(files !== "custom" ? { files } : {}), ...(site && index !== site.index ? { index } : {}),
+          ...(g.type === "channel" && comments !== (g.comments || "none") ? { comments } : {}),
+          ...(g.comment_days_possible && String(v.comment_days || "") !== String(g.comment_days || "") ?
+            { comment_days: Number(v.comment_days) > 0 ? Math.floor(Number(v.comment_days)) : null } : {}),
           ...(issuers.map(i => i.key).join(" ") !== startIssuers ? { report_issuers: issuers.map(i => i.key) } : {}),
           ...(g.type === "inbox" && (v.team_name || "") !== (g.team_name || "") ? { team_name: (v.team_name || "").trim() } : {}),
           ...(g.type !== "inbox" && (v.glangs || "") !== (g.languages || []).join(", ") ?
@@ -564,11 +580,11 @@ async function openCompose() {
   const may = mayWrite(S.data, "post");
   if (!may.allowed) { if (may.reason) toast(may.reason); return; }    // N says why, as the button does
   const sig = await signatureText();
-  openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0,
+  openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0, newThread: true,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
-    send: (subject, text, notify, files, tags, languages) => doPost(g.id, { subject, body: text, signature: false, notify,
+    send: (subject, text, notify, files, tags, languages, days) => doPost(g.id, { subject, body: text, signature: false, notify,
       ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}),
-      ...(languages !== undefined ? { languages } : {}) }, { text }) });
+      ...(languages !== undefined ? { languages } : {}), ...(days !== undefined ? { comment_days: days } : {}) }, { text }) });
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 

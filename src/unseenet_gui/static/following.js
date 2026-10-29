@@ -451,6 +451,9 @@ function moreMenu(m) {
     m.may_edit ? ["Edit", () => (m.kind === "chat" ? openEditLine(m) : openEdit(m, groupOf(m.group) || here))] : null,
     m.may_withdraw ? ["Withdraw (delete)", () => openWithdraw(m)] : null,
     pinHere ? [m.pinned ? "Unpin" : "Pin", () => openPin(m)] : null,
+    // its author, the owner and moderators (UN-RFC 0030 3.2): not past its deadline
+    m.may_close_comments && !(m.comments && m.comments.reason === "deadline") ?
+      [m.comments && m.comments.reason === "closed" ? "Open comments" : "Close comments", () => openCloseComments(m)] : null,
     m.address && !m.private ? ["Copy address", () => copy(m.address, "The address is copied.")] : null,
     m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
     ...ruleItems(m),                        // your own rules: why, and the thread's mark
@@ -505,7 +508,8 @@ function quoteSelection(k) {
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo,
-                             startTags, startLanguages }) {
+                             startTags, startLanguages, newThread }) {
+  const daysChoice = newThread && !priv && threadTakesComments(g);   // UN-RFC 0030 3.1
   // an edit starts with the post's own tags and warnings (unseenet#733)
   const dialog = { focus: "#body", node: null, files: [], tags: [...(startTags || [])] };
   // the language row: an edit's is the post's own, a new post's the core's suggestion
@@ -595,8 +599,10 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     // An edit sends what the field says - the post's own unless you changed it
     dialog.languages = !langField ? undefined : edit ? chosen :
       (chosen.length || suggested.length ? chosen : undefined);
+    const daysField = f.querySelector("#cdays");
+    const days = daysField && daysField.value !== "" ? Number(daysField.value) : undefined;
     closeDialog();
-    await send(s, b, N.may ? N.on : undefined, files, dialog.tags, dialog.languages);
+    await send(s, b, N.may ? N.on : undefined, files, dialog.tags, dialog.languages, days);
     toast(edit ? "Saving the new version - postage takes a few seconds." :
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
@@ -662,7 +668,12 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       !priv ? (tagBox = tagField(dialog, () => {
         const f = dialog.node && dialog.node.querySelector("form");
         return f ? f.subject.value + "\n" + f.body.value : "";
-      })) : null),
+      })) : null,
+      daysChoice ? h("div", { class: "langrow" },
+        h("label", { for: "cdays", class: "llabel", text: "Comments" }),
+        h("select", { id: "cdays", name: "cdays", class: "in", "data-k": "cdays" },
+          commentDaysChoices(g).map(([v, l]) => h("option", { value: v, text: l }))),
+        h("span", { class: "hint", text: "How long it takes comments" })) : null),
       quoting ? h("p", { class: "hint", style: "margin:0", text: "Cut the quote down to what you answer." }) : null),
     h("div", { class: "df btns" },
       h("span", { class: "hint grow", text: priv ? "Sealed to them: only they can read it" : "Signed with your key · proof-of-work added" }),
@@ -705,4 +716,63 @@ function pendingState(p) {
       h("span", { class: "bar determinate" }, h("span", { style: `width:${pct}%` })));
   }
   return h("span", { class: "sending" }, "Sending · proof-of-work", h("span", { class: "bar" }, h("span", {})));
+}
+
+
+// Close comments on an entry, with a short note for readers, or open them again (UN-RFC
+// 0030 section 3.2). Its author, the owner and moderators; an author cannot open what the
+// owner or a moderator closed - the core says so.
+function openCloseComments(m) {
+  const gid = m.group || (S.data && S.data.group && S.data.group.id);
+  const g = groupOf(gid) || (S.data && S.data.group) || {};
+  const closing = !(m.comments && m.comments.reason === "closed");
+  const run = async (note) => {
+    await api("POST", `/api/groups/${encodeURIComponent(gid)}/comments`,
+      { id: m.id, close: closing, ...(note ? { note } : {}) });
+    closeDialog(); await loadGroup(); render();
+    toast(closing ? "Comments are closed on it." : "Comments are open again.");
+  };
+  if (!closing) {
+    confirmDialog({ title: "Open comments again?", button: "Open comments",
+      text: "Readers can comment again, until its time for comments runs out.", ok: async () => { try { await run(""); } catch (e) { closeDialog(); toast(e.message); } } });
+    return;
+  }
+  formDialog({ label: "Close comments", title: "Close comments on “" + subjectOf(m) + "”", focus: "#cnote", button: "Close comments",
+    note: "New comments are refused; those already there stay, and readers can still react. " +
+      "You can open them again" + (m.mine ? "." : " - its author cannot open what you closed."),
+    fields: (vals) => g.type === "closed" ? [h("p", { class: "hint", style: "margin:0",
+        text: "In a closed group a close has no note: nodes can read it." })] : [
+      h("label", { for: "cnote", text: "A note for readers (optional)" }),
+      h("input", { id: "cnote", name: "note", class: "in", "data-k": "cnote", maxlength: 256,
+        value: vals.note || "", placeholder: "e.g. Closed - the discussion went off topic" })],
+    submit: async (v) => run(g.type === "closed" ? "" : (v.note || "").trim()) });
+}
+
+// Under an entry or a thread: why it takes no comments now, with a close's note - or,
+// once less than a day is left, when they close (UN-RFC 0030 section 5).
+function commentsLine(m) {
+  const c = m && m.comments;
+  if (!c) return null;
+  if (!c.open) return h("p", { class: "hint cclosed", text: c.reason === "closed" ?
+    "Comments were closed" + (c.note ? ": " + c.note : ".") : "Comments are closed." });
+  if (!c.until) return null;
+  const left = new Date(c.until).getTime() - Date.now();
+  if (left <= 0 || left > 86400000) return null;
+  const hours = Math.round(left / 3600000);
+  return h("p", { class: "hint", text: hours >= 1 ? `Comments close in ${hours} hour${hours === 1 ? "" : "s"}.` :
+    "Comments close in less than an hour." });
+}
+
+// The choice of how long a new thread takes comments (UN-RFC 0030 section 3.1): as the
+// group (the default), none, or shorter - never longer than the group's.
+function commentDaysChoices(g) {
+  const max = g.comment_days;
+  const opts = [["", max ? `As the group (${max} day${max === 1 ? "" : "s"})` : "As the group (no limit)"],
+    ["0", "No comments"], ["1", "A day"], ["7", "A week"], ["30", "A month"]];
+  return opts.filter(([v]) => v === "" || v === "0" || !max || Number(v) < max);
+}
+// Whether a new thread here can have its own time for comments.
+function threadTakesComments(g) {
+  return !!(g && g.comment_days_possible && !(g.type === "channel" && g.comments !== "open")
+    && g.view !== "chat" && g.view !== "pages");
 }

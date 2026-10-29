@@ -195,7 +195,9 @@ function entryCard(d, e) {
           onkeydown: (ev) => sendOnEnter(ev, send) }),
         timeline ? null : languageChip(m.group),            // what you write in here (0052 5a)
         h("button", { class: "send", type: "submit", "aria-label": "Send the comment" }, svg(ICON.send, 16, 2.5))) :
-      cp.reason ? h("p", { class: "hint", text: cp.code === "comments_closed" ? "Comments are closed." : cp.reason }) : null));
+      cp.code === "comments_closed" ? (commentsLine(m) || h("p", { class: "hint", text: cp.reason || "Comments are closed." })) :
+      cp.reason ? h("p", { class: "hint", text: cp.reason }) : null,
+      cp.allowed ? commentsLine(m) : null));
 }
 
 // An entry's text, cut after a few lines with "… more" when it is long - opened in place,

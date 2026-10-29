@@ -210,7 +210,7 @@ async def test_entries_whole_with_comments_under_them(feed_page):
     await note.get_by_role("button", name="View 5 more comments").click()
     await expect(note.locator(".comment")).to_have_count(6)
     await expect(note.locator(".comment.answer").last).to_contain_text("in answer to Dybt")
-    await expect(post).to_contain_text("Comments are closed.")
+    await expect(post).to_contain_text("Comments are closed on this entry")   # the core's reason
     await expect(post.locator(".cbar")).to_have_count(0)
     await expect(page.locator(".notebar")).to_have_count(0)            # a channel: only Bob writes
 

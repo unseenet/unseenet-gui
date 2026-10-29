@@ -137,6 +137,9 @@ function fromRow(r) {
     // reactions (UN-RFC 0048): the counts, may you react, and its own group's set
     reactions: r.reactions || [], react: r.react || null, react_offered: r.react_offered || null,
     comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "",
+    // a thread's first post: does it take comments now, until when, a close's note, and
+    // may you close or open them (UN-RFC 0030 sections 3.1-3.2)
+    comments: r.comments || null, may_close_comments: !!r.may_close_comments,
     // first published elsewhere (UN-RFC 0049): {network, date, id, from}, and old on arrival
     origin: m.origin || null, old_on_arrival: !!m.old_on_arrival,
     // your own rules (UN-RFC 0051), only when you have some: score, actions, hidden, why
