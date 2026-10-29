@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+**On unseenet 0.6 (`unseenet[api]>=0.6.1,<0.7`): update the nodes first.** Facebook mode
+that you can live in - feeds, comments with an entry's own time and *Close comments*,
+reactions, your own rules for your feed with *Show all* - plus tags and content
+warnings, spam reports and labels you choose to follow, team inboxes, copying your
+identity to another device (also onto a phone in the browser) and recovery words, a
+PIN on a device, notifications, export, and level 4 by choice.
+
 - **Get your identity onto a phone in the browser** (#234, UN-RFC 0050 3.8): in the browser,
   *Get it from another device* at first start and *Get identity from another device* in the
   palette work through the entrance (unseenet-entrance#53, UN-RFC 0043 4.5) - with the code,
@@ -594,7 +603,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/unseenet/unseenet-gui/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/unseenet/unseenet-gui/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/unseenet/unseenet-gui/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/unseenet/unseenet-gui/compare/v0.1.0...v0.1.1
