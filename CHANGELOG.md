@@ -7,6 +7,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A tab bar on phones** (#248): Groups, For you, Timeline, Chats and You at the bottom,
+  within reach of the thumb, so the groups get the screen - at 360x740 thirteen rows
+  instead of two or three. Chats has Private posts and Your contacts at its top; You has
+  what the desktop keeps in the account box and the status bar (your profile and key,
+  node, ripening, your feed and site, things to approve, connection, update, About). A
+  dot on You and a thin line at the top say when you are not connected or a node is not
+  answering. The bar steps aside while you read a post or write. The desktop is as it was.
+
 - **The QR code of a copy can be scanned** (#247): it was drawn at a fixed 294 px with no
   `viewBox` into a 220 px box, which cut off two of its three corner marks - no phone
   could read it. It now scales to its box, crisp, with its quiet zone; a test reads the

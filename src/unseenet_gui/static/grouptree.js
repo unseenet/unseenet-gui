@@ -386,6 +386,7 @@ function mainArea() {
   }
   if (S.gid === CHATS) return chatsView();             // the list of private chats (gui#172)
   if (S.gid === CONTACTS) return contactsView();       // your contacts (gui#209)
+  if (S.gid === YOU) return youView();                 // you and the state of things (gui#248)
   const g = d.group;
   const chips = [
     h("span", { class: "chip mono", text: g.view === "chat" ? "» chat" : g.view === "feed" ? "☰ feed" : g.view === "pages" ? "⌂ site" : "≡ threads" }),
