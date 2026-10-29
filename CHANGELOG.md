@@ -7,6 +7,12 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.3.3] - 2026-10-29
+
+**The phone, part three.** One head everywhere with the round + for its action, a chat line
+you can see what you write in, Private as on the desktop, one icon for the palette, and a
+copied key's ripening shown right.
+
 - **One head on a phone, everywhere** (#260): the back arrow, the name - on two lines
   before it is cut, so `alt.history.onthisday` can be read - and the palette; nothing else.
   The head's one action (New post, Write a private post, Chat with someone, Add a contact)
@@ -695,7 +701,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/unseenet/unseenet-gui/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/unseenet/unseenet-gui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/unseenet/unseenet-gui/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/unseenet/unseenet-gui/compare/v0.2.0...v0.3.0
