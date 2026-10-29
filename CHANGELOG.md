@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Get your identity onto a phone in the browser** (#234, UN-RFC 0050 3.8): in the browser,
+  *Get it from another device* at first start and *Get identity from another device* in the
+  palette work through the entrance (unseenet-entrance#53, UN-RFC 0043 4.5) - with the code,
+  or by scanning the QR code where the browser can. Offered only where the entrance says it
+  passes a copy on (`"copy": true`); elsewhere the palette says why. Being the device that
+  gives a copy stays for the app.
+
 - **Keep ripening to level 4** (#241, unseenet#740): a switch in Key ripening, off by
   default, that says first what it costs - about two weeks of one core while Unseenet is
   open, at this machine's speed, no more memory - and what it gives: about a quarter of

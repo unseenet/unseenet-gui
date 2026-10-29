@@ -220,3 +220,34 @@ async def test_copy_to_shows_the_code_and_the_qr_code(browser):
         await expect(page.get_by_text("ocean   zebra")).to_be_visible()
         await expect(page.get_by_role("button", name="The words match")).to_be_visible()
         assert errors == []
+
+
+class WebAPI(FakeAPI):
+    """The GUI in a browser through an entrance (#234): the copy only where it relays it."""
+    def __init__(self, copy):
+        super().__init__(setup=True)
+        self.copy = copy
+
+    async def handle(self, request):
+        if request.path == "/x/gui/state":
+            return web.json_response({"bootable": False, "web": True, "identities": []})
+        return await super().handle(request)
+
+
+@pytest.mark.parametrize("copy", [True, False])
+async def test_in_a_browser_copy_is_offered_only_where_the_entrance_relays_it(browser, copy):
+    api = WebAPI(copy)
+    app = await _page(api)
+
+    async def info(_request):
+        return web.json_response({"operator": "", "copy": copy})
+    app.router.add_get("/.well-known/unseenet-entrance", info)
+    async with TestServer(app, host="127.0.0.1") as server:
+        page = await browser.new_page(viewport={"width": 1100, "height": 900})
+        errors = []
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        await page.goto(str(server.make_url("/")) + "#t=" + TOKEN)
+        await expect(page.get_by_role("button", name="Restore from recovery words")).to_be_visible()
+        await page.wait_for_timeout(500)                 # the entrance has answered
+        assert await page.get_by_role("button", name="Get it from another device").count() == (1 if copy else 0)
+        assert errors == []

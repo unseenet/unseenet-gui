@@ -340,8 +340,30 @@ async function receiveCopy(code, node) {
   return done;
 }
 
+// Whether this client can receive a copy (UN-RFC 0050 3.8): the app always; in a browser
+// only where its entrance passes the copy on (UN-RFC 0043 4.5: "copy": true in what the
+// entrance says about itself). null until asked.
+let copyAllowed = null;
+async function loadCopyAllowed() {
+  if (!(S.state && S.state.web)) { copyAllowed = true; return true; }
+  try {
+    const r = await fetch("/.well-known/unseenet-entrance", { cache: "no-store" });
+    copyAllowed = r.ok && (await r.json()).copy === true;
+  } catch (_) { copyAllowed = false; }
+  return copyAllowed;
+}
+// Without asking: the app, or a browser whose entrance said yes.
+function copyPossible() {
+  if (!(S.state && S.state.web)) return true;
+  if (copyAllowed === null) loadCopyAllowed().then(() => render());
+  return copyAllowed === true;
+}
+const NO_COPY_HERE = "This entrance does not pass a copy on to a browser. Use another " +
+  "entrance, or the app, to get your identity from another device.";
+
 // Get an identity from another device (UN-RFC 0050 3.6) with the code it shows.
-function openCopyFrom() {
+async function openCopyFrom() {
+  if (!copyPossible() && !(await loadCopyAllowed())) { toast(NO_COPY_HERE); return; }
   formDialog({ label: "Get identity from another device", title: "Get identity from another device", focus: "#ccode", button: "Connect",
     note: "On the other device choose \"Copy to another device\". The code works once, for 10 minutes.",
     fields: codeFields,
@@ -358,8 +380,10 @@ function openCopyFrom() {
 function setupHowChoice() {
   const how = S.setupHow || "new";
   const pick = (v) => () => { S.setupHow = v; S.error = ""; render(); };
-  return h("div", { class: "howpicks", role: "group", "aria-label": "Your identity" }, [["new", "Create a new identity"], ["restore", "Restore from recovery words"],
-    ["copy", "Get it from another device"]].map(([v, t]) => h("button", { type: "button", class: "howpick", "aria-pressed": String(how === v), onclick: pick(v) },
+  // in a browser, copying needs an entrance that passes it on (UN-RFC 0043 4.5)
+  const ways = [["new", "Create a new identity"], ["restore", "Restore from recovery words"],
+    ...(copyPossible() ? [["copy", "Get it from another device"]] : [])];
+  return h("div", { class: "howpicks", role: "group", "aria-label": "Your identity" }, ways.map(([v, t]) => h("button", { type: "button", class: "howpick", "aria-pressed": String(how === v), onclick: pick(v) },
     h("span", { text: t }))));
 }
 
