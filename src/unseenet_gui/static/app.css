@@ -43,6 +43,8 @@
 }
 
 * { box-sizing: border-box; }
+/* a sideways swipe in a list that cannot scroll further is not the browser's Back (#249) */
+html, body { overscroll-behavior-x: none; }
 html, body { margin: 0; height: 100%; background: var(--ink); color: var(--paper);
   font-family: var(--sans); font-size: 14px; line-height: 1.45; }
 button, input, textarea { font: inherit; color: inherit; }
