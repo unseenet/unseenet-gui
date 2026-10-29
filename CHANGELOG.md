@@ -7,6 +7,17 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **How long threads take comments, and closing comments on one entry** (#237, #238,
+  unseenet#732, UN-RFC 0030): creating a group asks how many days a thread takes
+  comments (a feed) or replies (other groups), empty for never; Edit group changes it,
+  and a channel's "Readers may comment" too, saying that a change counts for comments
+  from now on. Writing a new thread offers its own time - as the group, none, a day, a
+  week or a month, never longer than the group's. The ⋯ menu of an entry has *Close
+  comments* (with a short note for readers) and *Open comments* for its author, the
+  owner and moderators. Where the comment box was, an entry says why it takes no
+  comments - with a close's note - and "Comments close in 5 hours" once less than a
+  day is left. Needs unseenet 0.6.
+
 - **A group's charter** (#231, unseenet#726): what a group's owner writes about the group
   is now called its *charter* - in About this group, Edit group (with a hint that no
   machine enforces it), the palette and the report texts. *Rules* means only your own

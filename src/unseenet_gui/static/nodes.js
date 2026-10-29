@@ -343,6 +343,9 @@ function openCreateGroup() {
   const pick = (name, value, current, label, small) => h("button", { type: "button", class: "choice", "aria-pressed": String(current === value),
     onclick: () => choose(name, value) },
     h("span", {}, h("span", { text: label }), h("small", { text: small })));
+  // how long threads take comments or replies (UN-RFC 0030 3.3): not for chat or sites,
+  // nor a channel whose readers do not comment
+  const daysAsked = () => view !== "chat" && view !== "pages" && !(gtype === "channel" && (view !== "feed" || comments === "none"));
   const about = () => view === "pages" ? "A site is a channel: you, and the people you add as posters, write its pages. The first page you write, index, is its home page."
     : view === "feed" ? (gtype === "channel" ? "A feed: entries newest first, comments under each. Only you (and your posters) post entries."
       : "A feed: entries newest first, comments under each. As an open group anyone posts entries; a channel is for one voice.")
@@ -377,6 +380,11 @@ function openCreateGroup() {
       h("label", { text: "Files" }),
       h("div", { class: "choices row" }, FILE_PICKS.map(([v, l, s]) => pick("files", v, files, l, s))),
       view === "chat" ? h("label", { class: "check" }, h("input", { type: "checkbox", name: "fast", checked: !!vals.fast }), " Fast delivery: nodes pass messages on at once (less hiding of where they came from)") : null,
+      daysAsked() ? [h("label", { for: "gdays", text: view === "feed" ? "Comments close after … days" : "Replies close after … days" }),
+        h("input", { id: "gdays", name: "comment_days", type: "number", min: 1, class: "in", "data-k": "gdays",
+          value: vals.comment_days || "", placeholder: "empty: never" }),
+        h("p", { class: "hint", style: "margin:0", text: "Days after a thread is started during which it takes " +
+          (view === "feed" ? "comments" : "replies") + ". Each writer can choose shorter for their own." })] : null,
       h("label", { for: "gtitle", text: "Title" }),
       h("input", { id: "gtitle", name: "title", class: "in", "data-k": "gtitle", value: vals.title || "", placeholder: "One line about the group" })],
     submit: async (v) => {
@@ -384,6 +392,7 @@ function openCreateGroup() {
       const { id } = await api("POST", "/api/groups", { name: v.name, type: gtype, view,
         kinds, fast: view === "chat" && !!v.fast, title: v.title,
         ...(gtype === "channel" && view === "feed" ? { comments } : {}),
+        ...(daysAsked() && Number(v.comment_days) > 0 ? { comment_days: Math.floor(Number(v.comment_days)) } : {}),
         ...(files !== "none" ? { files } : {}) });
       closeDialog(); await loadSidebar(); await openGroup(id); toast("The group is created.");
     } });
