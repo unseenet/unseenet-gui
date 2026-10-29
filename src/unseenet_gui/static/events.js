@@ -86,6 +86,9 @@ function connectEvents() {
     } else if (type === "ripening") {
       setRipening({ level: e.level, next_at: e.next_at, t: e.t }, true);
       render();                                                 // the sidebar's level, a waiting message, the web's banner
+    } else if (type === "ripening-target") {                    // level 4 chosen or not (unseenet#740)
+      try { const st = await api("GET", "/api/state"); if (st.ripening) setRipening(st.ripening, false); } catch (_) { /* next state */ }
+      render();
     } else if (type === "ripening-paused") {                    // from this window or another (unseenet#337)
       ripeSamples = [];
       setRipening({ paused: e.paused }, false);

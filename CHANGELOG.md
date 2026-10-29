@@ -7,6 +7,13 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Keep ripening to level 4** (#241, unseenet#740): a switch in Key ripening, off by
+  default, that says first what it costs - about two weeks of one core while Unseenet is
+  open, at this machine's speed, no more memory - and what it gives: about a quarter of
+  the work for each post. With it on, the dialog shows the target and the time left;
+  the sidebar says "ripening" again until level 4. In the browser it says that the page
+  must stay open, and that it is slower there. This device's choice, kept with the key.
+  Needs unseenet 0.6.
 - **How long threads take comments, and closing comments on one entry** (#237, #238,
   unseenet#732, UN-RFC 0030): creating a group asks how many days a thread takes
   comments (a feed) or replies (other groups), empty for never; Edit group changes it,
