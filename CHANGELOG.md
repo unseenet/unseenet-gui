@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **The QR code of a copy can be scanned** (#247): it was drawn at a fixed 294 px with no
+  `viewBox` into a 220 px box, which cut off two of its three corner marks - no phone
+  could read it. It now scales to its box, crisp, with its quiet zone; a test reads the
+  code on screen back, on a desktop and a phone.
+
 - **A new vault says where the copy comes** (found in the live test 29 Oct): *Get it
   from another device* comes after the vault is made, so someone bringing their identity
   over did not find it. The new-vault screen now says so - wherever a copy can be

@@ -159,20 +159,28 @@ CLOUD_HINTS = ("dropbox", "onedrive", "icloud", "google drive", "googledrive", "
                "nextcloud", "owncloud", "pcloud", "box sync")
 
 
+def qr_svg(text: str) -> str:
+    """``text`` as a QR code in SVG that scales to whatever box shows it: a viewBox and
+    no fixed size (#247 - with segno's fixed 294 px and no viewBox, the 220 px box cut
+    off two of the three corner marks, and no phone could read it). Black on white with
+    a quiet zone of four modules, crisp edges."""
+    import io
+    import segno
+    out = io.BytesIO()
+    segno.make(text, error="m", boost_error=False).save(
+        out, kind="svg", scale=1, border=4, dark="#000", light="#fff", xmldecl=False,
+        svgns=True, title="QR code", omitsize=True)
+    return out.getvalue().decode().replace("<svg ", '<svg shape-rendering="crispEdges" ', 1)
+
+
 async def qr(request):
     """A QR code as SVG, for the code of a copy to another device (UN-RFC 0050 section
     3.2). Made here, on this machine: the text is a one-time secret."""
-    import segno
-    import io
     data = await _body(request)
     text = str(data.get("text", ""))
     if not text or len(text) > 512:
         return web.json_response({"error": "nothing to show"}, status=400)
-    out = io.BytesIO()
-    segno.make(text, error="m", boost_error=False).save(out, kind="svg", scale=6, border=4,
-                                                      dark="#000", light="#fff", xmldecl=False,
-                                                      svgns=True, title="QR code")
-    return web.json_response({"svg": out.getvalue().decode()})
+    return web.json_response({"svg": qr_svg(text)})
 
 
 def _same_medium(a: Path, b: Path) -> bool:

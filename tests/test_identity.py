@@ -14,6 +14,7 @@ from unseenet.client.session import Session
 from unseenet.core import recovery as rc
 from unseenet.core.vault import Vault
 
+from unseenet_gui.server import qr_svg
 from unseenet_gui import server as gs
 from unseenet_gui.server import STATIC, build
 
@@ -120,8 +121,8 @@ class FakeAPI:
             data = {"role": "old", "state": "waiting", "code": "7-guitar-tunnel",
                     "qr": "unseenet-copy:1:" + "a" * 56 + ".onion:7-guitar-tunnel", "expires": 9999999999,
                     "check_words": [], "error": "", "added": []}
-        elif path == "/x/gui/qr":
-            data = {"svg": '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>'}
+        elif path == "/x/gui/qr":                  # the real drawing (#247)
+            data = {"svg": qr_svg((await request.json())["text"])}
         else:
             data = {}
         return web.json_response(data)
@@ -292,3 +293,24 @@ async def test_the_new_vault_says_the_copy_comes_next(browser, exists, in_browse
         assert await page.locator("[data-k=copy-hint]").count() == (1 if shown else 0)
         assert errors == []
 
+
+
+@pytest.mark.parametrize("width,height", [(1100, 900), (390, 844)])
+async def test_the_qr_code_shown_can_be_read(browser, width, height):
+    """#247: the QR code in *Copy to another device* was cut off by its box (two of three
+    corner marks gone) and no phone could read it. Read back what is on screen."""
+    zxingcpp = pytest.importorskip("zxingcpp")
+    from io import BytesIO
+    from PIL import Image
+    api = FakeAPI(setup=False)
+    async with TestServer(await _page(api), host="127.0.0.1") as server:
+        page = await browser.new_page(viewport={"width": width, "height": height})
+        await page.goto(str(server.make_url("/")) + "#t=" + TOKEN)
+        await page.wait_for_function("typeof openCopyTo === 'function' && typeof S !== 'undefined' && S.state && S.state.me")
+        await page.evaluate("openCopyTo()")
+        await page.get_by_role("button", name="Show the code").click()
+        qr = page.locator("svg.qr")
+        await expect(qr).to_be_visible()
+        shot = Image.open(BytesIO(await qr.screenshot()))
+        found = zxingcpp.read_barcodes(shot)
+        assert [r.text for r in found] == ["unseenet-copy:1:" + "a" * 56 + ".onion:7-guitar-tunnel"]
