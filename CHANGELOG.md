@@ -7,6 +7,19 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares; update the nodes first.
+
+### Added
+
+- **Sharing** (#285, UN-RFC 0060): Share, Share with a comment, Share into a group… and
+  Send to… in the ⋯ menu of what can be shared - not on closed or private posts, and where
+  the author asked not to, ⋯ says why. Undo share on your own. A plain share shows the
+  original under "Mette shared" (in the timeline "shared by Søren and Mette", once), a
+  share with a comment shows it as a card, "Edited after it was shared" when it was;
+  "Fetching …" while the core fetches it, and a share whose original is gone is not shown.
+  Comments and reactions go to the original, where it was posted. Never a count. Share
+  notices in For you; Ctrl+P to stop them or to hide shares, ⋯ to hide them in one feed.
+
 ## [0.4.1] - 2026-10-30
 
 A fix release on unseenet 0.6.5.

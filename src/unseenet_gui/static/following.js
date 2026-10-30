@@ -165,6 +165,7 @@ async function openMentioned(m) {
   const n = m.notice;
   if (!n) return;
   markRead([m]);
+  if (n.share) { S.full = false; openShared(n.share, n.in); return; }   // a share notice (0060 8)
   if (!n.followed) { goToGroup(n.ref); return; }
   S.full = false;
   await openGroup(n.group);
@@ -217,6 +218,7 @@ function postMenu(m, g) {
       m.may_edit && m.kind !== "chat" ? ["Edit", () => openEdit(m, g)] : null,
       m.may_withdraw ? ["Withdraw (delete)", () => openWithdraw(m)] : null,
       g.may_pin ? [m.pinned ? "Unpin" : "Pin", () => openPin(m)] : null,
+      ...shareItems(m),                         // share, with a comment, into a group, send to
       m.address && !m.private ? ["Copy address", () => copy(m.address, "The post's address is copied.")] : null,
       m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
       m.why ? ["Why is this here?", () => openWhy(m)] : null,
@@ -455,6 +457,7 @@ function moreMenu(m) {
     // its author, the owner and moderators (UN-RFC 0030 3.2): not past its deadline
     m.may_close_comments && !(m.comments && m.comments.reason === "deadline") ?
       [m.comments && m.comments.reason === "closed" ? "Open comments" : "Close comments", () => openCloseComments(m)] : null,
+    ...shareItems(m),                       // share, with a comment, into a group, send to (0060)
     m.address && !m.private ? ["Copy address", () => copy(m.address, "The address is copied.")] : null,
     m.address && !m.private ? ["Copy web address", () => copyWeb(m.address, "post")] : null,
     ...ruleItems(m),                        // your own rules: why, and the thread's mark

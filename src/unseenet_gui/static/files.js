@@ -49,7 +49,9 @@ function filesOf(m, chat) {
   // the post's own pictures first; its link card then small, as in a chat (UN-RFC 0059 8)
   const own = rest.length || inline.size;
   const card = cardOf(m, chat || !!own);
-  return card || files ? (own ? [files, card] : [card, files]) : null;
+  const shared = shareCard(m, chat);                 // what a share refers to (UN-RFC 0060)
+  if (!card && !files) return shared;
+  return [shared, ...(own ? [files, card] : [card, files])];
 }
 
 // A file on a post: the picture shown, or its name and size with a Save button.
