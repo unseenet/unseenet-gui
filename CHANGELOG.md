@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-10-30
+
+A fix release on unseenet 0.6.5.
+
 - **A post's own pictures before its link card** (unseenet#799, UN-RFC 0059 section 8): a
   post with pictures or files of its own shows them first, full size, and its card as the
   small line a chat shows - a NASA picture of the day is the picture again.
@@ -745,7 +749,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/unseenet/unseenet-gui/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/unseenet/unseenet-gui/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/unseenet/unseenet-gui/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/unseenet/unseenet-gui/compare/v0.3.1...v0.3.2
