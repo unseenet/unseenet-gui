@@ -1,3 +1,3 @@
 """unseenet-gui: the graphical client for Unseenet, built on the unseenet core."""
 
-__version__ = "0.4.1"
+__version__ = "0.5.0"

@@ -12,7 +12,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Andreas Lorensen" }]
 requires-python = ">=3.11"
 dependencies = [
-    "unseenet[api]>=0.6.5,<0.7",   # one minor version of the core at a time (0.6.1.devN on core main is below 0.6.1)
+    "unseenet[api]>=0.6.6,<0.7",   # one minor version of the core at a time (0.6.1.devN on core main is below 0.6.1)
     "aiohttp>=3.9",
     "segno>=1.5",                 # QR codes for copying to another device (UN-RFC 0050); pure Python
 ]
