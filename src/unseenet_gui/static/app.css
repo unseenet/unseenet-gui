@@ -1373,3 +1373,8 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
 .cardbox .cx { position: absolute; top: 6px; right: 6px; }
 .cardbox .cardtools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
 @media (max-width: 520px) { .cardbox .cthumb { width: 84px; } }
+/* a chat line's card while it is written: the small line it will be in the chat, and a ✕ */
+.chatbar .chatcard { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+.chatbar .chatcard .lcard { flex: 1; min-width: 0; margin: 0; }
+.chatbar .chatcard.wait { min-height: 28px; }
+.chatbar .chatcard .cx { flex: none; font-size: 18px; line-height: 1; padding: 2px 6px; }

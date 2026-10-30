@@ -79,7 +79,8 @@ function chatView(d) {
     const files = pending.splice(0).map(f => ({ name: f.name, data: f.data, alt: "" }));
     const shown = text + (files.length ? ` (+ ${files.length} file${files.length > 1 ? "s" : ""})` : "");
     input.value = ""; S.drafts["chat:" + g.id] = "";        // before doSend draws the grey line (#48)
-    const more = files.length ? { files } : {};
+    const card = chatCardTake(g.id, text);                  // UN-RFC 0059, small in a chat
+    const more = { ...(files.length ? { files } : {}), ...(card ? { card } : {}) };
     if (g.type === "contact") doSend("/api/private", g.id, { key: g.key, body: text, chat: true, ...more }, { text: shown, chat: true });
     else doPost(g.id, { body: text, chat: true, ...more }, { text: shown, chat: true });
   };
@@ -108,12 +109,14 @@ function chatView(d) {
         h("label", { for: "chat", class: "sr", text: "Message " + g.label }),
         h("textarea", { id: "chat", rows: 1, class: "grow-in", "data-k": "chat", autocomplete: "off", spellcheck: "true",
           placeholder: "Message " + (g.access || "") + (g.access ? " " : "") + g.label, value: S.drafts["chat:" + g.id] || "",
-          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; growField(e.target); chatLanguage(g.id, e.target.value); },
+          oninput: (e) => { S.drafts["chat:" + g.id] = e.target.value; growField(e.target); chatLanguage(g.id, e.target.value);
+            chatCardText(g.id, e.target.value, e.inputType === "insertFromPaste"); },
           onkeydown: (e) => sendOnEnter(e, send) }),
         ...attach,
         languageChip(g.id),                               // what you write in here (0052 5a)
         emojiButton("chat"),
         h("button", { class: "send", type: "submit", "aria-label": "Send" }, svg(ICON.send, 18, 2.5))),
+      chatCardNode(g.id),
       chips,
       h("div", { class: "hint" }, h("kbd", { text: "Enter" }), " sends · ", h("kbd", { text: "Shift+Enter" }), " new line · ",
         h("kbd", { text: "Esc" }), " for shortcuts",
