@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- The manual no longer says updating is missing (it has been there since the
+  builds were signed) and drops the "from 0.5" marks.
+
 - **Long entries and comments in a feed, cut by the core's one rule** (#269, unseenet#781):
   the feed and the timeline ask the core for the cut (`?preview=`), the same as the
   terminal client's - the author's read-more line, nothing cut for a line or two, a cut at a
