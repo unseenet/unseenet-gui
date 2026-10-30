@@ -45,9 +45,11 @@ function filesOf(m, chat) {
   const inline = new Set();
   (function walk(nodes) { (nodes || []).forEach(n => { if (n.t === "image" && n.blob) inline.add(n.blob); walk(n.c); (n.items || []).forEach(walk); }); })(m.markdown ? m.tree : []);
   const rest = (m.attachments || []).filter(a => !inline.has(a.blob) && !a.card);
-  const card = cardOf(m, chat);
   const files = rest.length ? h("div", { class: "files" + (chat ? " in-chat" : "") }, rest.map(a => fileView(m, a, false))) : null;
-  return card || files ? [card, files] : null;
+  // the post's own pictures first; its link card then small, as in a chat (UN-RFC 0059 8)
+  const own = rest.length || inline.size;
+  const card = cardOf(m, chat || !!own);
+  return card || files ? (own ? [files, card] : [card, files]) : null;
 }
 
 // A file on a post: the picture shown, or its name and size with a Save button.
