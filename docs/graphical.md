@@ -103,8 +103,10 @@ first post waits a few minutes more, once, while your new key
   domain, title, description and picture - made once over Tor when you write
   it, shown before you post so you can change or remove it, and carried in
   the post, so readers fetch nothing. The domain always comes from the link
-  itself. Ctrl+P: *Link previews* to turn them off (off from the start on
-  the bootable image).
+  itself. A chat line with a link gets a small one - the icon, domain and
+  title, no picture - shown above the input while you write; its × sends the
+  line without it. Ctrl+P: *Link previews* to turn them off (off from the
+  start on the bootable image).
 - Pins, reactions and tables in Markdown; a ⋯ menu on every post
   and chat line to edit, withdraw, pin or copy its `unseenet:` address.
 - Private chats and posts with anyone, by key; contacts as an address book;

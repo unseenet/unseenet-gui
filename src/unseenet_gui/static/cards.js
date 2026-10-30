@@ -179,3 +179,57 @@ function shortLink(u) {
   try { const x = new URL(u); return x.hostname.replace(/^www\./, "") + (x.pathname.length > 1 ? x.pathname.slice(0, 18) + (x.pathname.length > 18 ? "…" : "") : ""); }
   catch (_) { return u.slice(0, 30); }
 }
+
+// ---- a card for a chat line (section 7, small) -------------------------------
+// While a chat line is written, the core makes a card for its first link that is not
+// quoted, in the background; it is shown above the input as it will be shown in the chat -
+// one small line, without a picture - and sent with the line. Its ✕ leaves it out for
+// that link. Turned off with the other link previews.
+const CHATCARD = {};
+// A chat's card while its line is written: the link, the card, the link it is being made for.
+function chatCardState(gid) {
+  return CHATCARD[gid] || (CHATCARD[gid] = { url: null, card: null, loading: null, off: new Set(), timer: null });
+}
+
+// The chat line's text changed: ask for a card when typing pauses (or at once, pasted).
+function chatCardText(gid, text, pasted) {
+  if (S.sidebar && S.sidebar.link_cards === false) return;
+  const st = chatCardState(gid);
+  clearTimeout(st.timer);
+  const url = writtenLinks(text).find(u => !st.off.has(u)) || null;
+  if (url === st.url) return;
+  if (!url) { const had = st.url; st.url = st.card = st.loading = null; if (had) render(); return; }
+  st.timer = setTimeout(async () => {
+    st.url = st.loading = url; st.card = null; render();
+    let card = null;
+    try {
+      const c = (await api("POST", "/api/card", { url })).card;
+      if (c && c.title) card = { url: c.url, title: c.title, desc: c.desc || "", site: c.site || "",
+        icon: c.icon || null, made: c.made, domain: c.domain, domain_confusable: !!c.domain_confusable };
+    } catch (e) { /* no card: the line is sent without one */ }
+    if (st.loading !== url) return;              // the text has moved on
+    st.loading = null; st.card = card; render();
+  }, pasted ? 0 : 900);
+}
+
+// The card above the chat input, or nothing.
+function chatCardNode(gid) {
+  const st = CHATCARD[gid];
+  if (!st || !st.url || (!st.card && !st.loading)) return null;
+  const leave = h("button", { type: "button", class: "link cx", "aria-label": "Send without a preview",
+    title: "Send without a preview",
+    onclick: () => { st.off.add(st.url); st.url = st.card = st.loading = null; render(); } }, "×");
+  if (!st.card) return h("div", { class: "chatcard wait" },
+    h("span", { class: "hint", text: "Making a preview of " + shortLink(st.url) + " …" }), leave);
+  return h("div", { class: "chatcard" }, cardOf({ card: st.card, readable: true, id: "draft:" + gid }, true), leave);
+}
+
+// The card to send with a chat line of ``text`` (only while its link is in it), and done.
+function chatCardTake(gid, text) {
+  const st = CHATCARD[gid];
+  if (!st) return null;
+  clearTimeout(st.timer);
+  const c = st.card && writtenLinks(text).includes(st.card.url) ? st.card : null;
+  delete CHATCARD[gid];
+  return c ? { url: c.url, title: c.title, desc: c.desc, site: c.site, icon: c.icon, made: c.made } : null;
+}

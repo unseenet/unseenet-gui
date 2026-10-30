@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Link previews on chat lines**: a chat line with a link gets a small card too - made
+  while you write, shown above the input as the one line it will be in the chat (icon,
+  domain, title; no picture), sent with the line; × leaves it out. Off with the other
+  link previews.
+
 - **Link previews when writing** (needs unseenet main with #795): in the compose window the
   card is a compact row, a small picture beside the title and description, so it is not
   stretched to the width of the window, large or small. Editing a post shows its picture and
