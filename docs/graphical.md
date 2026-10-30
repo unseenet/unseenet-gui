@@ -94,12 +94,12 @@ first post waits a few minutes more, once, while your new key
 - Read and write: threads and chats (closed groups decrypted), posts, replies
   and chat lines in Markdown with emoji, *For you* (replies and mentions),
   `!group` links (`#word` is a tag), editing your own posts, your signature.
-- Feeds and sites (from 0.5): *Timeline* with the feeds you follow, **My
+- Feeds and sites: *Timeline* with the feeds you follow, **My
   feed** and **My site**, creating a group as a feed or a site, pages with an
   index, and a person's feed and site from their profile.
-- Pictures and files (from 0.5): in posts, chat lines and private posts, as
+- Pictures and files: in posts, chat lines and private posts, as
   the group allows; profile pictures.
-- Pins, reactions and tables in Markdown (from 0.5); a ⋯ menu on every post
+- Pins, reactions and tables in Markdown; a ⋯ menu on every post
   and chat line to edit, withdraw, pin or copy its `unseenet:` address.
 - Private chats and posts with anyone, by key; contacts as an address book;
   private profiles shared with one person or a closed group.
@@ -223,10 +223,11 @@ In an emergency, contact the police. Nobody on Unseenet can see who anyone is.
   sent - straight to the other device over Tor. In a browser through an
   entrance you can only receive a copy.
 
-Not yet - use the [terminal client](https://unseenet.org/client/): Tor bridges and several
-identities. **Updating** a stick or portable folder of the graphical client
-is not there yet either, because its builds are not signed yet: download the
-new release for now.
+Not yet - use the [terminal client](https://unseenet.org/client/): Tor bridges and
+switching between several identities in one vault. **Updating** is there: on a
+stick or in a portable folder the status bar says when a new signed release is
+ready, and *Update* fetches it, checks its signature and puts it in place - see
+[Updating](https://unseenet.org/updating/).
 
 ## How it works
 
