@@ -7,6 +7,8 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- Screenshots for the user guide on unseenet.org in `docs/img/guide/`, made by the
+  layout test (unseenet-docs#6); *Developers* says how to make them again.
 - The manual no longer says updating is missing (it has been there since the
   builds were signed) and drops the "from 0.5" marks.
 
