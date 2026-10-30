@@ -7,6 +7,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Link previews when writing** (needs unseenet main with #795): in the compose window the
+  card is a compact row, a small picture beside the title and description, so it is not
+  stretched to the width of the window, large or small. Editing a post shows its picture and
+  keeps it when only the title or text is changed; "Without the picture" drops it.
+
 - **Link previews** (#275, UN-RFC 0059; needs unseenet main with #792): a post with a link
   shows a card - the site's icon and the **domain from the link** first, the site's own
   name, the title, the start of the description and the picture, "Preview from the poster"
