@@ -58,3 +58,18 @@ The client says **your** when it speaks to you (titles, navigation, the palette,
 messages: *Your feed*, *Your rules*, *Export your data*) and **my** only in your own
 words (a checkbox or a choice: *Use my rules*) - never both in one list. The rule for
 every client is in the core's *Write a client*, docs/developers/index.md.
+
+## Screenshots for the user guide
+
+The pictures in `docs/img/guide/` are the graphical half of the user guide on
+unseenet.org (*Getting started → How do I …*, in unseenet-docs). They are made, not
+drawn: the layout test opens every screen and dialog against recorded answers and can
+save each one.
+
+```sh
+SHOTS=dev/shots python -m pytest -q tests/test_layout.py -k desktop-dark
+```
+
+Copy the ones the guide uses from `dev/shots/<name>__desktop__dark.png` to
+`docs/img/guide/<name>.png` (reduced to 256 colours keeps each under 60 KB). Do it
+again when a screen in the guide changes.
