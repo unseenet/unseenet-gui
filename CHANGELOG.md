@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Long entries and comments in a feed, cut by the core's one rule** (#269, unseenet#781):
+  the feed and the timeline ask the core for the cut (`?preview=`), the same as the
+  terminal client's - the author's read-more line, nothing cut for a line or two, a cut at a
+  sentence or word and never inside a link, code block or table. Long **comments** are now
+  cut too, at about three lines with "… more", their own words first (what they quote shows
+  when opened), and so are long notes. Opened in place, "Show less" cuts again; kept open
+  across redraws. **Alt+R** puts a read-more line in a comment as in a post (Ctrl+R in the
+  terminal client; a browser keeps it for reloading), and the palette has *Insert a
+  read-more line*. With a core without the shared cut, entries are measured as before.
 ## [0.3.3] - 2026-10-29
 
 **The phone, part three.** One head everywhere with the round + for its action, a chat line

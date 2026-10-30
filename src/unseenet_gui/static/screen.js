@@ -67,6 +67,16 @@ function olderButton(d) {
 
 // Read the group shown from the core again: its settings and messages, and what you may do
 // there.
+// The cut a feed asks the core for (unseenet#781, gui#269): an entry's and a comment's normal
+// cut in lines, and about how many characters a line of the feed holds here. The rule is
+// the core's, the same as the terminal client's; only these numbers are this client's.
+function previewCut() {
+  const wide = matchMedia("(min-width: 1100px)").matches;
+  const column = Math.min(window.innerWidth - (window.innerWidth < 760 ? 40 : 360), 720);
+  return [wide ? 10 : CLIP_LINES, COMMENT_LINES, Math.max(30, Math.round(column / 8.5))].join(",");
+}
+
+// Load the group shown (S.gid) from the core: its head and its rows.
 async function loadGroup() {
   if (!S.gid) return;
   const gid = S.gid;
@@ -76,7 +86,7 @@ async function loadGroup() {
     return;
   }
   try {
-    const q = [S.showAll === gid ? "all=1" : "", "limit=" + shownLimit(gid)].filter(Boolean).join("&");
+    const q = [S.showAll === gid ? "all=1" : "", "limit=" + shownLimit(gid), "preview=" + previewCut()].filter(Boolean).join("&");
     const data = await api("GET", "/api/groups/" + encodeURIComponent(gid) + "?" + q, null, { signal: viewSignal() });
     let site = null;
     if (data.group.view === "pages") site = await loadSite(gid);   // a site: its pages (UN-RFC 0035)

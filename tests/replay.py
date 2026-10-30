@@ -17,7 +17,12 @@ TOKEN = "t" * 43
 async def _replay(request):
     """The recorded answer to this request (an error as the error it was), else to its path
     without the query; a GET nobody recorded is not found, anything else just done ({})."""
-    for key in (f"{request.method} {request.path_qs}", f"{request.method} {request.path}"):
+    # what the page asks for that was not asked when the answers were recorded (preview=,
+    # gui#269) does not change which answer it is
+    qs = "&".join(p for p in request.query_string.split("&") if p and not p.startswith("preview="))
+    raw = request.rel_url.raw_path                      # as recorded: %3A, not ":"
+    for key in (f"{request.method} {request.path_qs}", f"{request.method} {raw}?{qs}",
+                f"{request.method} {request.path}"):
         if key in ANSWERS:
             a = ANSWERS[key]
             if isinstance(a, dict) and "__status" in a:
