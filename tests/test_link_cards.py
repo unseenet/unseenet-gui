@@ -94,6 +94,27 @@ async def test_the_card_picture_is_not_a_file_too(page):
     await expect(entry.locator(".files")).to_have_count(0)        # and nowhere else
 
 
+OWN_PICTURE = """async (card) => { await openGroup(TIMELINE);
+  const m = S.data.messages.find(x => x.depth === 0 && x.readable);
+  m.text = 'The Moon over the sea. ' + card.url;
+  m.tree = [{ t: 'p', c: [{ t: 'text', v: m.text }] }];
+  m.card = card;
+  m.attachments = [{ blob: 'blob1:' + 'b'.repeat(52), type: 'image/jpeg', size: 90000,
+                     dim: [1600, 900], name: 'moon.jpg', alt: 'The Moon', card: false }];
+  render(); return m.id; }"""
+
+
+async def test_a_posts_own_picture_comes_first_and_its_card_small(page):
+    """UN-RFC 0059 section 8: a NASA picture of the day is the picture; the card says where
+    the link goes, small, after it."""
+    mid = await page.evaluate(OWN_PICTURE, CARD)
+    entry = page.locator(f'.entry[data-id="{mid}"]')
+    await expect(entry.locator(".lcard.in-chat")).to_have_count(1)
+    order = await entry.evaluate("""e => { const f = e.querySelector('.files'), c = e.querySelector('.lcard');
+        return f && c && (f.compareDocumentPosition(c) & Node.DOCUMENT_POSITION_FOLLOWING) ? 'files first' : 'card first'; }""")
+    assert order == "files first"
+
+
 async def test_a_look_alike_domain_is_marked(page):
     mid = await page.evaluate(WITH_CARD, [{**CARD, "domain": "bаnk.dk", "domain_confusable": True}, False])
     await expect(page.locator(f'.entry[data-id="{mid}"] .lcard .cdom.odd')).to_have_count(1)

@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **A post's own pictures before its link card** (unseenet#799, UN-RFC 0059 section 8): a
+  post with pictures or files of its own shows them first, full size, and its card as the
+  small line a chat shows - a NASA picture of the day is the picture again.
+
 ## [0.4.0] - 2026-10-30
 
 Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
