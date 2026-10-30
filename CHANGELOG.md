@@ -7,6 +7,18 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- **Link previews** (#275, UN-RFC 0059; needs unseenet main with #792): a post with a link
+  shows a card - the site's icon and the **domain from the link** first, the site's own
+  name, the title, the start of the description and the picture, "Preview from the poster"
+  and its date, "+N links" beside it in a feed. Without a picture it is compact, with the
+  icon big; in a chat it is one small line; an address that may look like another is marked.
+  The card's picture is shown in the card only. Clicking opens the link as any link does,
+  with the warning before leaving Tor. Writing a post, a reply, an edit or a private post,
+  the first link that is not quoted gets a preview, made by the core over Tor when you paste
+  it or stop typing, shown as it will be sent: change its title and description, send it
+  without the picture, preview another link instead, or send without one. An edit keeps the
+  post's card unless you change it. Ctrl+P: "Link previews" on or off.
+
 - Screenshots for the user guide on unseenet.org in `docs/img/guide/`, made by the
   layout test (unseenet-docs#6); *Developers* says how to make them again.
 - The manual no longer says updating is missing (it has been there since the

@@ -468,6 +468,16 @@ async function togglePictures() {
   toast(on ? "People's pictures are shown." : "Identicons only: pictures are not fetched or shown.");
 }
 
+// Make link previews when writing, or not (UN-RFC 0059 section 7.5): off, nothing is fetched
+// for the links you write. Cards in others' posts are shown either way - they fetch nothing.
+async function toggleLinkCards() {
+  const on = !!(S.sidebar && S.sidebar.link_cards === false);
+  await api("POST", "/api/settings", { link_cards: on });
+  await loadSidebar(); render();
+  toast(on ? "A link you write gets a preview, made over Tor - you can remove it before posting."
+    : "Link previews are off: nothing is fetched for the links you write.");
+}
+
 // Show or hide what a hierarchy's maintainer blocked (UN-RFC 0018 5.4).
 async function toggleShowBlocked() {
   const on = !(S.sidebar && S.sidebar.show_blocked);
@@ -582,9 +592,10 @@ async function openCompose() {
   const sig = await signatureText();
   openComposeWindow({ g, title: "New post in " + g.label, subject: "", cursor: 0, newThread: true,
     body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
-    send: (subject, text, notify, files, tags, languages, days) => doPost(g.id, { subject, body: text, signature: false, notify,
+    send: (subject, text, notify, files, tags, languages, days, card) => doPost(g.id, { subject, body: text, signature: false, notify,
       ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}),
-      ...(languages !== undefined ? { languages } : {}), ...(days !== undefined ? { comment_days: days } : {}) }, { text }) });
+      ...(languages !== undefined ? { languages } : {}), ...(days !== undefined ? { comment_days: days } : {}),
+      ...(card ? { card } : {}) }, { text }) });
   setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 

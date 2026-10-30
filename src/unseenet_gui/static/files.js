@@ -39,12 +39,15 @@ function size(octets) {
   return octets >= 1048576 ? (octets / 1048576).toFixed(1) + " MB" : octets >= 1024 ? Math.round(octets / 1024) + " KB" : octets + " bytes";
 }
 
-// The files of a post not already drawn in its text.
+// The files of a post not already drawn in its text - and its link card first (UN-RFC
+// 0059), whose picture is shown in the card only (cards.js).
 function filesOf(m, chat) {
   const inline = new Set();
   (function walk(nodes) { (nodes || []).forEach(n => { if (n.t === "image" && n.blob) inline.add(n.blob); walk(n.c); (n.items || []).forEach(walk); }); })(m.markdown ? m.tree : []);
-  const rest = (m.attachments || []).filter(a => !inline.has(a.blob));
-  return rest.length ? h("div", { class: "files" + (chat ? " in-chat" : "") }, rest.map(a => fileView(m, a, false))) : null;
+  const rest = (m.attachments || []).filter(a => !inline.has(a.blob) && !a.card);
+  const card = cardOf(m, chat);
+  const files = rest.length ? h("div", { class: "files" + (chat ? " in-chat" : "") }, rest.map(a => fileView(m, a, false))) : null;
+  return card || files ? [card, files] : null;
 }
 
 // A file on a post: the picture shown, or its name and size with a Save button.

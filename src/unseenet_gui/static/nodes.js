@@ -321,9 +321,9 @@ async function openPost(key, who = "", subject = "", replyTo = null, quote = "")
   const inbox = S.sidebar && S.sidebar.inbox.id;
   openComposeWindow({ g: null, title: "Post to " + (who || key.slice(0, 20) + "…"), subject, private: true,
     body: top + "\n" + (sig ? "-- \n" + sig + "\n" : ""), cursor: top.length,
-    send: (subject, text, _notify, files) => doSend("/api/private", inbox,
+    send: (subject, text, _notify, files, _tags, _languages, _days, card) => doSend("/api/private", inbox,
       { key, subject, body: text, ...(replyTo ? { reply_to: replyTo } : {}),
-        ...(files && files.length ? { files } : {}) }, { text }) });
+        ...(files && files.length ? { files } : {}), ...(card ? { card } : {}) }, { text }) });
   if (!subject) setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 

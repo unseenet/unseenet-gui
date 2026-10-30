@@ -135,6 +135,7 @@ function fromRow(r) {
     may_withdraw: r.may_withdraw, may_edit: r.may_edit, groups: r.groups, notice: r.notice,
     edit_tags: r.edit_tags || null,                   // what an edit starts with (unseenet#733)
     depth: r.depth, attachments: m.attachments || [], identicon: r.identicon || null,
+    card: m.card || null,                             // its link card (UN-RFC 0059)
     pinned: !!r.pinned, address: r.address || "",
     // reactions (UN-RFC 0048): the counts, may you react, and its own group's set
     reactions: r.reactions || [], react: r.react || null, react_offered: r.react_offered || null,
@@ -193,6 +194,7 @@ function fromSidebar(d, st) {
       label: p.name, colour: colour(p.key) })),
     moderation: d.moderation, name_requests: d.name_requests, inbox: d.inbox,
     show_blocked: !!st.show_blocked, hide_bots: !!st.hide_bots, pictures: st.pictures !== false,
+    link_cards: st.link_cards !== false,   // previews of links (UN-RFC 0059, core 0.6)
     state_local: !!st.state_local,
     report_issuer: !!st.report_issuer,   // you publish spam reports (UN-RFC 0045, core 0.6)
     markdown: st.markdown !== false, notices: st.notices || {},

@@ -375,12 +375,12 @@ async function openReply(m, g) {
   const body = top + "\n" + (sig ? "-- \n" + sig + "\n" : "");
   openComposeWindow({ g, title: g.private_reply ? "Private reply to " + m.who : "Reply in " + g.label, replyTo: m.id,
     subject, body, cursor: top.length, private: !!g.private_reply,
-    send: (subject, text, notify, files, tags, languages) => g.private_reply ?
+    send: (subject, text, notify, files, tags, languages, _days, card) => g.private_reply ?
       doSend("/api/private", g.id, { key: m.key, subject, body: text, reply_to: m.id,
-        ...(files && files.length ? { files } : {}) }, { text }) :
+        ...(files && files.length ? { files } : {}), ...(card ? { card } : {}) }, { text }) :
       doPost(g.id, { subject, body: text, references: [...m.references, m.id], signature: false, notify,
         ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}),
-        ...(languages !== undefined ? { languages } : {}) }, { text }) });
+        ...(languages !== undefined ? { languages } : {}), ...(card ? { card } : {}) }, { text }) });
 }
 
 // Reply in a team inbox: as the team, sealed to the writer - without your signature,
@@ -390,8 +390,8 @@ function openTeamReply(m, g) {
   const quoted = m.text.trimEnd().split("\n").map(ln => "> " + ln).join("\n");
   const top = `${m.who} wrote:\n${quoted}\n\n`;
   openComposeWindow({ g, title: "Reply as " + g.team.name, subject, body: top, cursor: top.length, private: true,
-    send: (subject, text, _notify, files) => doSend("/api/private", g.id, { key: m.key, subject, body: text,
-      reply_to: m.id, as_team: g.id, ...(files && files.length ? { files } : {}) }, { text }) });
+    send: (subject, text, _notify, files, _tags, _languages, _days, card) => doSend("/api/private", g.id, { key: m.key, subject, body: text,
+      reply_to: m.id, as_team: g.id, ...(files && files.length ? { files } : {}), ...(card ? { card } : {}) }, { text }) });
 }
 
 // Edit your own post (UN-RFC 0042): a new version, in the same place in its thread.
@@ -402,10 +402,11 @@ function openEdit(m, g) {
   const startTags = m.edit_tags || (m.tags || []).filter(t => !written.includes(t));
   openComposeWindow({ g, title: "Edit your post in " + g.label, subject: m.subject, edit: true, cursor: 0,
     body: (m.text || "").trimEnd() + "\n" + (m.signature ? "\n-- \n" + m.signature + "\n" : ""),
-    startTags, startLanguages: m.languages || [],
-    send: (subject, text, _notify, _files, tags, languages) => doSend(`/api/groups/${encodeURIComponent(g.id)}/edit`, g.id,
+    startTags, startLanguages: m.languages || [], startCard: m.card || null,
+    // the card: left out, the post's is kept; null takes it off (UN-RFC 0059 section 10)
+    send: (subject, text, _notify, _files, tags, languages, _days, card) => doSend(`/api/groups/${encodeURIComponent(g.id)}/edit`, g.id,
       { id: m.id, subject, body: text, tags: tags || [],
-        ...(languages !== undefined ? { languages } : {}) }, { text }) });
+        ...(languages !== undefined ? { languages } : {}), ...(card !== undefined ? { card } : {}) }, { text }) });
 }
 
 // Edit a chat line or a comment (UN-RFC 0042): one line, no subject, no signature.
@@ -508,7 +509,9 @@ function quoteSelection(k) {
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo,
-                             startTags, startLanguages, newThread }) {
+                             startTags, startLanguages, newThread, startCard }) {
+  // a preview of the first link (UN-RFC 0059): made by the core over Tor, sent with the post
+  const cards = cardComposer(startCard || null, !(S.sidebar && S.sidebar.link_cards === false));
   const daysChoice = newThread && !priv && threadTakesComments(g);   // UN-RFC 0030 3.1
   // an edit starts with the post's own tags and warnings (unseenet#733)
   const dialog = { focus: "#body", node: null, files: [], tags: [...(startTags || [])] };
@@ -557,7 +560,8 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       } catch (_) { /* keep what it says */ }
     }, 600);
   };
-  const askWho = () => {
+  const askWho = (e) => {
+    if (e && e.target && e.target.id === "body") cards.onText(e.target.value, e.inputType === "insertFromPaste");
     askLanguage();
     if (tagBox) tagBox.redraw();                      // #words in the text, shown as tags
     clearTimeout(N.timer);
@@ -601,8 +605,11 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       (chosen.length || suggested.length ? chosen : undefined);
     const daysField = f.querySelector("#cdays");
     const days = daysField && daysField.value !== "" ? Number(daysField.value) : undefined;
+    const card = cards.value();
+    if (card !== undefined && card !== null && !b.includes(card.url)) {
+      toast("The preview's link is no longer in the text."); return; }
     closeDialog();
-    await send(s, b, N.may ? N.on : undefined, files, dialog.tags, dialog.languages, days);
+    await send(s, b, N.may ? N.on : undefined, files, dialog.tags, dialog.languages, days, card);
     toast(edit ? "Saving the new version - postage takes a few seconds." :
       priv ? "Sending - sealed to them." : "Sending - postage takes a few seconds." +
       (N.may && N.on && N.names.length ? ` ${Math.min(N.names.length, N.max)} told in a few minutes.` : ""));
@@ -655,6 +662,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
         onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
         " Tell the people you mention (a notice in their inbox)") : null,
       N.may ? h("p", { id: "notify-who", class: "hint", style: "margin:0", text: whoText() }) : null,
+      cards.node,
       takes ? filePicker(dialog, fg, carries, undefined, { toolbar: true }) : null,
       // language, tags and content warnings on one row (gui#203), each with its explanation
       h("div", { class: "metarow" },
