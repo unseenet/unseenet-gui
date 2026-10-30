@@ -7,7 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
-Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares; update the nodes first.
+## [0.5.0] - 2026-10-30
+
+Sharing (UN-RFC 0060). Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares; update the nodes first.
 
 ### Added
 
@@ -762,7 +764,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/unseenet/unseenet-gui/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/unseenet/unseenet-gui/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/unseenet/unseenet-gui/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/unseenet/unseenet-gui/compare/v0.3.2...v0.3.3
