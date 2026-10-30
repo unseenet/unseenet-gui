@@ -1358,12 +1358,18 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
 .lcard.in-chat .ctext { padding: 6px 9px; flex-direction: row; flex-wrap: wrap; column-gap: 8px; align-items: center; }
 .lcard.in-chat .ctitle { font-size: 13px; font-weight: 600; }
 .cmore { display: block; margin: 2px 0 6px; font-size: 12px; }
-/* in the compose window: the card as it will be sent, its title and description editable */
+/* in the compose window: the card as it will be sent - a small picture beside its title and
+   description, so it is never stretched to the width of the window */
 .cardbox { display: flex; flex-direction: column; gap: 4px; }
-.cardbox .lcard { margin: 4px 0 0; max-width: none; position: relative; cursor: default; }
-.cardbox .lcard.wait { flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 12px; }
-.cardbox .lcard .cpic { max-height: 220px; }
+.cardbox .lcard.edit { flex-direction: row; align-items: flex-start; gap: 12px; padding: 10px 12px;
+  margin: 4px 0 0; max-width: none; position: relative; cursor: default; }
+.cardbox .lcard.edit.wait { align-items: center; justify-content: space-between; }
+.cardbox .cthumb { width: 132px; aspect-ratio: 1.91/1; object-fit: cover; border-radius: 6px; flex: none;
+  background: var(--ink-deep); }
+.cardbox .lcard.edit .cicon.big { margin-top: 2px; }
+.cardbox .lcard.edit .ctext { flex: 1; padding: 0 30px 0 0; gap: 6px; }
 .cardbox .ctitle-in { font-weight: 650; }
 .cardbox .cdesc-in { resize: vertical; min-height: 2.4em; font-size: 13px; }
-.cardbox .cx { position: absolute; top: 6px; right: 6px; background: var(--scrim); }
+.cardbox .cx { position: absolute; top: 6px; right: 6px; }
 .cardbox .cardtools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
+@media (max-width: 520px) { .cardbox .cthumb { width: 84px; } }

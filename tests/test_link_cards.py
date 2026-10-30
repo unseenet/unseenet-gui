@@ -138,3 +138,32 @@ async def test_no_card_when_turned_off(page):
     await page.wait_for_timeout(1500)
     assert page.asked == []
     assert json.dumps(await page.evaluate("() => document.querySelectorAll('.cardbox .lcard').length")) == "0"
+
+
+EDIT = """(card) => { window.SENT = null;
+  openComposeWindow({ g: null, title: 'Edit', subject: 'Dømt', body: 'Se ' + card.url, cursor: 0,
+    private: true, startCard: card, send: (...args) => { window.SENT = args; } }); }"""
+
+
+async def test_an_edit_keeps_the_picture(page):
+    await page.evaluate(EDIT, {**CARD, "image": "blob1:" + "a" * 52})
+    box = page.locator(".cardbox .lcard.edit")
+    await expect(box.locator(".cthumb")).to_have_count(1)        # the picture is still there
+    await box.locator(".ctitle-in").fill("Ny titel")
+    await page.locator("#body").press("Control+s")
+    card = (await page.evaluate("() => window.SENT"))[7]
+    assert card["title"] == "Ny titel" and card["keep_picture"] is True and not card.get("picture")
+
+
+async def test_an_edit_without_the_picture(page):
+    await page.evaluate(EDIT, {**CARD, "image": "blob1:" + "a" * 52})
+    await page.get_by_role("button", name="Without the picture").click()
+    await page.locator("#body").press("Control+s")
+    card = (await page.evaluate("() => window.SENT"))[7]
+    assert card["title"] == CARD["title"] and "keep_picture" not in card
+
+
+async def test_an_unchanged_edit_leaves_the_card(page):
+    await page.evaluate(EDIT, {**CARD, "image": "blob1:" + "a" * 52})
+    await page.locator("#body").press("Control+s")
+    assert (await page.evaluate("() => window.SENT"))[7] is None   # undefined: the card is kept

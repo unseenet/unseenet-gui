@@ -86,18 +86,24 @@ function writtenLinks(text) {
   return out;
 }
 
-// The card part of a compose window. ``start``: an edit's card (kept unless changed).
+// The card part of a compose window. ``start``: an edit's card (kept unless changed), its
+// picture fetched from ``group`` and kept unless the poster removes it.
 // Returns {node, value(), onText(text, pasted)}: value() is undefined to keep (an edit),
 // null for none, or the card to send.
-function cardComposer(start, enabled) {
-  const st = { card: start || null, url: start ? start.url : null, chosen: null, off: new Set(),
-    loading: null, changed: false, timer: null, ask: 0, links: [] };
+function cardComposer(start, enabled, group) {
+  // keepPic: an edit's card keeps the picture its post carries until the poster removes it
+  const st = { card: start ? { ...start } : null, chosen: null, off: new Set(), loading: null,
+    changed: false, timer: null, ask: 0, links: [], keepPic: !!(start && start.image), thumb: null };
+  if (st.keepPic && group) {                     // the post's own picture, through the core
+    api("GET", `/api/groups/${encodeURIComponent(group)}/files/${encodeURIComponent(start.image)}`)
+      .then(p => { st.thumb = p.data; draw(); }).catch(() => { /* shown without it */ });
+  }
   const box = h("div", { class: "cardbox", hidden: !st.card });
   const draw = () => {
     box.hidden = !st.card && !st.loading;
     if (st.loading) {
-      box.replaceChildren(h("div", { class: "lcard compact wait" },
-        h("span", { class: "hint", text: "Making a preview of " + st.loading + " over Tor …" }),
+      box.replaceChildren(h("div", { class: "lcard edit wait" },
+        h("span", { class: "hint", text: "Making a preview of " + shortLink(st.loading) + " over Tor …" }),
         h("button", { type: "button", class: "btn icon", "aria-label": "No preview",
           onclick: () => { st.off.add(st.loading); st.loading = null; st.ask++; draw(); } }, svg(ICON.x))));
       return;
@@ -105,10 +111,14 @@ function cardComposer(start, enabled) {
     const c = st.card;
     if (!c) { box.replaceChildren(); return; }
     const others = st.links.filter(u => u !== c.url);
-    const pic = c.picture ? h("img", { class: "cpic", src: `data:${c.picture.type};base64,${c.picture.data}`, alt: "" }) : null;
+    // a small picture beside the text: the card as sent, without stretching it to the window
+    const src = c.picture ? `data:${c.picture.type};base64,${c.picture.data}` : st.keepPic ? st.thumb : null;
+    const thumb = src ? h("img", { class: "cthumb", src, alt: "" })
+      : st.keepPic ? h("div", { class: "cthumb wait" }) : cardIcon(c, true);
+    const hasPic = !!(c.picture || st.keepPic);
     box.replaceChildren(
-      h("div", { class: "lcard edit" + (pic ? "" : " compact") }, pic, pic ? null : cardIcon(c, true),
-        h("div", { class: "ctext" }, cardSource(c, !pic),
+      h("div", { class: "lcard edit" }, thumb,
+        h("div", { class: "ctext" }, cardSource(c, true),
           h("input", { class: "in ctitle-in", "aria-label": "The preview's title", value: c.title, maxlength: 200,
             placeholder: "A title for the preview", oninput: (e) => { c.title = e.target.value; st.changed = true; } }),
           h("textarea", { class: "in cdesc-in", "aria-label": "The preview's description", rows: 2, maxlength: 300,
@@ -116,10 +126,11 @@ function cardComposer(start, enabled) {
             oninput: (e) => { c.desc = e.target.value; st.changed = true; } }),
           c.note ? h("p", { class: "hint", style: "margin:0", text: c.note }) : null),
         h("button", { type: "button", class: "btn icon cx", "aria-label": "Send without a preview", title: "Send without a preview",
-          onclick: () => { st.off.add(c.url); st.card = null; st.changed = true; draw(); } }, svg(ICON.x))),
+          onclick: () => { st.off.add(c.url); st.card = null; st.keepPic = false; st.changed = true; draw(); } }, svg(ICON.x))),
       h("div", { class: "cardtools" },
         h("span", { class: "hint", text: "Preview of the link, sent with your post - readers fetch nothing." }),
-        c.picture ? h("button", { type: "button", class: "link", onclick: () => { c.picture = null; st.changed = true; draw(); } }, "Without the picture") : null,
+        hasPic ? h("button", { type: "button", class: "link",
+          onclick: () => { c.picture = null; st.keepPic = false; st.changed = true; draw(); } }, "Without the picture") : null,
         others.length ? h("button", { type: "button", class: "link",
           onclick: () => { st.chosen = others[0]; st.off.delete(others[0]); make(others[0]); } }, "Preview " + shortLink(others[0]) + " instead") : null));
   };
@@ -132,7 +143,7 @@ function cardComposer(start, enabled) {
       st.loading = null;
       st.card = r.card && (r.card.title || r.card.note) ? r.card : null;
       if (st.card && !st.card.title) st.card.title = "";
-      st.url = url; st.changed = true;
+      st.keepPic = false; st.changed = true;
     } catch (err) {
       if (ask !== st.ask) return;
       st.loading = null; st.card = null; st.off.add(url);
@@ -145,7 +156,7 @@ function cardComposer(start, enabled) {
     if (!enabled) return;
     clearTimeout(st.timer);
     // the card's link taken out of the text: the card goes too
-    if (st.card && !st.links.includes(st.card.url)) { st.card = null; st.changed = true; draw(); }
+    if (st.card && !st.links.includes(st.card.url)) { st.card = null; st.keepPic = false; st.changed = true; draw(); }
     if (st.card || st.loading) { if (st.card) draw(); return; }
     const url = (st.chosen && st.links.includes(st.chosen)) ? st.chosen : st.links.find(u => !st.off.has(u));
     if (!url) return;
@@ -158,7 +169,8 @@ function cardComposer(start, enabled) {
       const c = st.card;
       if (!c || !c.title.trim()) return start ? null : undefined;
       return { url: c.url, title: c.title.trim(), desc: (c.desc || "").trim(), site: c.site || "",
-        icon: c.icon || null, picture: c.picture || null, made: c.made || null };
+        icon: c.icon || null, picture: c.picture || null, made: c.made || null,
+        ...(st.keepPic && !c.picture ? { keep_picture: true } : {}) };   // the post's own picture
     } };
 }
 

@@ -511,7 +511,8 @@ function quoteSelection(k) {
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo,
                              startTags, startLanguages, newThread, startCard }) {
   // a preview of the first link (UN-RFC 0059): made by the core over Tor, sent with the post
-  const cards = cardComposer(startCard || null, !(S.sidebar && S.sidebar.link_cards === false));
+  const cards = cardComposer(startCard || null, !(S.sidebar && S.sidebar.link_cards === false),
+    (g && g.id) || null);
   const daysChoice = newThread && !priv && threadTakesComments(g);   // UN-RFC 0030 3.1
   // an edit starts with the post's own tags and warnings (unseenet#733)
   const dialog = { focus: "#body", node: null, files: [], tags: [...(startTags || [])] };
