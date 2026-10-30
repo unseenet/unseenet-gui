@@ -7,17 +7,21 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-30
+
+Needs unseenet 0.6.5 (`unseenet>=0.6.5,<0.7`), which makes the link cards; nodes need no update for it.
+
 - **Link previews on chat lines**: a chat line with a link gets a small card too - made
   while you write, shown above the input as the one line it will be in the chat (icon,
   domain, title; no picture), sent with the line; × leaves it out. Off with the other
   link previews.
 
-- **Link previews when writing** (needs unseenet main with #795): in the compose window the
+- **Link previews when writing** (needs unseenet 0.6.5): in the compose window the
   card is a compact row, a small picture beside the title and description, so it is not
   stretched to the width of the window, large or small. Editing a post shows its picture and
   keeps it when only the title or text is changed; "Without the picture" drops it.
 
-- **Link previews** (#275, UN-RFC 0059; needs unseenet main with #792): a post with a link
+- **Link previews** (#275, UN-RFC 0059; needs unseenet 0.6.5): a post with a link
   shows a card - the site's icon and the **domain from the link** first, the site's own
   name, the title, the start of the description and the picture, "Preview from the poster"
   and its date, "+N links" beside it in a feed. Without a picture it is compact, with the
@@ -737,7 +741,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/unseenet/unseenet-gui/compare/v0.3.3...v0.4.0
 [0.3.3]: https://github.com/unseenet/unseenet-gui/compare/v0.3.2...v0.3.3
 [0.3.2]: https://github.com/unseenet/unseenet-gui/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/unseenet/unseenet-gui/compare/v0.3.0...v0.3.1
