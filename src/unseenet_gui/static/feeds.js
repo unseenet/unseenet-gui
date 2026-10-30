@@ -13,6 +13,7 @@
 const FEED_SHOWN = 1;                              // the newest comment shown, and your own talks
 const COMMENT_PAGE = 20;                           // "View more" shows this many more at a time
 const CLIP_LINES = 6;                              // an entry's text before "… more" (10 wide)
+const COMMENT_LINES = 3;                           // a comment's, shorter (gui#269)
 // A feed's entries, each with its comments under it, newest first (UN-RFC 0034).
 function feedEntries(d) {
   const out = [];
@@ -190,9 +191,9 @@ function entryCard(d, e) {
         h("label", { for: "c-" + m.id, class: "sr", text: "Comment" }),
         h("textarea", { id: "c-" + m.id, rows: 1, class: "grow-in", "data-k": "c:" + m.id, autocomplete: "off", spellcheck: "true",
           placeholder: target ? "Your answer" : "Write a comment", value: S.drafts["c:" + m.id] || "",
-          title: "Enter sends · Shift+Enter new line",
+          title: "Enter sends · Shift+Enter new line · Alt+R a read-more line",
           oninput: (ev) => { S.drafts["c:" + m.id] = ev.target.value; growField(ev.target); },
-          onkeydown: (ev) => sendOnEnter(ev, send) }),
+          onkeydown: (ev) => { if (readMoreKey(ev, "c:" + m.id)) return; sendOnEnter(ev, send); } }),
         timeline ? null : languageChip(m.group),            // what you write in here (0052 5a)
         h("button", { class: "send", type: "submit", "aria-label": "Send the comment" }, svg(ICON.send, 16, 2.5))) :
       cp.code === "comments_closed" ? (commentsLine(m) || h("p", { class: "hint", text: cp.reason || "Comments are closed." })) :
@@ -206,9 +207,20 @@ function entryCard(d, e) {
 function entryBody(m) {
   if (m.reported) return h("div", { class: "ebody" }, reportedNote(m));   // UN-RFC 0045
   if (labelCovered(m)) return h("div", { class: "ebody" }, labelVeil(m));   // UN-RFC 0053
+  const open = S.textOpen && S.textOpen[m.id];
+  if (m.preview && m.readable) {                    // the core's cut, as every client's (gui#269)
+    const cut = m.preview.cut && !open;
+    const p = cut ? previewOf(m) : m;
+    const [text, files] = m.kind === "chat"       // a note: drawn as a chat line, cut alike
+      ? [m.markdown ? (cut ? h("div", { class: "md" }, renderTree(p.tree)) : renderChatLine(m)) : linkGroups(p.text), filesOf(m, false)]
+      : messageBody(p);
+    return h("div", { class: "ebody" + (m.preview.cut ? " cut" : "") },
+      h("div", { class: "etext" + (cut ? " core-cut" : " open"), "data-clip": m.id }, text),
+      m.preview.cut ? moreOrLess(m.id, open) : null, files);
+  }
   if (m.kind === "chat" && m.readable)
     return h("div", { class: "ebody" }, m.markdown ? renderChatLine(m) : linkGroups(m.text), filesOf(m, false));
-  const open = S.textOpen && S.textOpen[m.id];
+  // a core without the shared cut: measured here, as before (unseenet-gui#143)
   // the author's read-more line (UN-RFC 0031 3.2.1): cut there, up to twice the normal cut
   const more = !open && hasReadMore(m) && !(S.moreTooLong || {})[m.id];
   const [text, files] = messageBody(more ? beforeReadMore(m) : m);
@@ -217,6 +229,18 @@ function entryBody(m) {
     open ? h("button", { class: "link less", onclick: () => { delete S.textOpen[m.id]; render(); } }, "Show less") :
       h("button", { class: "link emore", onclick: () => { S.textOpen = { ...(S.textOpen || {}), [m.id]: true }; render(); } }, "… more"),
     files);
+}
+
+// A message as its preview: the start the core's cut shows (unseenet#781).
+function previewOf(m) {
+  return { ...m, text: m.preview.text, tree: m.preview.tree };
+}
+
+// "… more" to open a cut text in place, "Show less" to cut it again; kept open across
+// redraws (S.textOpen), entries and comments alike.
+function moreOrLess(id, open) {
+  return open ? h("button", { class: "link less", onclick: () => { delete S.textOpen[id]; render(); } }, "Show less")
+    : h("button", { class: "link emore", onclick: () => { S.textOpen = { ...(S.textOpen || {}), [id]: true }; render(); } }, "… more");
 }
 
 // After a feed is drawn: an entry's text that is cut by only a line or two is shown whole,
@@ -262,6 +286,20 @@ function commentsHead(e, hidden) {
   return choice || more || fewer ? h("div", { class: "chead" }, choice, more, fewer) : null;
 }
 
+// A comment's text: cut by the core's rule with "… more" when it is long (gui#269), its own
+// words first; opened in place, the whole of it, quotes included.
+function commentText(c) {
+  if (c.reported) return h("div", { class: "ctext" }, reportedNote(c));
+  if (labelCovered(c)) return h("div", { class: "ctext" }, labelVeil(c));
+  if (!c.readable) return h("div", { class: "ctext" }, h("i", { text: c.error || "Could not be read." }));
+  const open = S.textOpen && S.textOpen[c.id], cut = c.preview && c.preview.cut && !open;
+  const m = cut ? previewOf(c) : c;
+  const body = c.kind === "chat" ? (c.markdown ? (cut ? h("div", { class: "md" }, renderTree(m.tree)) : renderChatLine(c))
+    : linkGroups(m.text)) : [h("strong", { text: subjectOf(c) }), messageBody(m)];
+  return h("div", { class: "ctext" + (cut ? " core-cut" : "") }, body,
+    c.preview && c.preview.cut ? moreOrLess(c.id, open) : null);
+}
+
 // two levels (section 4.2; the core caps the depth at 2): a deeper answer sits at the
 // second level and says whom it answers
 function commentEl(c, entry, byId) {
@@ -272,8 +310,7 @@ function commentEl(c, entry, byId) {
       h("div", { class: "chd" }, whoEl(c), timeEl(c.date),
         parent && parent.depth > 1 ? h("span", { class: "hint", text: "in answer to " + parent.who }) : null,
         moreMenu(c)),
-      h("div", { class: "ctext" }, c.reported ? reportedNote(c) : labelCovered(c) ? labelVeil(c) : c.readable ? (c.kind === "chat" ? (c.markdown ? renderChatLine(c) : linkGroups(c.text)) :
-        [h("strong", { text: subjectOf(c) }), messageBody(c)]) : h("i", { text: c.error || "Could not be read." })),
+      commentText(c),
       // the reactions given stay; adding one and Answer show on hover or focus (#120)
       h("div", { class: "crow" }, reactionBar(c),
         entry.comment && entry.comment.allowed ? iconAction(ICON.bubble, "Answer", () => {

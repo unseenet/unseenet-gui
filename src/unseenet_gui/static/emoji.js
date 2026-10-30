@@ -86,6 +86,22 @@ function insertEmoji(k, code, from) {
   rememberEmoji(code);
 }
 
+// Alt+R in a post's or a comment's field: a read-more line (gui#269, as the terminal
+// client's Ctrl+R - which a browser keeps for reloading). True when it was that key.
+function readMoreKey(e, k) {
+  if (!e.altKey || e.ctrlKey || e.metaKey || (e.key || "").toLowerCase() !== "r") return false;
+  e.preventDefault();
+  insertReadMore(k);
+  return true;
+}
+
+// The last post or comment field you wrote in, for the palette's "Insert a read-more line".
+let lastWriteField = null;
+document.addEventListener("focusin", (e) => {
+  const k = e.target && e.target.dataset && e.target.dataset.k;
+  if (k && (k === "cbody" || k.startsWith("c:"))) lastWriteField = k;
+});
+
 // A read-more line (UN-RFC 0031 3.2.1) at the cursor in field k, on a line of its own,
 // so nobody needs to know the syntax; a feed cuts the post there for "… more".
 function insertReadMore(k) {

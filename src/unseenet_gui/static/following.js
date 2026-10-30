@@ -631,7 +631,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     h("form", { class: "db", onsubmit: go,
       // what a pasted or dropped file is told where none can go (gui#187)
       "data-nofiles": takes ? null : edit ? "Files cannot be added to a new version." : "This group takes no files.",
-      onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); } },
+      onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); else readMoreKey(e, "cbody"); } },
       h("label", { for: "subject", text: "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
       h("label", { for: "body", class: "sr", text: "Text" }),
@@ -645,7 +645,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
           emojiButton("cbody"),
           takes ? attachButton(carries, fileAbout) : null,
           h("button", { type: "button", class: "btn mini-text", "data-k": "readmore", onclick: () => insertReadMore("cbody"),
-            title: "Where a feed cuts this post for \"… more\" - a line of three dots" }, "Read more"),
+            title: "Where a feed cuts this post for \"… more\" - a line of three dots (Alt+R)" }, "Read more"),
           h("span", { class: "grow" }),
           h("span", { class: "hint mdmark", tabindex: "0",
             title: md ? "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:" : "Plain text: sent and shown as typed",

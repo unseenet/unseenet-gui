@@ -138,6 +138,7 @@ function fromRow(r) {
     pinned: !!r.pinned, address: r.address || "",
     // reactions (UN-RFC 0048): the counts, may you react, and its own group's set
     reactions: r.reactions || [], react: r.react || null, react_offered: r.react_offered || null,
+    preview: r.preview || null,                      // a feed's shared cut (unseenet#781, gui#269)
     comment: r.comment || null, replyPerm: r.reply || null, group_label: r.group_label || "",
     // a thread's first post: does it take comments now, until when, a close's note, and
     // may you close or open them (UN-RFC 0030 sections 3.1-3.2)

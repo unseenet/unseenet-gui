@@ -392,6 +392,9 @@ function commands() {
     { name: "Private posts", key: "", when: S.sidebar && S.sidebar.inbox.id, run: () => openGroup(S.sidebar.inbox.id) },
     { name: "Private chats: every person you chat with", key: "", also: "chats people dm messages beskeder", run: () => openGroup(CHATS) },
     { name: "Chat with someone", key: "", run: () => openWrite("", "chat") },
+    // where a feed cuts what you write for "… more" (UN-RFC 0031 3.2.1, gui#269)
+    { name: "Insert a read-more line", key: "Alt R", also: "cut more three dots", when: !!lastWriteField &&
+      !!document.querySelector(`[data-k="${CSS.escape(lastWriteField)}"]`), run: () => insertReadMore(lastWriteField) },
     { name: "For you: replies and mentions", key: "", run: () => openGroup(FOR_YOU) },
   ].filter(c => c.when === undefined || c.when);
   return cmds.concat(allGroups().map(x => ({ name: x.label, group: x, key: "", run: () => openGroup(x.id) })));
