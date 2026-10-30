@@ -140,6 +140,7 @@ function visibleComments(e) {
 
 // One entry of a feed: who, when, the text, pictures, reactions and its comments.
 function entryCard(d, e) {
+  if (e.m.kind === "share" && e.m.share) return sharedEntry(d, e);   // UN-RFC 0060 5.2
   const m = e.m, g = d.group, timeline = isMixed(g);
   const shown = visibleComments(e), hidden = e.comments.length - shown.length;
   const byId = Object.fromEntries(e.comments.map(c => [c.id, c]));

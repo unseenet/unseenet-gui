@@ -309,6 +309,13 @@ function commands() {
       run: async () => { const on = !!(S.sidebar && S.sidebar.notices && S.sidebar.notices.receive === false);
         await api("POST", "/api/settings", { notices: { receive: on } }); await loadSidebar();
         toast(on ? "Mentions of you in groups you do not follow show in For you." : "Mention notices from others are no longer shown."); } },
+    { name: S.sidebar && S.sidebar.share_notices === false ? "Show share notices" : "Stop showing share notices", key: "",
+      also: "share shared del delt notice", run: async () => { const on = !!(S.sidebar && S.sidebar.share_notices === false);
+        await api("POST", "/api/settings", { share_notices: on }); await loadSidebar();
+        toast(on ? "When someone shares your post, you are told in For you." : "You are no longer told when your posts are shared."); } },
+    { name: S.sidebar && S.sidebar.hide_shares && S.sidebar.hide_shares.all ? "Show shares in feeds and the timeline" : "Hide shares in feeds and the timeline", key: "",
+      also: "share shared del delt hide skjul", run: async () => { const all = !(S.sidebar && S.sidebar.hide_shares && S.sidebar.hide_shares.all);
+        await setHideShares({ all }); toast(all ? "Shares are hidden; posts with words of their own still show." : "Shares show again."); } },
     { name: S.sidebar && S.sidebar.markdown === false ? "Write Markdown (*emphasis*, `code`, :tada:)" : "Write plain text instead of Markdown", key: "",
       run: async () => { const on = !(S.sidebar && S.sidebar.markdown !== false); await api("POST", "/api/settings", { markdown: on }); await loadSidebar();
         toast(on ? "You write Markdown: *emphasis*, **strong**, `code`, lists, :tada:" : "You write plain text: sent and shown exactly as typed."); } },

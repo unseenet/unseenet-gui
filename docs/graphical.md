@@ -108,7 +108,9 @@ first post waits a few minutes more, once, while your new key
   line without it. Ctrl+P: *Link previews* to turn them off (off from the
   start on the bootable image).
 - Pins, reactions and tables in Markdown; a ⋯ menu on every post
-  and chat line to edit, withdraw, pin or copy its `unseenet:` address.
+  and chat line to share, edit, withdraw, pin or copy its `unseenet:` address.
+- Sharing: into your feed, with a comment, into a group, or to one person
+  (see below).
 - Private chats and posts with anyone, by key; contacts as an address book;
   private profiles shared with one person or a closed group.
 - People: names (`@you`), profiles (an author's name opens theirs; *Your
@@ -125,6 +127,40 @@ first post waits a few minutes more, once, while your new key
 - Recovery words and copying (from 0.3, see below).
 - A light and a dark theme, and phones and other narrow screens. On the
   bootable image also the network, Wi-Fi, the keyboard, restart and shut down.
+
+## Sharing
+
+On Facebook, Mastodon and X you pass on what you see; here too (UN-RFC 0060).
+The ⋯ menu of a post, an entry, a comment or a chat line has:
+
+- **Share** - into your own feed at once (start your feed first: *My feed*).
+- **Share with a comment** - a few words of your own, with the original as a
+  card under them.
+- **Share into a group…** - bring it to up to three other groups besides your
+  feed. A discussion group needs a comment that says why it is brought there;
+  a group can say it takes no shares, and chat groups take none unless their
+  owner allows it.
+- **Send to…** - to one person, privately: nobody else is told.
+- **Undo share** on your own shares. Sharing again replaces your earlier
+  share in that group.
+
+A share is a reference, never a copy. Readers see the original as its author
+wrote it, fetched through your nodes - "Fetching the shared post …" while it
+comes, and the post itself once it has. When the author edits it, the newest
+version shows, marked *Edited after it was shared* under a share with a
+comment; when the author withdraws it, it is gone from every share. Comments
+and reactions belong to the original: *Comment or react where it was posted*
+opens it there.
+
+In the timeline each post shows once, "shared by Søren and Mette" (only people
+you follow are named). Nothing is counted: there is no "shared 12 times", and
+nothing is ordered by shares. Ctrl+P: *Hide shares in feeds and the timeline*,
+or ⋯ on a share: *Hide shares in this feed*. When someone shares a post of
+yours you are told in *For you* (Ctrl+P: *Stop showing share notices*).
+
+Shares are public, like any post: everyone can see what you shared. An author
+can ask that a post not be shared; then Share is not offered, and ⋯ says why -
+a request, not a protection, since anyone who can read a post can copy it.
 
 ## Tags and content warnings
 
