@@ -315,6 +315,7 @@ function commands() {
     { name: S.sidebar && S.sidebar.show_blocked ? "Hide posts blocked by maintainers" : "Show posts blocked by maintainers", key: "", run: toggleShowBlocked },
     { name: S.sidebar && S.sidebar.hide_bots ? "Show bots" : "Hide bots: posts by keys that say they post automatically", key: "", run: toggleBots },
     { name: S.sidebar && S.sidebar.pictures === false ? "Show people's pictures" : "Identicons only: do not show people's pictures", key: "", run: togglePictures },
+    { name: S.sidebar && S.sidebar.link_cards === false ? "Link previews: make one when you write a link" : "Link previews: turn them off (nothing is fetched for your links)", key: "", run: toggleLinkCards },
     { net: true, name: "Your picture: in your profile", key: "", run: openMyProfile },
     // the owner's and moderators' tools, as in the TUI's Ctrl+P
     { net: true, name: "To approve: posts waiting in groups you moderate", key: "", run: openModeration },

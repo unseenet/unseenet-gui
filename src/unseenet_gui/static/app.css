@@ -1331,3 +1331,39 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
   .bubble .reacts:not(:has(.react:not(.add))) { margin: 0; }
   .bubble:focus { outline: none; box-shadow: inset 0 0 0 1px var(--green); }
 }
+
+/* ---- link cards (UN-RFC 0059): the poster's preview of a link; the domain always shown ---- */
+.lcard { display: flex; flex-direction: column; max-width: 560px; margin: 12px 0 4px; border: 1px solid var(--line-2);
+  border-radius: 10px; overflow: hidden; background: var(--ink-2); color: inherit; text-decoration: none; }
+.lcard:hover, .lcard:focus-visible { border-color: var(--green); }
+.lcard .cpic { display: block; width: 100%; aspect-ratio: 1.91/1; object-fit: cover; background: var(--ink-deep); }
+.lcard .cpic.wait, .lcard .cpic.off { display: flex; align-items: center; justify-content: center; padding: 12px; text-align: center; }
+.lcard .ctext { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px 12px; min-width: 0; }
+.lcard .csrc { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.lcard .cicon { width: 18px; height: 18px; border-radius: 4px; background: #fff; flex: none; object-fit: contain; }
+.lcard .cicon.big { width: 40px; height: 40px; border-radius: 8px; padding: 4px; box-sizing: border-box; }
+.lcard .cicon.none { display: inline-flex; align-items: center; justify-content: center; background: var(--paper-2);
+  color: var(--ink); font-weight: 700; font-size: 11px; }
+.lcard .cicon.none.big { font-size: 18px; }
+.lcard .cdom { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lcard .cdom.odd, .lcard .codd { color: var(--amber); }
+.lcard .csite { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lcard .ctitle { font-weight: 650; font-size: 15px; line-height: 1.3; overflow-wrap: anywhere; }
+.lcard .cdesc { color: var(--paper-2); font-size: 13px; display: -webkit-box; -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical; overflow: hidden; }
+.lcard .cfoot { color: var(--muted); font-size: 11px; margin-top: 4px; }
+.lcard.compact { flex-direction: row; align-items: center; gap: 12px; padding: 12px; }
+.lcard.compact .ctext { padding: 0; }
+.lcard.in-chat { margin: 6px 0 0; max-width: 360px; }
+.lcard.in-chat .ctext { padding: 6px 9px; flex-direction: row; flex-wrap: wrap; column-gap: 8px; align-items: center; }
+.lcard.in-chat .ctitle { font-size: 13px; font-weight: 600; }
+.cmore { display: block; margin: 2px 0 6px; font-size: 12px; }
+/* in the compose window: the card as it will be sent, its title and description editable */
+.cardbox { display: flex; flex-direction: column; gap: 4px; }
+.cardbox .lcard { margin: 4px 0 0; max-width: none; position: relative; cursor: default; }
+.cardbox .lcard.wait { flex-direction: row; justify-content: space-between; align-items: center; padding: 10px 12px; }
+.cardbox .lcard .cpic { max-height: 220px; }
+.cardbox .ctitle-in { font-weight: 650; }
+.cardbox .cdesc-in { resize: vertical; min-height: 2.4em; font-size: 13px; }
+.cardbox .cx { position: absolute; top: 6px; right: 6px; background: var(--scrim); }
+.cardbox .cardtools { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; }
