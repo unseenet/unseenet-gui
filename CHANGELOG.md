@@ -7,6 +7,19 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-31
+
+Needs unseenet 0.6.8 (`unseenet>=0.6.8,<0.7`), whose posts take `share`.
+
+### Changed
+
+- **Sharing in the compose window** (UN-RFC 0060): *Share with a comment*, *Share into a
+  group…* and *Send to…* open the ordinary window for a new post - subject (if you like),
+  text, pictures, link preview, language, tags - with the shared post as a card under your
+  words, instead of a small dialog with grey drop-downs. *Share into a group…* chooses the
+  group first, with a search, those that cannot take it last with why; *Send to…* chooses
+  the person with the person picker.
+
 ## [0.5.0] - 2026-10-30
 
 Sharing (UN-RFC 0060). Needs unseenet 0.6.6 (`unseenet>=0.6.6,<0.7`), which shares; update the nodes first.
@@ -764,7 +777,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/unseenet/unseenet-gui/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/unseenet/unseenet-gui/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/unseenet/unseenet-gui/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/unseenet/unseenet-gui/compare/v0.3.3...v0.4.0

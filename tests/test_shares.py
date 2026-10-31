@@ -1,8 +1,9 @@
 """Sharing (gui#285, UN-RFC 0060) against a synthetic local API: a plain share drawn as the
 original under "Mette shared" once the core has fetched it, a share with a comment with
 the original as a card, a share whose original is gone not drawn at all; Share in the ⋯
-menu where it can be shared and why not where the author asked; Share with a comment;
-Undo share on your own.
+menu where it can be shared and why not where the author asked; Share with a comment,
+into a group and Send to in the ordinary compose window, the group or person chosen
+first with a search; Undo share on your own.
 
 Run with: pip install -e '.[dev]' playwright; playwright install chromium;
 python -m pytest -q tests/test_shares.py
@@ -27,7 +28,7 @@ class ShareAPI:
     """Synthetic answers only: no vault, Tor or outgoing messages."""
 
     def __init__(self):
-        self.shares, self.unshares = [], []
+        self.shares, self.unshares, self.posts, self.privates = [], [], [], []
         self.target_asks = 0
 
     def head(self):
@@ -82,6 +83,8 @@ class ShareAPI:
                     "hide_shares": {"all": False, "groups": []}}
         elif path == "/api/groups":
             data = {"groups": [self.head()], "people": [],
+                    "contacts": [{"key": "ed25519:soeren", "name": "Søren"},
+                                 {"key": "ed25519:mette", "name": "Mette"}],
                     "hierarchies": [{"name": "alt", "tree": None}], "inbox": {"id": "inbox:test"}}
         elif path == "/api/share-target":
             of = request.query.get("of")
@@ -103,7 +106,11 @@ class ShareAPI:
                             {"group": "feed@me", "label": "Your feed", "own_feed": True, "plain": True,
                              "allowed": True, "reason": "", "shared": False},
                             {"group": "dk.dyr@abcd", "label": "dk.dyr", "own_feed": False, "plain": False,
-                             "allowed": True, "reason": "", "shared": False}]}
+                             "allowed": True, "reason": "", "shared": False},
+                            {"group": "dk.katte@abcd", "label": "dk.katte", "own_feed": False, "plain": True,
+                             "allowed": True, "reason": "", "shared": False},
+                            {"group": "dk.chat@abcd", "label": "dk.chat", "own_feed": False, "plain": False,
+                             "allowed": False, "reason": "takes no shares", "shared": False}]}
             else:
                 self.shares.append(await request.json())
                 data = {"job": "job1"}
@@ -112,6 +119,15 @@ class ShareAPI:
             data = {"groups": [GROUP]}
         elif request.method == "GET" and path == f"/api/groups/{GROUP}":
             data = {"group": self.head(), "rows": self.rows()}
+        elif request.method == "GET" and path in ("/api/groups/feed@me", "/api/groups/dk.dyr@abcd"):
+            gid = path.rsplit("/", 1)[1]
+            data = {"group": {**self.head(), "id": gid, "label": gid.split("@")[0], "kinds": ["post"]}, "rows": []}
+        elif path.endswith("/post"):
+            self.posts.append((path.split("/")[3], await request.json()))
+            data = {"job": "job2"}
+        elif path == "/api/private":
+            self.privates.append(await request.json())
+            data = {"job": "job3"}
         elif path == "/api/pictures":
             data = {"pictures": {}}
         else:
@@ -185,24 +201,53 @@ async def test_share_from_the_menu_and_why_not(page_api):
     await expect(page.locator(".toast")).to_contain_text("asked not to share")
 
 
+async def _write_and_send(page, title, words, button="Post"):
+    win = page.get_by_role("dialog", name=title)
+    await expect(win.locator(".share-slot .scard")).to_be_visible()     # what you share, as a card
+    await win.locator("#body").fill(words)
+    await win.locator(".df .btn.primary").click()
+    await expect(win).to_have_count(0)
+
+
 async def test_share_with_a_comment_and_into_a_group(page_api):
     page, api = page_api
+    # with a comment: the ordinary compose window for your feed, no subject needed
     await _menu(page, "<p@x>", "Share with a comment…")
-    dialog = page.get_by_role("dialog", name="Share with a comment")
-    await dialog.get_by_label("Your words").fill("Se lige her")
-    await dialog.get_by_role("button", name="Share").click()
-    await expect(dialog).to_have_count(0)
-    assert api.shares[-1] == {"id": "<p@x>", "comment": "Se lige her"}
+    win = page.get_by_role("dialog", name="Share in your feed")
+    await expect(win.get_by_label("Subject (if you like)")).to_be_visible()
+    await win.locator(".df .btn.primary").click()                        # no words: not sent
+    await expect(page.locator(".toast")).to_contain_text("why you share it")
+    await _write_and_send(page, "Share in your feed", "Se lige her")
+    gid, body = api.posts[-1]
+    assert gid == "feed@me" and body["share"] == {"group": GROUP, "id": "<p@x>"}
+    assert body["body"].startswith("Se lige her") and body["subject"] == ""
 
+    # into a group: chosen with a search; what cannot take it is last, with why
     await _menu(page, "<p@x>", "Share into a group…")
-    dialog = page.get_by_role("dialog", name="Share into a group")
-    await expect(dialog).to_contain_text("needs a comment")         # a discussion group
-    await dialog.get_by_role("button", name="Share").click()
-    await expect(dialog.locator(".error")).to_contain_text("Write a few words")
-    await dialog.get_by_label("Your words").fill("Til jer med dyr")
-    await dialog.get_by_role("button", name="Share").click()
-    await expect(dialog).to_have_count(0)
-    assert api.shares[-1] == {"id": "<p@x>", "comment": "Til jer med dyr", "into": "dk.dyr@abcd"}
+    pick = page.get_by_role("dialog", name="Share into a group")
+    rows = pick.get_by_role("option")
+    await expect(rows).to_have_count(3)
+    await expect(rows.last).to_contain_text("takes no shares")
+    await pick.get_by_role("searchbox").fill("dyr")
+    await expect(rows).to_have_count(1)
+    await rows.first.click()
+    await _write_and_send(page, "Share in dk.dyr", "Til jer med dyr")
+    gid, body = api.posts[-1]
+    assert gid == "dk.dyr@abcd" and body["share"] == {"group": GROUP, "id": "<p@x>"}
+    assert api.shares == []                                              # never the old dialog
+
+
+async def test_send_to_one_person(page_api):
+    page, api = page_api
+    await _menu(page, "<p@x>", "Send to…")
+    pick = page.get_by_role("dialog", name="Send to…")
+    await expect(pick.locator(".seg")).to_have_count(0)                  # a post, no Chat | Post
+    await pick.get_by_role("searchbox").fill("sø")
+    await pick.get_by_role("option", name="Søren").click()
+    await _write_and_send(page, "Send to Søren", "Til dig", button="Send")
+    sent = api.privates[-1]
+    assert sent["key"] == "ed25519:soeren" and sent["share"] == {"group": GROUP, "id": "<p@x>"}
+    assert sent["body"].startswith("Til dig")
 
 
 async def test_undo_your_own_share(page_api):

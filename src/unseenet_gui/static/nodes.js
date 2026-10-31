@@ -256,7 +256,7 @@ async function pickedPerson(key, label, kind) {
 
 // The person picker (gui#209), in place of a To field: Chat | Post, a search that also
 // takes a pasted key, recent people first, then contacts; arrows choose, Enter opens.
-function openPersonPicker(kind = "chat") {
+function openPersonPicker(kind = "chat", { title = null, onPick = null } = {}) {
   let query = "", at = 0;
   const looksLikeKey = (t) => /^ed25519:[a-z2-7]{20,}$/i.test(t.trim());
   const people = () => {
@@ -268,14 +268,16 @@ function openPersonPicker(kind = "chat") {
     const q = query.trim().toLowerCase();
     return [...recent, ...rest].filter(c => contactMatches(c, q));
   };
-  const choose = (p) => pickedPerson(p.key, p.label, kind);
+  // onPick: someone to send something to (Send to…, UN-RFC 0060 7.4) - a post, no Chat | Post
+  const choose = (p) => { if (onPick) { closeDialog(); onPick(p); } else pickedPerson(p.key, p.label, kind); };
+  const heading = () => title || (kind === "chat" ? "New private chat" : "New private post");
   S.dialog = { focus: "#pfind", render: () => {
     const list = people();
     if (at >= list.length) at = Math.max(0, list.length - 1);
     const firstRest = list.findIndex(p => !p.recent);
-    return dialogShell({ label: kind === "chat" ? "New private chat" : "New private post", cls: "picker" },
-      h("div", { class: "dh" }, h("h2", { text: kind === "chat" ? "New private chat" : "New private post" }),
-        h("div", { class: "seg", role: "group", "aria-label": "Chat or post" },
+    return dialogShell({ label: heading(), cls: "picker" },
+      h("div", { class: "dh" }, h("h2", { text: heading() }),
+        onPick ? null : h("div", { class: "seg", role: "group", "aria-label": "Chat or post" },
           ["chat", "post"].map(k => h("button", { type: "button", class: "segbtn" + (kind === k ? " on" : ""),
             "aria-pressed": String(kind === k), onclick: () => { kind = k; render(); } }, k === "chat" ? "Chat" : "Post"))),
         h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
@@ -286,7 +288,7 @@ function openPersonPicker(kind = "chat") {
           "aria-activedescendant": list.length ? "p-" + at : null,
           oninput: (e) => { query = e.target.value; at = 0; render(); },
           onkeydown: (e) => {
-            if (e.key === "Tab" && !e.shiftKey) { e.preventDefault(); kind = kind === "chat" ? "post" : "chat"; render(); }
+            if (e.key === "Tab" && !e.shiftKey && !onPick) { e.preventDefault(); kind = kind === "chat" ? "post" : "chat"; render(); }
             else if (e.key === "ArrowDown" || e.key === "ArrowUp") {
               e.preventDefault(); at = Math.max(0, Math.min(list.length - 1, at + (e.key === "ArrowDown" ? 1 : -1))); render();
               const row = document.getElementById("p-" + at); if (row) row.scrollIntoView({ block: "nearest" });
@@ -309,22 +311,25 @@ function openPersonPicker(kind = "chat") {
         h("p", { class: "muted", style: "padding:12px", text: query ? "Nobody matches - paste their key (they find it with K)." :
           "Nobody yet - paste someone's key (they find it with K)." })),
       h("div", { class: "df" }, h("span", { text: kind === "chat" ? "Sealed to their key: only the two of you can read it" :
-        "A post with a subject, sealed to them" }), h("span", { text: "↑↓ choose · Enter open · Tab chat/post" })));
+        "A post with a subject, sealed to them" }), h("span", { text: onPick ? "↑↓ choose · Enter write" : "↑↓ choose · Enter open · Tab chat/post" })));
   } };
   render();
 }
 
 // The compose window for a post: subject, text, your signature; sent to their inbox.
-async function openPost(key, who = "", subject = "", replyTo = null, quote = "") {
+// ``share``: sending a post on to them (Send to…, UN-RFC 0060 7.4), shown as a card.
+async function openPost(key, who = "", subject = "", replyTo = null, quote = "", share = null) {
   const sig = await signatureText();
   const top = quote;
   const inbox = S.sidebar && S.sidebar.inbox.id;
-  openComposeWindow({ g: null, title: "Post to " + (who || key.slice(0, 20) + "…"), subject, private: true,
+  const to = who || key.slice(0, 20) + "…";
+  openComposeWindow({ g: null, title: (share ? "Send to " : "Post to ") + to, subject, private: true, share,
     body: top + "\n" + (sig ? "-- \n" + sig + "\n" : ""), cursor: top.length,
     send: (subject, text, _notify, files, _tags, _languages, _days, card) => doSend("/api/private", inbox,
       { key, subject, body: text, ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(share ? { share: { group: share.group, id: share.id } } : {}),
         ...(files && files.length ? { files } : {}), ...(card ? { card } : {}) }, { text }) });
-  if (!subject) setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
+  if (!subject && !share) setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
 }
 
 // Create a group: name, type, view (threads, chat, feed, site), kinds, files and comments.

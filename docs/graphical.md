@@ -134,13 +134,15 @@ On Facebook, Mastodon and X you pass on what you see; here too (UN-RFC 0060).
 The ⋯ menu of a post, an entry, a comment or a chat line has:
 
 - **Share** - into your own feed at once (start your feed first: *My feed*).
-- **Share with a comment** - a few words of your own, with the original as a
-  card under them.
-- **Share into a group…** - bring it to up to three other groups besides your
-  feed. A discussion group needs a comment that says why it is brought there;
-  a group can say it takes no shares, and chat groups take none unless their
-  owner allows it.
-- **Send to…** - to one person, privately: nobody else is told.
+- **Share with a comment** - the usual window for a new post in your feed,
+  with the original as a card under your words: a subject if you like,
+  pictures, a link preview, language and tags, as in any post.
+- **Share into a group…** - choose the group first (type to find it among those
+  you follow), then write as in your feed. Up to three other groups besides
+  your feed. A group can say it takes no shares, and chat groups take none
+  unless their owner allows it; those are listed last, with why.
+- **Send to…** - choose the person (type a name, or paste a key), then write a
+  private post with the original under it. Nobody else is told.
 - **Undo share** on your own shares. Sharing again replaces your earlier
   share in that group.
 

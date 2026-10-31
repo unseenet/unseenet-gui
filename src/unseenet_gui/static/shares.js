@@ -197,72 +197,115 @@ async function setHideShares(change) {
   catch (x) { toast(x.message); }
 }
 
-// Share with a comment, into a group, or send to one person: a dialog. The places come
-// from the core - your feed first, the groups you follow that take shares, at most three
-// besides your feed, where you shared it already marked (section 7.2).
+// A list to choose one from, with a filter above it (the share dialogs: a contact, a
+// group): the house's search field and rows, as in the person picker - never a bare
+// select, and never a list longer than the dialog. Arrows move, Enter chooses.
+function shareChooser({ id, label, placeholder, rows, q, chosen, onQuery, onChoose, empty }) {
+  const pick = rows.filter(r => !r.off);
+  const go = (d) => {
+    const i = pick.findIndex(r => r.value === chosen);
+    const r = pick[Math.max(0, Math.min(pick.length - 1, (i < 0 ? -1 : i) + d))];
+    if (r) { onChoose(r); const el = document.querySelector(`#${id}-list [data-v="${CSS.escape(r.value)}"]`);
+      if (el) el.scrollIntoView({ block: "nearest" }); }
+  };
+  return h("div", { class: "schoose" },
+    h("label", { for: id, text: label }),
+    h("div", { class: "side-filter" }, svg(ICON.search, 16),
+      h("input", { id, type: "search", "data-k": id, autocomplete: "off", placeholder, value: q, "aria-controls": id + "-list",
+        oninput: (e) => onQuery(e.target.value),
+        onkeydown: (e) => {
+          if (e.key === "ArrowDown" || e.key === "ArrowUp") { e.preventDefault(); go(e.key === "ArrowDown" ? 1 : -1); }
+          else if (e.key === "Enter") { e.preventDefault(); if (pick.length === 1) onChoose(pick[0]); }
+          else if (e.key === "Escape" && q) { e.preventDefault(); e.stopPropagation(); onQuery(""); }
+        } })),
+    h("div", { class: "slist", id: id + "-list", role: "listbox", "aria-label": label },
+      rows.length ? rows.map(r => h("div", { class: "cmd" + (r.value === chosen ? " on" : "") + (r.off ? " off" : ""),
+          role: "option", "aria-selected": String(r.value === chosen), "aria-disabled": r.off ? "true" : null, "data-v": r.value,
+          onclick: () => { if (!r.off) onChoose(r); } },
+        r.colour !== undefined ? h("span", { class: `av xs c${r.colour}`, "aria-hidden": "true", text: initials(r.label) }) : null,
+        h("span", { class: "nm", text: r.label }),
+        r.sub ? h("small", { text: r.sub }) : null,
+        r.value === chosen ? svg(ICON.check, 16) : null))
+        : h("p", { class: "muted", style: "padding:10px 12px;margin:0", text: empty })));
+}
+
+// Share with a comment, into a group, or send to one person (sections 5.5, 7.2, 7.4): the
+// ordinary compose window - subject, text, files, link card, language, tags - with the
+// shared post as a card under the text. Into a group: the group is chosen first, from those
+// that take shares; send to: the person, with the person picker.
 async function openShare(m, mode) {
   let o;
   try { o = await api("GET", `/api/groups/${encodeURIComponent(m.group)}/share?id=${encodeURIComponent(m.id)}`); }
   catch (x) { toast(x.message); return; }
-  const places = (o.destinations || []).filter(p => mode === "group" ? !p.own_feed : true);
-  const first = mode === "group" ? places.find(p => p.allowed) : places.find(p => p.own_feed) || places.find(p => p.allowed);
-  const st = { mode, into: first ? first.group : "", comment: S.drafts["share:" + m.id] || "", to: "", busy: false, err: "" };
-  const contacts = (S.sidebar && S.sidebar.contacts) || [];
-  const place = () => places.find(p => p.group === st.into) || null;
-  const needs = () => mode === "comment" || (mode === "group" && place() && !place().plain);
-  const title = mode === "send" ? "Send to…" : mode === "group" ? "Share into a group" : "Share with a comment";
-  const draw = () => dialogShell({ label: title },
-    h("div", { class: "dh" }, h("h2", { text: title }),
+  const share = { group: m.group, id: m.id, of: o.target, ofGroup: o.target_group };
+  sharedOriginal(share.of, share.ofGroup);                  // fetched while you choose
+  if (mode === "send") {
+    openPersonPicker("post", { title: "Send to…", onPick: (p) => openPost(p.key, p.label, "", null, "", share) });
+    return;
+  }
+  const places = o.destinations || [];
+  if (mode === "comment") {
+    const feed = places.find(p => p.own_feed);
+    if (!feed || feed.reason) { toast(feed && feed.reason ? feed.reason + "." : "Start your feed first."); openMyFeed(); return; }
+    openShareCompose(share, feed.group, "Share in your feed");
+    return;
+  }
+  openSharePlace(share, places.filter(p => !p.own_feed));
+}
+
+// Into a group: which one - a search over the groups you follow that take shares, those
+// that cannot take this one last, with why.
+function openSharePlace(share, places) {
+  const st = { q: "", into: "" };
+  const rows = () => {
+    const q = st.q.trim().toLowerCase();
+    return places.filter(p => !q || (p.label + " " + p.group).toLowerCase().includes(q))
+      .sort((a, b) => (b.allowed - a.allowed) || a.label.localeCompare(b.label, undefined, { sensitivity: "base" }))
+      .map(p => ({ value: p.group, label: p.label, off: !p.allowed,
+        sub: !p.allowed ? p.reason : p.shared ? "shared here - this replaces it" : "" }));
+  };
+  const go = (r) => { const p = places.find(x => x.group === r.value); closeDialog();
+    openShareCompose(share, r.value, "Share in " + (p ? p.label : labelOf(r.value))); };
+  S.dialog = { focus: "#sinto", render: () => dialogShell({ label: "Share into a group", cls: "picker sharing" },
+    h("div", { class: "dh" }, h("h2", { text: "Share into a group" }),
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("div", { class: "db" },
-      mode === "send" ? [
-        h("p", { style: "margin:0", text: "Only they can read it, sent privately. Nobody else is told." }),
-        contacts.length ? h("label", { class: "field" }, "A contact",
-          h("select", { "aria-label": "A contact", onchange: (e) => { st.to = e.target.value; } },
-            h("option", { value: "", text: "Choose …" }),
-            contacts.map(c => h("option", { value: c.key, selected: st.to === c.key, text: c.label })))) : null,
-        h("label", { class: "field" }, "Or their key",
-          h("input", { type: "text", "aria-label": "Their key", placeholder: "ed25519:…", value: st.to,
-            oninput: (e) => { st.to = e.target.value.trim(); } }))] :
-      mode === "group" ? [
-        places.length ? h("div", { class: "places", role: "radiogroup", "aria-label": "Where" },
-          places.map(p => h("label", { class: "radio" + (p.allowed ? "" : " off") },
-            h("input", { type: "radio", name: "into", value: p.group, checked: st.into === p.group, disabled: !p.allowed,
-              onchange: () => { st.into = p.group; render(); } }),
-            " " + p.label, p.shared ? h("span", { class: "sm", text: "shared here" }) : null,
-            !p.allowed ? h("span", { class: "hint", text: " " + p.reason }) : !p.plain ? h("span", { class: "hint", text: " needs a comment" }) : null)))
-          : h("p", { class: "hint", text: "None of your groups takes shares, or you shared it into three already." }),
-        h("p", { class: "hint", text: "At most three groups besides your feed. Each share is its own post there, at its own postage." })] :
-      places.length && places.length > 1 ? h("label", { class: "field" }, "Where",
-        h("select", { "aria-label": "Where", onchange: (e) => { st.into = e.target.value; render(); } },
-          places.filter(p => p.allowed || p.own_feed).map(p => h("option", { value: p.group, selected: st.into === p.group,
-            text: p.own_feed ? "Your feed" : p.label })))) : null,
-      h("label", { class: "field" }, mode === "send" ? "A few words (if you like)" : needs() ? "Your words" : "A few words (if you like)",
-        h("textarea", { rows: 3, "aria-label": "Your words", value: st.comment, "data-k": "share:" + m.id,
-          placeholder: needs() ? "Why you bring it here" : "",
-          oninput: (e) => { st.comment = e.target.value; S.drafts["share:" + m.id] = e.target.value; } })),
-      shareCard({ share: { of: o.target, group: o.target_group }, date: null }, false),
-      st.err ? h("p", { class: "error", text: st.err }) : null),
-    h("div", { class: "df btns" },
-      h("button", { class: "btn", onclick: closeDialog }, "Cancel"),
-      h("button", { class: "btn primary", disabled: st.busy, onclick: async () => {
-        const body = { id: m.id, comment: st.comment.trim() };
-        if (mode === "send") {
-          if (!st.to) { st.err = "Choose a contact or give their key."; render(); return; }
-          body.to = st.to;
-        } else {
-          if (needs() && !body.comment) { st.err = "Write a few words: why you bring it here."; render(); return; }
-          const p = place();
-          if (p && !p.own_feed) body.into = p.group;
-          if (p && p.own_feed && p.reason) { closeDialog(); openMyFeed(); return; }
-        }
-        st.busy = true; st.err = ""; render(); shareWarnOnce();
-        try { await api("POST", `/api/groups/${encodeURIComponent(m.group)}/share`, body); }
-        catch (x) { st.busy = false; st.err = x.message; render(); return; }
-        delete S.drafts["share:" + m.id];
-        closeDialog();
-        toast(mode === "send" ? "Sent." : body.into ? "Shared into " + (place() ? place().label : "the group") + "." : "Shared in your feed.");
-      } }, st.busy ? "Sending …" : mode === "send" ? "Send" : "Share")));
-  S.dialog = { focus: ".dialog textarea", render: draw };
+      places.length ? shareChooser({ id: "sinto", label: "Into", placeholder: "Find a group", rows: rows(), q: st.q,
+        chosen: st.into, onQuery: (v) => { st.q = v; render(); }, onChoose: go,
+        empty: "No group you follow matches." })
+        : h("p", { class: "hint", text: "None of the groups you follow takes shares." })),
+    h("div", { class: "df" }, h("span", { text: "At most three groups besides your feed · each share is its own post there" }))) };
   render();
+}
+
+// The compose window for a share in a group (your feed or another): a post of your own,
+// the shared post as a card under it; no subject needed - the core makes one.
+async function openShareCompose(share, gid, title) {
+  let g;
+  try { g = fromGroup((await api("GET", "/api/groups/" + encodeURIComponent(gid) + "?limit=1")).group); }
+  catch (x) { toast(x.message); return; }
+  const sig = await signatureText();
+  openComposeWindow({ g, title, subject: "", cursor: 0, newThread: true, share,
+    body: "\n\n" + (sig ? "-- \n" + sig + "\n" : ""),
+    send: (subject, text, notify, files, tags, languages, days, card) => {
+      shareWarnOnce();
+      return doPost(gid, { subject, body: text, signature: false, notify, share: { group: share.group, id: share.id },
+        ...(files && files.length ? { files } : {}), ...(tags && tags.length ? { tags } : {}),
+        ...(languages !== undefined ? { languages } : {}), ...(days !== undefined ? { comment_days: days } : {}),
+        ...(card ? { card } : {}) }, { text });
+    } });
+}
+
+// The shared post in a compose window: drawn again until it is fetched.
+function shareSlot(share) {
+  const slot = h("div", { class: "share-slot" });
+  const fill = () => {
+    if (!slot.isConnected && slot.dataset.drawn) return;          // the window is closed
+    slot.dataset.drawn = "1";
+    const t = sharedOriginal(share.of, share.ofGroup);
+    slot.replaceChildren(shareCard({ share: { of: share.of, group: share.ofGroup }, date: null }, false) || h("span"));
+    if (t.state === "fetching") setTimeout(fill, 1000);
+  };
+  fill();
+  return slot;
 }
