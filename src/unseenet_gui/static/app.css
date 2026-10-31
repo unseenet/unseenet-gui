@@ -1396,5 +1396,13 @@ img.gemoji.big { height: 32px; width: 32px; vertical-align: middle; }
 .entry.shared .shline .shicon { font-size: 15px; }
 .entry.shared .shline .more { margin-left: auto; }
 .entry.shared .scard { margin: 4px 0; }
-.dialog .places { display: flex; flex-direction: column; gap: 6px; }
-.dialog .places .radio.off { opacity: .6; }
+/* Sharing (UN-RFC 0060): choosing where, and the shared post under your words */
+.dialog .schoose { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.dialog .schoose .side-filter { min-height: 40px; }
+.dialog .schoose .side-filter input { font-size: 14px; }
+.dialog .slist { display: flex; flex-direction: column; gap: 2px; max-height: min(320px, 45vh); overflow-y: auto;
+  border: 1px solid var(--line-2); border-radius: 10px; padding: 4px; }
+.dialog .slist .cmd { cursor: pointer; }
+.dialog .slist .cmd.off { opacity: .55; cursor: default; }
+.dialog .slist .cmd small { max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compose-win .share-slot .scard { margin: 0; }

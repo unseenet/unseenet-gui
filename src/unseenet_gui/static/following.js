@@ -512,7 +512,7 @@ function quoteSelection(k) {
 // The compose window for a post, a reply, an edit or a private message: subject, text with
 // preview, files, signature.
 function openComposeWindow({ g, title, subject, body, cursor, send, private: priv, edit, replyTo,
-                             startTags, startLanguages, newThread, startCard }) {
+                             startTags, startLanguages, newThread, startCard, share }) {
   // a preview of the first link (UN-RFC 0059): made by the core over Tor, sent with the post
   const cards = cardComposer(startCard || null, !(S.sidebar && S.sidebar.link_cards === false),
     (g && g.id) || null);
@@ -596,7 +596,9 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
     const f = dialog.node.querySelector("form");
     const s = f.subject.value.trim(), b = f.body.value.replace(/\s+$/, "");
     const own = b.split(/\n-- \n/)[0].split("\n").filter(ln => !/^>/.test(ln) && !/ wrote:$/.test(ln)).join("").trim();
-    if (!s || (!own && !dialog.files.length)) { toast("Write something of your own above the signature."); return; }
+    // a share (UN-RFC 0060): words of your own, a subject only if you like
+    if ((!s && !share) || (!own && !dialog.files.length)) {
+      toast(share && !own ? "Write a few words of your own: why you share it." : "Write something of your own above the signature."); return; }
     const files = dialog.files.map(f => ({ name: f.name, data: f.data, alt: f.alt.trim() }));
     if (files.some(f => /^image\//.test(dialog.files.find(x => x.name === f.name).type) && !f.alt) &&
         !window.confirm("A picture without a description: people who cannot see it - a terminal, a screen reader - get only its name. Post anyway?")) return;
@@ -643,7 +645,7 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
       // what a pasted or dropped file is told where none can go (gui#187)
       "data-nofiles": takes ? null : edit ? "Files cannot be added to a new version." : "This group takes no files.",
       onkeydown: (e) => { if ((e.ctrlKey || e.metaKey) && e.key === "s") go(e); else readMoreKey(e, "cbody"); } },
-      h("label", { for: "subject", text: "Subject" }),
+      h("label", { for: "subject", text: share ? "Subject (if you like)" : "Subject" }),
       h("input", { id: "subject", name: "subject", class: "in", "data-k": "csubject", autocomplete: "off", value: subject, oninput: askWho }),
       h("label", { for: "body", class: "sr", text: "Text" }),
       h("div", { class: "editor" },
@@ -661,7 +663,9 @@ function openComposeWindow({ g, title, subject, body, cursor, send, private: pri
           h("span", { class: "hint mdmark", tabindex: "0",
             title: md ? "Markdown: *emphasis*, **strong**, `code`, - lists, > quotes, :tada:" : "Plain text: sent and shown as typed",
             text: md ? "Markdown" : "Plain text" })),
-        h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true", oninput: askWho })),
+        h("textarea", { id: "body", name: "body", class: "in compose-body mono", "data-k": "cbody", value: body, spellcheck: "true",
+          placeholder: share ? "Why you share it" : null, oninput: askWho })),
+      share ? shareSlot(share) : null,                // what you share, as a card (UN-RFC 0060)
       N.may ? h("label", { class: "check" }, h("input", { type: "checkbox", checked: N.on,
         onchange: (e) => { N.on = e.target.checked; const el = dialog.node.querySelector("#notify-who"); if (el) el.textContent = whoText(); } }),
         " Tell the people you mention (a notice in their inbox)") : null,
