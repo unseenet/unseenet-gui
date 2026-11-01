@@ -7,6 +7,9 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+- The docs name the starter groups as unseenet 0.6.9 has them: `test.unseenet`,
+  `demo.unseenet.site` and `demo.unseenet.feed` (unseenet#821).
+
 ## [0.5.1] - 2026-10-31
 
 Needs unseenet 0.6.8 (`unseenet>=0.6.8,<0.7`), whose posts take `share`.

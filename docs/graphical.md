@@ -79,9 +79,9 @@ and a vault. Do not run both on the same vault at the same time.
    backups. Choose *Another node* for an address you were given.
 
 You start in the project's groups - `unseenet`, `unseenet.announce`,
-`unseenet.help`, `unseenet.chat` and `unseenet.test`, and the demo site and
-feed `unseenet.demo.site` and `unseenet.demo.feed` - so there is something to
-read. The
+`unseenet.help`, `unseenet.chat` and `test.unseenet`, and the demo site and
+feed `demo.unseenet.site` and `demo.unseenet.feed` - so there is something to
+read (before unseenet 0.6.9: `unseenet.test` and `unseenet.demo.*`). The
 first connection takes 10-30 seconds while Tor builds its circuits. Your
 first post waits a few minutes more, once, while your new key
 [ripens](https://unseenet.org/spec/un-rfc-0025/); the client shows how far it is. Stuck? Ask in
