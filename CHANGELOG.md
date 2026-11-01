@@ -10,6 +10,14 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 - The docs name the starter groups as unseenet 0.6.9 has them: `test.unseenet`,
   `demo.unseenet.site` and `demo.unseenet.feed` (unseenet#821).
 
+### Added
+
+- **Public name claims** (#290, UN-RFC 0054 section 8): where the registrar is a
+  council, claims are public and go out in two steps. The Names dialog says so before a claim,
+  renewal, transfer or release is sent, and shows each public claim's state - waiting
+  for its hour, sent, answered (issued, refused with the reason, released) or lapsed,
+  to claim again.
+
 ## [0.5.1] - 2026-10-31
 
 Needs unseenet 0.6.8 (`unseenet>=0.6.8,<0.7`), whose posts take `share`.

@@ -8881,12 +8881,70 @@
   "waiting": []
  },
  "GET /api/names": {
+  "commits": [
+   {
+    "action": "claim",
+    "claim": {},
+    "commit": "<c1@unseenet>",
+    "date": "2026-10-20T10:00:00Z",
+    "group": "unseenet.names.claims@abcdefghijklmnop",
+    "name": "oldname",
+    "sent": "2026-10-20T10:01:00Z",
+    "state": "lapsed"
+   },
+   {
+    "action": "claim",
+    "answer": {
+     "date": "2026-10-30T11:00:00Z",
+     "from": "ed25519:x",
+     "outcome": "refused",
+     "text": "andlo is held by another key"
+    },
+    "claim": {},
+    "commit": "<c1@unseenet>",
+    "date": "2026-11-01T18:10:00Z",
+    "group": "unseenet.names.claims@abcdefghijklmnop",
+    "name": "andlo",
+    "revealed": "2026-10-30T09:00:00Z",
+    "sent": "2026-11-01T18:12:31Z",
+    "state": "answered"
+   },
+   {
+    "action": "claim",
+    "claim": {},
+    "commit": "<c1@unseenet>",
+    "date": "2026-11-01T18:10:00Z",
+    "group": "unseenet.names.claims@abcdefghijklmnop",
+    "name": "sonia",
+    "revealed": "2026-11-01T17:30:00Z",
+    "sent": "2026-11-01T18:12:31Z",
+    "state": "revealed"
+   },
+   {
+    "action": "claim",
+    "claim": {},
+    "commit": "<c1@unseenet>",
+    "date": "2026-11-01T18:10:00Z",
+    "group": "unseenet.names.claims@abcdefghijklmnop",
+    "name": "lorensen",
+    "sent": "2026-11-01T18:12:31Z",
+    "state": "waiting"
+   }
+  ],
   "dns_value": "unseenet-key=ed25519:e2xvaeiszutn2p6ms43qdhk5cokcifxben7bkzfykkoadqcmw5vq",
   "given": [],
   "key": "ed25519:e2xvaeiszutn2p6ms43qdhk5cokcifxben7bkzfykkoadqcmw5vq",
   "mine": [],
   "parents": [],
-  "pending": [],
+  "pending": [
+   {
+    "action": "claim",
+    "name": "lorensen",
+    "sent": "2026-11-01T18:12:31Z"
+   }
+  ],
+  "public_claims": true,
+  "public_notice": "Claims are public: anybody can see which key claimed which name, also when the claim is refused or never completed (UN-RFC 0054 section 8).",
   "requests": []
  },
  "GET /api/nodes": {
