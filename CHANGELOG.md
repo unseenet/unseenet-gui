@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+### Changed
+
+- Runs on core 0.7 (`unseenet>=0.7,<0.8`): announced nodes, councils and servers that update themselves.
+
 - The docs name the starter groups as unseenet 0.6.9 has them: `test.unseenet`,
   `demo.unseenet.site` and `demo.unseenet.feed` (unseenet#821).
 
