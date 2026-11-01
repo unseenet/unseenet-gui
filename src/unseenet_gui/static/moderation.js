@@ -321,13 +321,28 @@ function openModeration() {
   render();
 }
 
+// A public claim's state in words (UN-RFC 0054 section 8; core naming.commit_state).
+function claimState(c, when) {
+  if (c.state === "waiting") return `- promise sent ${when(c.sent)}; the claim goes out by itself once it is an hour old, while Unseenet is open`;
+  if (c.state === "revealed") return `- sent ${when(c.revealed)}; the registrar decides, usually within a few hours`;
+  if (c.state === "lapsed") return "- not sent within seven days, so it no longer counts: claim again";
+  const a = c.answer || {};
+  if (a.outcome === "issued") return `- issued ${when(a.date)}`;
+  if (a.outcome === "released") return `- released ${when(a.date)}`;
+  return `- refused${a.text ? ": " + a.text : ""}`;
+}
+
 // ---- names (UN-RFC 0019): the TUI's @ and its Ctrl+P name tools, in one dialog -------
 function openNames() {
   let data = null, err = "", msg = "", claim = "", ask = "", give = "", giveTo = "", years = 1, busy = false;
   const load = () => api("GET", "/api/names").then(d => { data = d; if (S.dialog) render(); })
     .catch(e => { err = e.message; if (S.dialog) render(); });
   load();
+  // where the registrar is a council, claims are public (UN-RFC 0054 section 8): say so first
+  const publicClaim = (body) => data && data.public_claims && ["claim", "renew", "release", "transfer"].includes(body.action);
   const act = async (body, confirmText) => {
+    if (publicClaim(body)) confirmText = (confirmText ? confirmText + "\n\n" : "") + data.public_notice +
+      "\n\nIt goes out in two steps: a sealed promise now, the claim itself once that is an hour old.";
     if (confirmText && !window.confirm(confirmText)) return;
     busy = true; err = ""; render();
     try { const r = await api("POST", "/api/names", body); msg = r.text; await load(); await loadSidebar(); }
@@ -354,7 +369,12 @@ function openNames() {
           n.kind !== "sub" ? h("button", { class: "btn danger", onclick: () => act({ action: "release", name: n.name },
             `Release @${n.name}? You give it up at once; others can then claim it.`) }, "Release") : null)) :
           h("p", { class: "muted", style: "margin:0", text: "No names yet. A name like @you shows on your posts instead of your key." }),
-        data.pending.length ? data.pending.map(p => h("p", { class: "hint", style: "margin:2px 0",
+        (data.commits || []).length ? [sect("Your public claims"), data.commits.slice().reverse().map(c => h("div", { class: "cmd" },
+          h("span", { class: "nm" }, h("span", { class: "mono", text: `${c.action} @${c.name}` }),
+            h("small", { text: " " + claimState(c, when) })),
+          c.state === "lapsed" ? h("button", { class: "btn", onclick: () => act({ action: c.action, name: c.name }) }, "Claim again") : null))] : null,
+        data.pending.filter(p => !(data.commits || []).some(c => c.name === p.name && c.sent === p.sent)).length ?
+          data.pending.filter(p => !(data.commits || []).some(c => c.name === p.name && c.sent === p.sent)).map(p => h("p", { class: "hint", style: "margin:2px 0",
           text: `${p.action} ${p.name}: sent ${when(p.sent)}, waiting for ${p.action === "ask" ? "its holder" : "the registrar (about an hour)"}` })) : null,
         h("form", { class: "row", style: "gap:8px;margin-top:6px", onsubmit: (e) => { e.preventDefault();
             const name = claim.trim().replace(/^@/, "");
@@ -364,6 +384,7 @@ function openNames() {
           h("input", { id: "nclaim", class: "in", "data-k": "nclaim", value: claim, placeholder: "claim a name: lorensen, or a domain you own",
             oninput: (e) => { claim = e.target.value; }, autocomplete: "off" }),
           h("button", { class: "btn primary", type: "submit", disabled: busy }, "Claim")),
+        data.public_claims ? h("p", { class: "hint", style: "margin:2px 0 0", text: data.public_notice }) : null,
         sect("A name under someone else's"),
         h("form", { class: "row", style: "gap:8px", onsubmit: (e) => { e.preventDefault(); if (ask.trim()) act({ action: "ask", name: ask.trim() }); } },
           h("input", { class: "in", "data-k": "nask", value: ask, placeholder: "e.g. sonia@lorensen - its holder decides",
