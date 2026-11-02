@@ -364,7 +364,7 @@ function statusbar() {
     // have those, and out of the Tab order
     h("span", { class: "keys", "aria-hidden": "true" }, keyHints().map(k)),
     h("span", { class: "grow" }),
-    S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
+    S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `${S.state.update.label || "Unseenet"} ${S.state.update.version} is ready`) : null,
     S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
     // nodes not answering yet (#206, unseenet#704): the others' groups are already shown
     (S.state.slow || []).length ? h("span", { class: "slow-node", role: "status",

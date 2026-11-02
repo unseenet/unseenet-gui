@@ -6,6 +6,7 @@
     unseenet-gui --kiosk               full screen, nothing else (the bootable image)
     unseenet-gui --no-browser          only print the address
     unseenet-gui --self-test [--offline] [--node ADDRESS]
+    unseenet-gui update --product gui  update this stick or folder (the core's updater, #264)
 """
 
 from __future__ import annotations
@@ -52,6 +53,11 @@ def main(argv=None) -> None:
         from .winfix import hide_child_consoles
         hide_child_consoles()                       # no console window for Tor
     use_bundled_tor()
+    rest = sys.argv[1:] if argv is None else list(argv)
+    if rest[:1] == ["update"]:                      # the Update button runs this (unseenet#264)
+        from unseenet.update import main as update_main
+        update_main(rest[1:])
+        return
     p = argparse.ArgumentParser(prog="unseenet-gui", description="Unseenet in a window of its own.")
     p.add_argument("--vault", default=str(default_vault()), help="encrypted vault file (the same as the TUI's)")
     p.add_argument("--port", type=int, default=0, help="local port (default: a random free one)")

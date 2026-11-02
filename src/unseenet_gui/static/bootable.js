@@ -58,7 +58,7 @@ function openUpdate() {
   };
   updateProgress = (text) => { if (busy) { msg = text; render(); } };
   S.dialog = { focus: ".dialog .btn.primary", render: () => dialogShell({ label: "Update Unseenet" },
-    h("div", { class: "dh" }, h("h2", { text: `Unseenet ${u.version}` }),
+    h("div", { class: "dh" }, h("h2", { text: `${u.label || "Unseenet"} ${u.version}` }),
       h("button", { class: "btn icon", "aria-label": "Close", onclick: closeDialog }, svg(ICON.x))),
     h("div", { class: "db" },
       h("p", { style: "margin:0" }, u.here
