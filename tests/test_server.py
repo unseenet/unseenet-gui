@@ -92,19 +92,23 @@ async def test_system_routes_only_on_the_bootable_image(client):
 
 
 def test_update_offer_only_where_it_can_update(tmp_path, monkeypatch):
-    """unseenet#264: a newer signed release is shown; the button only on a stick or folder."""
-    from unseenet import __version__
+    """unseenet#264: a newer signed build of this client is shown; the button only on a
+    stick or folder that has this client. With a core that cannot update it, nothing."""
     import unseenet.update
     from unseenet.client.session import Session
     from unseenet.core.vault import Vault
-    monkeypatch.setattr(update, "UPDATES", True)                  # off for now (unseenet#264)
+    from unseenet_gui import __version__ as gui_version
     s = Session(Vault.open(tmp_path / "v.vault", "pw", ops=1, mem=8192 * 1024),
                 status=lambda *_: None)
     u = update.Updater()
     assert u.info(s) is None
-    channel = "dev" if ".dev" in __version__ else "stable"
-    s.data["releases"] = {channel: {"version": "99.0"}}
+    channel = "dev" if ".dev" in gui_version else "stable"
+    s.data["releases"] = {channel: {"version": "99.0", "gui": "99.0"}}
     monkeypatch.setattr(unseenet.update, "find_stick", lambda: None)
-    assert u.info(s) == {"version": "99.0", "channel": channel, "here": False}
+    if not update.supported():                              # a core before 0.8
+        assert u.info(s) is None
+        return
+    assert u.info(s) == {"version": "99.0", "channel": channel, "label": "Unseenet graphical",
+                         "here": False}
     u._stick = tmp_path
     assert u.info(s)["here"] is True

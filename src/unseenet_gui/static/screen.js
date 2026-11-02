@@ -259,7 +259,7 @@ function youView() {
           h("span", { text: S.state.connected ? (S.state.status || "Connected") : (S.state.status || "Not connected") })),
         (S.state.slow || []).length ? h("div", { class: "slow-node", text: S.state.slow.map(nodeLabel).join(", ") +
           (S.state.slow.length === 1 ? " is" : " are") + " not answering yet" }) : null,
-        S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `Unseenet ${S.state.update.version} is ready`) : null,
+        S.state.update ? h("button", { class: "link update", onclick: openUpdate }, `${S.state.update.label || "Unseenet"} ${S.state.update.version} is ready`) : null,
         S.state.bootable ? h("button", { class: "link", onclick: openNetwork }, "Network") : null,
         h("div", { class: "muted", text: "pre-alpha" })),
       h("div", { class: "nav" },

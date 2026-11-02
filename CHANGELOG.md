@@ -7,6 +7,15 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+### Added
+
+- **The Update button is on** (unseenet/unseenet#264). With a core that knows two products in a
+  folder (unseenet 0.8), the status bar says *Unseenet graphical X is ready* when a signed build
+  of this client is newer than this one, and on a stick or portable folder with it, *Update now*
+  replaces its program files over Tor, keeping `data/` and the terminal client's files.
+  `unseenet-gui update` runs the core's updater (the portable build has no other Python to run
+  it with). With an older core nothing is offered, as before.
+
 ## [0.6.0] - 2026-11-02
 
 Public name claims, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
