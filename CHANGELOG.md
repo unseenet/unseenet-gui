@@ -7,6 +7,10 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-02
+
+Public name claims, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
+
 ### Changed
 
 - Runs on core 0.7 (`unseenet>=0.7,<0.8`): announced nodes, councils and servers that update themselves.
@@ -792,7 +796,8 @@ the background first. Pre-alpha: not security reviewed.
   list (UN-RFC 0043 section 5.1).
 - Renamed from unseenet-web to unseenet-gui.
 
-[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/unseenet/unseenet-gui/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/unseenet/unseenet-gui/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/unseenet/unseenet-gui/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/unseenet/unseenet-gui/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/unseenet/unseenet-gui/compare/v0.4.0...v0.4.1
