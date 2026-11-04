@@ -82,6 +82,8 @@ class LocalAPI:
             data = {"bootable": False, "web": False}
         elif path == "/api/settings":
             data = {"signature_preview": "Test signature", "notices": {"send": True}}
+        elif path == "/api/teams":                 # no team inboxes (gui#299)
+            data = {"teams": []}
         elif path == "/api/settings/clients/gui":
             data = {"client": "gui", "settings": {}}
         elif path == "/api/notifications":          # #126: nothing new to tell

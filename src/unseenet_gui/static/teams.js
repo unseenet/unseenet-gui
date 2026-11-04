@@ -76,3 +76,105 @@ async function openTeamReaders(g) {
       } }, "Add reader"))) };
   render();
 }
+
+// --- Operator boxes (UN-RFC 0065, gui#299) ---------------------------------------------
+// An operator box is a team inbox your servers write to: what happened, what waits for
+// you, answers to your commands. GET /api/teams lists its servers; the sidebar shows it
+// as "My servers" with your private things, not in the group tree. A new message is for
+// one server, chosen by name - the core puts "name:" first and seals it into the box, as
+// `unseenet operator say` does. Answers to a server's message go to that server already.
+
+// Mark the boxes among the groups and keep them, with their servers, in sb.operator.
+// The groups stay in sb.hierarchies (reactions and the reader look them up there); the
+// tree leaves them out (treeHierarchies).
+function markOperatorBoxes(sb, teams) {
+  const boxes = (teams || []).filter(t => Array.isArray(t.servers) && t.reader !== false);
+  const ids = new Set(boxes.map(b => b.group));
+  const groups = sb.hierarchies.flatMap(hr => hr.groups);
+  groups.forEach(g => { if (ids.has(g.id)) g.operator = true; });
+  sb.operator = boxes.map(b => ({ id: b.group, name: b.name || "",
+    servers: b.servers.filter(s => s && s.key),
+    unread: (groups.find(g => g.id === b.group) || {}).unread || 0 }));
+}
+
+// The operator box with this id, or null: a team inbox your servers write to.
+function operatorBox(gid) {
+  return ((S.sidebar && S.sidebar.operator) || []).find(b => b.id === gid) || null;
+}
+
+// "My servers" - with the box's own name only when you read more than one.
+function boxLabel(b) {
+  const many = ((S.sidebar && S.sidebar.operator) || []).length > 1;
+  return many && b.name ? "My servers · " + b.name : "My servers";
+}
+
+// The hierarchies as the group tree draws them: without the operator boxes, and without a
+// hierarchy that held nothing else.
+function treeHierarchies(sb) {
+  return sb.hierarchies.map(hr => {
+    const gs = hr.groups.filter(g => !g.operator);
+    return gs.length === hr.groups.length ? hr : gs.length ? { ...hr, groups: gs } : null;
+  }).filter(Boolean);
+}
+
+// The box's rows in the private part of the sidebar.
+function operatorItems(sb, row) {
+  return (sb.operator || []).map(b => row(b.id, ICON.server, boxLabel(b), b.unread,
+    "What your servers tell you, and your commands to them"));
+}
+
+// The head's line under "My servers": who is in it.
+function boxServersLine(b) {
+  const named = b.servers.filter(s => s.name).map(s => s.name);
+  const waiting = b.servers.length - named.length;
+  if (!b.servers.length) return "No server writes here yet.";
+  return "Servers: " + named.join(", ") + (waiting ? (named.length ? ", " : "") +
+    `${waiting} not heard from yet` : "") + ". Everyone who reads the box sees what you write here.";
+}
+
+// N in a team inbox: in an operator box a message to one of its servers; in another team
+// inbox a private post to someone, on the inbox's behalf.
+function openTeamNew(g) {
+  const b = operatorBox(g.id);
+  if (b) { openServerMessage(b); return; }
+  if (!g.team || !g.team.reader) return;
+  openPersonPicker("post", { title: "New message as " + g.team.name, onPick: (p) => openTeamPost(g, p) });
+}
+
+// A private post to someone as the team (UN-RFC 0047): sealed to them, without your
+// signature, which would say who you are (section 8).
+function openTeamPost(g, p) {
+  openComposeWindow({ g, title: `To ${p.label}, as ${g.team.name}`, subject: "", body: "\n", cursor: 0, private: true,
+    send: (subject, text, _notify, files, _tags, _languages, _days, card) => doSend("/api/private", g.id, {
+      key: p.key, subject, body: text, as_team: g.id,
+      ...(files && files.length ? { files } : {}), ...(card ? { card } : {}) }, { text }) });
+  setTimeout(() => { const s = document.getElementById("subject"); if (s) s.focus(); });
+}
+
+// A message to one server in the box: To, the command, Send. Servers not heard from yet
+// have no name to address them by, so they cannot be chosen.
+function openServerMessage(b, key = "") {
+  const named = b.servers.filter(s => s.name);
+  if (!named.length) { toast("No server has written in this box yet, so none can be addressed by name."); return; }
+  const first = named.find(s => s.key === key) || named[0];
+  formDialog({ label: "New message", title: "New message to a server", focus: "#otext", button: "Send",
+    values: { to: first.key, text: "" },
+    note: "A command, e.g. status or help. It goes into the box: everyone who reads it sees the message and the answer.",
+    fields: (v) => [
+      h("label", { for: "oto", text: "To" }),
+      h("select", { id: "oto", name: "to", class: "in", "data-k": "op-to" }, b.servers.map(s => h("option", {
+        value: s.key, disabled: !s.name, selected: s.key === v.to,
+        text: s.name || "(not heard from yet) " + s.key.slice(0, 20) + "…" }))),
+      h("label", { for: "otext", text: "Message" }),
+      h("input", { id: "otext", name: "text", class: "in mono", "data-k": "op-text", autocomplete: "off",
+        placeholder: "status", value: v.text || "" })],
+    submit: async (v) => {
+      const text = (v.text || "").trim();
+      if (!text) throw new Error("Write a command, e.g. status.");
+      const s = b.servers.find(x => x.key === v.to && x.name);
+      if (!s) throw new Error("Choose a server.");
+      closeDialog();
+      await doSend("/api/private", b.id, { key: s.key, body: text, chat: true, as_team: b.id }, { text });
+      toast("Sent to " + s.name + ". Its answer comes in the box.");
+    } });
+}

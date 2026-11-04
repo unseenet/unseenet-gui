@@ -360,7 +360,9 @@ async function signatureText() {
 function subjectOf(m) {
   if (m.reported) return "⊘ " + reportedText(m);      // never the spam's own subject (0045)
   if (m.kind === "chat") {
-    const first = ((m.text || "").trim().split("\n")[0] || "…");
+    // a Markdown line by its words, not its marks: "replica1 - answer …", never "**replica1**" (gui#299)
+    const text = m.markdown && (m.tree || []).length ? inlineTextDeep(m.tree) : (m.text || "");
+    const first = (text.trim().split("\n")[0] || "…");
     return "» " + (first.length > 60 ? first.slice(0, 60) + "…" : first);
   }
   return m.subject || "(no subject)";

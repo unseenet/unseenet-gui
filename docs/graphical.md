@@ -246,6 +246,17 @@ never with your signature. If the owner removes you, the inbox says so, with
 **Forget it**. As the owner of an inbox, **Who reads this inbox** in the
 palette adds readers by their key, removes them, and sets the name replies go
 out as.
+**New message** (N) in a team inbox writes a private post to someone on the
+inbox's behalf.
+
+**My servers.** An operator box - the team inbox your servers tell you things
+in and take commands in (UN-RFC 0065) - is shown as **My servers** with your
+private posts and chats, with the servers it holds under its name. Answer a
+server's message to answer that server. **New message** (N) starts something:
+choose the server under **To** and write the command, e.g. `status` or `help`;
+it goes into the box, so everyone who reads it sees the command and the answer.
+A server that has not written yet has no name, and cannot be chosen until it
+has.
 
 In an emergency, contact the police. Nobody on Unseenet can see who anyone is.
 

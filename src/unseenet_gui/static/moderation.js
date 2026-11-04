@@ -606,6 +606,7 @@ function openReport(m) {
 async function openCompose() {
   const g = S.data && S.data.group;
   if (g && g.type === "contact") { openPost(g.key, g.label.replace(/ √$/, "")); return; }   // N in a chat: a post
+  if (g && g.type === "inbox" && (g.team || operatorBox(g.id))) { openTeamNew(g); return; }   // gui#299
   if (!g || !g.type || g.type === "inbox") return;
   if (g.kinds && !g.kinds.includes("post")) { toast("A chat group: it takes chat lines only."); return; }
   const may = mayWrite(S.data, "post");

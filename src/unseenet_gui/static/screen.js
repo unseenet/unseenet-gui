@@ -14,8 +14,10 @@ function allGroups() {
 // Read the sidebar again from the core: groups, people, For you and your settings.
 async function loadSidebar() {
   try {
-    const [d, st] = await Promise.all([api("GET", "/api/groups"), api("GET", "/api/settings")]);
+    const [d, st, tm] = await Promise.all([api("GET", "/api/groups"), api("GET", "/api/settings"),
+      api("GET", "/api/teams").catch(() => ({ teams: [] }))]);       // operator boxes (gui#299)
     S.sidebar = fromSidebar(d, st);
+    markOperatorBoxes(S.sidebar, tm.teams);
   }
   catch (err) { S.status = err.message; }
   if (!S.gid) {
@@ -187,7 +189,7 @@ function currentTab() {
   if (S.gid === TIMELINE) return "timeline";
   if (S.gid === YOU) return "you";
   if (S.gid === PRIVATE || S.gid === CHATS || S.gid === CONTACTS || (sb.inbox && S.gid === sb.inbox.id) ||
-      String(S.gid).startsWith("contact:")) return "private";
+      operatorBox(S.gid) || String(S.gid).startsWith("contact:")) return "private";
   return "groups";
 }
 
@@ -204,8 +206,9 @@ function tabBar() {
   const sb = S.sidebar;
   if (!sb) return null;
   const at = currentTab();
-  const groupsUnread = allGroups().reduce((n, g) => n + (g.unread || 0), 0);
-  const chatsUnread = sb.people.reduce((n, p) => n + (p.unread || 0), 0) + ((sb.inbox && sb.inbox.unread) || 0);
+  const groupsUnread = allGroups().filter(g => !g.operator).reduce((n, g) => n + (g.unread || 0), 0);
+  const chatsUnread = sb.people.reduce((n, p) => n + (p.unread || 0), 0) + ((sb.inbox && sb.inbox.unread) || 0) +
+    (sb.operator || []).reduce((n, b) => n + (b.unread || 0), 0);
   const me = S.state.me || {};
   const tab = (key, label, icon, go, badge = null) => h("button", {
     class: "tab" + (at === key ? " on" : ""), "aria-current": at === key ? "page" : null,
@@ -328,7 +331,7 @@ function sidebar() {
     h("div", { class: "side-scroll", "data-scroll": "side" },
     filtering() ? sideResults(sb, item) : null,
     filtering() ? null : sb ? peopleFollowedNav(sb, item) : null,
-    filtering() ? null : sb ? sb.hierarchies.map(hier => hierarchyNav(hier, item)) :
+    filtering() ? null : sb ? treeHierarchies(sb).map(hier => hierarchyNav(hier, item)) :
       h("p", { class: "muted", text: "Loading your groups …" }),
     sb && !sb.hierarchies.length && !(sb.people_followed || []).length ? h("div", { class: "nav" },
       h("p", { class: "muted", style: "margin:0 10px", text: "No groups yet." }),
@@ -362,6 +365,7 @@ function privateItems(sb) {
   return [
     row(CONTACTS, ICON.people, "Your contacts", 0, "The people you gave a name - only you see the names (C)"),
     sb.inbox.id ? row(sb.inbox.id, ICON.mail, "Private posts", sb.inbox.unread, "Posts sealed to you") : null,
+    operatorItems(sb, row),                              // My servers (UN-RFC 0065, gui#299)
     h("div", { class: "chats-row" }, row(CHATS, ICON.bubble, "Private chats", unread,
       "One chat per person - only the two of you can read it")),
     under.length ? h("div", { class: "sub chats-sub" }, under.map(p => personRow(p)),

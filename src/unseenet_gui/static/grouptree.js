@@ -344,7 +344,8 @@ function keyHints() {
     if (site.may_write && site.page) out.push(["E", "edit", () => openPageEditor(g, site, site.page)]);
     if (site.may_write) out.push(["N", "new page", () => openPageEditor(g, site, null)]);
   } else {
-    if (may("post")) out.push(["N", "new post", openCompose]);
+    if (operatorBox(g.id) || (g.team && g.team.reader)) out.push(["N", "new message", openCompose]);   // gui#299
+    else if (may("post")) out.push(["N", "new post", openCompose]);
     if (cur && !cur.notice) out.push(["R", "reply", () => tryReply(cur, g)]);
     out.push(["↑↓", "posts", () => step(1)], ["Space", "next unread", nextUnread]);
     if (cur) out.push(["Enter", "read", () => { S.full = true; render(); }]);
@@ -398,12 +399,13 @@ function mainArea() {
     groupTagChips(g),                                   // the group's tags, once (UN-RFC 0052 5)
   ];
   const canSwitch = g.type && g.type !== "inbox" && g.type !== "contact";
+  const box = operatorBox(g.id);                       // an operator box: My servers (gui#299)
   const head = h("header", { class: "ghead" },
     S.mobileReading ? h("button", { class: "btn icon back", "aria-label": "Back to threads", onclick: () => { S.mobileReading = false; render(); } }, svg(ICON.back)) :
       h("button", { class: "btn icon back-groups", "aria-label": "Back to your groups", onclick: () => { S.pane = "groups"; render(); } }, svg(ICON.back)),
     h("div", { class: "t" },
-      h("div", { class: "row" }, h("h1", { text: g.label }), chips),
-      g.title ? h("p", { text: g.title }) : null,
+      h("div", { class: "row" }, h("h1", { text: box ? boxLabel(box) : g.label }), chips),
+      box ? h("p", { class: "box-servers", text: boxServersLine(box) }) : g.title ? h("p", { text: g.title }) : null,
       g.files && g.node_files === false ? h("p", { class: "hint warn-line",
         text: "This group takes pictures and files, but your node does not carry them - they will not show here. Another node may." }) : null,
       // read without following (unseenet#506): say so, and offer to follow here
@@ -425,6 +427,11 @@ function mainArea() {
       S.sidebar && g.id === S.sidebar.inbox.id ? [
         h("button", { class: "btn primary fab", "aria-label": "Write a private post", onclick: () => openWrite("", "post") },
           svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "Write a private post" }), h("kbd", { text: "M" }))] : null,
+      // a team inbox you read (gui#299): a message to one of its servers, or to someone as the team
+      g.type === "inbox" && (box || (g.team && g.team.reader)) ? h("button", { class: "btn primary newpost fab",
+        "aria-label": "New message", "data-k": "team-new", onclick: () => openTeamNew(g),
+        title: box ? "A command for one of your servers, e.g. status" : "A private post to someone, as " + g.team.name },
+        svg(ICON.plus, 16, 2.5), h("span", { class: "lbl", text: "New message" }), h("kbd", { text: "N" })) : null,
       g.owner && g.type === "closed" ? h("button", { class: "btn", onclick: () => openInvite() }, "Invite") : null,
       canSwitch ? h("button", { class: "btn", onclick: toggleView },
         "Show as " + nextView(g), h("kbd", { text: "V" })) : null,

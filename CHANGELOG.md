@@ -16,6 +16,21 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
   `unseenet-gui update` runs the core's updater (the portable build has no other Python to run
   it with). With an older core nothing is offered, as before.
 
+- **My servers: your operator box** (#299, UN-RFC 0065, unseenet/unseenet#939). An operator box
+  your servers write to is shown as *My servers* with your private things, not in the group
+  tree, with the servers it holds under its name. **New message** (or N) writes to one of them:
+  *To* lists the servers by name, and the core puts the name first and seals it into the box, as
+  `unseenet operator say` does. Servers that have not written yet have no name and cannot be
+  chosen. In another team inbox you read, **New message** writes a private post to someone on
+  the inbox's behalf, without your signature. On a phone the box counts under *Private*.
+  Needs a core whose `GET /api/teams` gives `servers` (unseenet 0.8); with an older core the box
+  stays in the tree, as before.
+
+### Fixed
+
+- A Markdown chat line's title in a list shows its words, not its marks: `replica1 - answer …`,
+  never `**replica1** - answer …` (#299).
+
 ## [0.6.0] - 2026-11-02
 
 Public name claims, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
