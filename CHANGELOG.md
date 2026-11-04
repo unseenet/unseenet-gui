@@ -31,6 +31,11 @@ principles as [unseenet](https://github.com/unseenet/unseenet/blob/main/docs/dev
 - A Markdown chat line's title in a list shows its words, not its marks: `replica1 - answer …`,
   never `**replica1** - answer …` (#299).
 
+- A box called *My servers* is shown as that, not *My servers · My servers*; with more than one
+  box the others have their names after it. Each box in the sidebar has its ⋯ again (a right
+  click opens it too): *Mark all read*, *Copy address* and **Stop reading this box**, which
+  takes its team key from your vault (#299).
+
 ## [0.6.0] - 2026-11-02
 
 Public name claims, on core 0.7. Needs unseenet 0.7 (`unseenet>=0.7,<0.8`): update the nodes first.
