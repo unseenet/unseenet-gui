@@ -42,9 +42,12 @@ def row(mid, group, text, who="replica1", key=R1, kind="chat", markdown=False, s
             "depth": 0, "address": "", "message": msg, "tree": markup.body(text, ctype, kind)}
 
 
+OLD = "operator.replica1@me"
+
+
 class BoxAPI:
-    def __init__(self):
-        self.requests = []
+    def __init__(self, old_box=False):
+        self.requests, self.old_box = [], old_box
 
     def groups(self):
         box = {"id": BOX, "label": "operator", "shown": "operator", "type": "inbox", "view": "threads",
@@ -57,7 +60,9 @@ class BoxAPI:
                  "unread": 1, "kinds": ["post"], "may_post": True}
         mine = {"id": INBOX, "label": "Private posts", "type": "inbox", "view": "threads", "hierarchy": "inbox",
                 "unread": 0, "kinds": ["post"], "owner": True}
-        return [box, team, other, mine]
+        old = {"id": OLD, "label": "operator.replica1", "type": "inbox", "view": "threads", "hierarchy": "operator",
+               "unread": 0, "kinds": ["post"], "owner": False, "team": {"name": "replica1", "reader": True}}
+        return [box, team, other, mine] + ([old] if self.old_box else [])
 
     def rows(self, gid):
         if gid == BOX:
@@ -91,8 +96,12 @@ class BoxAPI:
         elif path == "/api/groups":
             data = {"groups": self.groups(), "people": [], "inbox": {"id": INBOX},
                     "hierarchies": [{"name": n, "tree": None} for n in ("dk", "operator", "support", "inbox")]}
+        elif path == "/api/teams/forget":
+            self.old_box = False
+            data = {"teams": []}
         elif path == "/api/teams":
-            data = {"teams": [
+            data = {"teams": ([{"group": OLD, "name": "replica1", "reader": True,
+                                "servers": [{"name": "replica1", "key": R1}]}] if self.old_box else []) + [
                 {"group": BOX, "name": "My servers", "reader": True,
                  "servers": [{"name": "replica1", "key": R1}, {"name": "replica2", "key": R2},
                              {"name": "", "key": R3}]},
@@ -110,8 +119,8 @@ class BoxAPI:
 
 
 @pytest.fixture
-async def box_page():
-    api = BoxAPI()
+async def box_page(request):
+    api = BoxAPI(**getattr(request, "param", {}))
     app = web.Application()
 
     async def index(_request):
@@ -231,3 +240,22 @@ async def test_a_new_message_as_the_team(box_page):
     [body] = sent(api)
     assert body["as_team"] == TEAM and body["key"] == "ed25519:abcdefghijklmnopqrstuvwxyz"
     assert body["subject"] == "Din node" and body["kind"] == "post"
+
+
+@pytest.mark.parametrize("box_page", [{"old_box": True}], indirect=True)
+async def test_two_boxes_by_name_and_stop_reading_one(box_page):
+    """A box called My servers is that, never "My servers · My servers"; another box has
+    its name after it, and its ⋯ stops reading it."""
+    page, api = box_page
+    items = page.locator(".side .private-item")
+    await expect(items.filter(has_text="My servers")).to_have_count(2)
+    await expect(page.locator(".side .private-item", has_text="My servers · My servers")).to_have_count(0)
+    await expect(items.filter(has_text="My servers · replica1")).to_have_count(1)
+    row = page.locator(".side .box-row", has_text="My servers · replica1")
+    await row.hover()
+    await row.locator(".morebtn").click()
+    await page.get_by_role("menuitem", name="Stop reading this box").click()
+    await page.wait_for_timeout(300)
+    assert ("/api/teams/forget", {"group": OLD}) in api.requests
+    await expect(items.filter(has_text="My servers")).to_have_count(1)
+    await expect(items.filter(has_text="replica1")).to_have_count(0)

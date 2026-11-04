@@ -88,9 +88,10 @@ async function openTeamReaders(g) {
 // The groups stay in sb.hierarchies (reactions and the reader look them up there); the
 // tree leaves them out (treeHierarchies).
 function markOperatorBoxes(sb, teams) {
-  const boxes = (teams || []).filter(t => Array.isArray(t.servers) && t.reader !== false);
-  const ids = new Set(boxes.map(b => b.group));
   const groups = sb.hierarchies.flatMap(hr => hr.groups);
+  const followed = new Set(groups.map(g => g.id));          // one you stopped reading is gone
+  const boxes = (teams || []).filter(t => Array.isArray(t.servers) && t.reader !== false && followed.has(t.group));
+  const ids = new Set(boxes.map(b => b.group));
   groups.forEach(g => { if (ids.has(g.id)) g.operator = true; });
   sb.operator = boxes.map(b => ({ id: b.group, name: b.name || "",
     servers: b.servers.filter(s => s && s.key),
@@ -102,10 +103,12 @@ function operatorBox(gid) {
   return ((S.sidebar && S.sidebar.operator) || []).find(b => b.id === gid) || null;
 }
 
-// "My servers" - with the box's own name only when you read more than one.
+// "My servers" - with the box's own name only when you read more than one, and never
+// "My servers · My servers" for a box that is called that itself.
 function boxLabel(b) {
   const many = ((S.sidebar && S.sidebar.operator) || []).length > 1;
-  return many && b.name ? "My servers · " + b.name : "My servers";
+  const own = (b.name || "").trim();
+  return many && own && own.toLowerCase() !== "my servers" ? "My servers · " + own : "My servers";
 }
 
 // The hierarchies as the group tree draws them: without the operator boxes, and without a
@@ -117,10 +120,29 @@ function treeHierarchies(sb) {
   }).filter(Boolean);
 }
 
-// The box's rows in the private part of the sidebar.
+// The box's rows in the private part of the sidebar, each with its ⋯ (a right click
+// opens it too), as a group in the tree has.
 function operatorItems(sb, row) {
-  return (sb.operator || []).map(b => row(b.id, ICON.server, boxLabel(b), b.unread,
-    "What your servers tell you, and your commands to them"));
+  return (sb.operator || []).map(b => {
+    const id = "box:" + b.id, g = allGroups().find(x => x.id === b.id) || { id: b.id, label: boxLabel(b) };
+    return h("div", { class: "grouprow box-row", oncontextmenu: (e) => { e.preventDefault(); S.menuFor = id; render(); } },
+      row(b.id, ICON.server, boxLabel(b), b.unread, "What your servers tell you, and your commands to them"),
+      sideMenu(id, "More for " + boxLabel(b), [[null, [
+        b.unread ? ["Mark all read", () => markAllRead([g])] : null,
+        ["Copy address", () => copyGroupAddress(g)],
+        ["Stop reading this box", () => stopReadingBox(b)]]]]));
+  });
+}
+
+// Stop reading an operator box: its team key goes from your vault, and it from your
+// sidebar (POST /api/teams/forget). Its owner can add you again.
+async function stopReadingBox(b) {
+  if (!window.confirm(`Stop reading ${boxLabel(b)}? Its team key goes from your vault: you no longer see what ` +
+      "its servers write, and cannot write to them. The box's owner can add you again.")) return;
+  try { await api("POST", "/api/teams/forget", { group: b.id }); } catch (x) { toast(x.message); return; }
+  if (S.gid === b.id) { S.gid = null; S.data = null; }   // the first group comes instead
+  await loadSidebar();
+  toast("You no longer read " + boxLabel(b) + ".");
 }
 
 // The head's line under "My servers": who is in it.
