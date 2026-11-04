@@ -140,6 +140,7 @@ async def box_page():
 async def open_box(page):
     await page.locator(".side .private-item", has_text="My servers").click()
     await page.wait_for_load_state("networkidle")
+    await expect(page.locator(".ghead h1")).to_have_text("My servers")    # shown, not only asked for
 
 
 def sent(api):
@@ -182,7 +183,7 @@ async def test_a_new_message_to_one_server(box_page):
 async def test_n_opens_it_and_an_empty_message_is_not_sent(box_page):
     page, api = box_page
     await open_box(page)
-    await page.locator("body").press("n")
+    await page.keyboard.press("n")
     dlg = page.locator(".dialog")
     await expect(dlg.locator("h2")).to_have_text("New message to a server")
     await dlg.get_by_role("button", name="Send").click()
