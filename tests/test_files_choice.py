@@ -61,6 +61,8 @@ class LocalAPI:
             data = {"languages": [{"code": "da", "name": "Dansk", "english": "Danish", "recognised": True}]}
         elif path == "/api/settings":
             data = {"signature_preview": "", "notices": {"send": True}}
+        elif path == "/api/teams":                 # no team inboxes (gui#299)
+            data = {"teams": []}
         elif path == "/api/settings/clients/gui":
             data = {"client": "gui", "settings": {}}
         elif path == "/api/groups" and request.method == "POST":
